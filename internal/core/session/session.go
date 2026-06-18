@@ -15,6 +15,8 @@ const (
 	StateProcessing       State = "Processing"
 	StatePaused           State = "Paused"
 	StateAwaitingApproval State = "AwaitingApproval"
+	StateCompleted        State = "Completed"
+	StateArchived         State = "Archived"
 )
 
 type Role string
@@ -55,12 +57,19 @@ type Session struct {
 	TrustLevel             string            `json:"trust_level"`
 	ApprovalPolicy         map[string]string `json:"approval_policy,omitempty"`
 	ApprovalTimeoutSeconds int               `json:"approval_timeout_seconds"`
+	CancelRequested        bool              `json:"cancel_requested"`
+	PauseRequested         bool              `json:"pause_requested"`
 }
 
 var (
-	ErrSessionNotFound = errors.New("session not found")
-	ErrSessionNotIdle  = errors.New("session is not idle")
-	ErrSessionConflict = errors.New("session id already exists")
+	ErrSessionNotFound       = errors.New("session not found")
+	ErrSessionNotIdle        = errors.New("session is not idle")
+	ErrSessionConflict       = errors.New("session id already exists")
+	ErrSessionArchived       = errors.New("session is archived")
+	ErrSessionNotPaused      = errors.New("session is not paused")
+	ErrSessionNotCompleted   = errors.New("session is not completed")
+	ErrSessionNotProcessing  = errors.New("session is not processing")
+	ErrSessionNotCancellable = errors.New("session is not in a cancellable state")
 )
 
 type SessionStore interface {

@@ -36,6 +36,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sessions/{id}/approve/{approval_id}", h.Approve)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/trust", h.SetTrustLevel)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/approval-policy", h.SetApprovalPolicy)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/cancel", h.Cancel)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/pause", h.Pause)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/resume", h.Resume)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/complete", h.Complete)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/archive", h.Archive)
 }
 
 type createSessionRequest struct {
@@ -242,6 +247,10 @@ func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "session not found")
 			return
 		}
+		if errors.Is(err, session.ErrSessionArchived) {
+			writeError(w, http.StatusConflict, "session is archived")
+			return
+		}
 		if errors.Is(err, session.ErrSessionNotIdle) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -334,7 +343,20 @@ func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to increment connections")
 		return
 	}
-	defer h.store.DecrementSSEConnections(id)
+	defer func() {
+		h.store.DecrementSSEConnections(id)
+		sess, err := h.store.Get(id)
+		if err == nil && sess.State == session.StateProcessing && sess.ActiveSSEConnections <= 0 {
+			eventBus.Publish("session_state_change", map[string]any{
+				"old_state": string(session.StateProcessing),
+				"new_state": string(session.StatePaused),
+				"reason":    "sse_disconnected",
+			})
+			sess.State = session.StatePaused
+			sess.LastActiveAt = time.Now()
+			h.store.Update(sess)
+		}
+	}()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -654,4 +676,79 @@ func (h *Handler) SetApprovalPolicy(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"approval_policy": sess.ApprovalPolicy,
 	})
+}
+
+func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	if err := h.loop.Cancel(id); err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"state": string(session.StateIdle)})
+}
+
+func (h *Handler) Pause(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	if err := h.loop.Pause(id); err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"state": string(session.StatePaused)})
+}
+
+func (h *Handler) Resume(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	if err := h.loop.Resume(id); err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"state": string(session.StateProcessing)})
+}
+
+func (h *Handler) Complete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	if err := h.loop.Complete(id); err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"state": string(session.StateCompleted)})
+}
+
+func (h *Handler) Archive(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	if err := h.loop.Archive(id); err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"state": string(session.StateArchived)})
 }

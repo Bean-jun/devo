@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os/exec"
+	"runtime"
 	"sync"
 	"time"
 
@@ -64,14 +66,26 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		return fmt.Errorf("get session: %w", err)
 	}
 
-	if sess.State != session.StateIdle {
+	if sess.State == session.StateArchived {
+		return fmt.Errorf("%w: session is archived", session.ErrSessionArchived)
+	}
+
+	if sess.State == session.StateProcessing || sess.State == session.StateAwaitingApproval {
 		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotIdle, sess.State)
 	}
 
-	sess.State = session.StateProcessing
-	sess.LastActiveAt = time.Now()
-	if err := l.store.Update(sess); err != nil {
-		return fmt.Errorf("update session state to processing: %w", err)
+	if sess.State == session.StatePaused {
+		sess.State = session.StateProcessing
+		sess.LastActiveAt = time.Now()
+		if err := l.store.Update(sess); err != nil {
+			return fmt.Errorf("resume session from paused: %w", err)
+		}
+	} else {
+		sess.State = session.StateProcessing
+		sess.LastActiveAt = time.Now()
+		if err := l.store.Update(sess); err != nil {
+			return fmt.Errorf("update session state to processing: %w", err)
+		}
 	}
 
 	userMsg := session.Message{
@@ -156,6 +170,224 @@ func (l *Loop) ResolveApproval(sessionID, approvalID, decision string) error {
 	return nil
 }
 
+func (l *Loop) Pause(sessionID string) error {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+
+	if sess.State != session.StateProcessing {
+		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotProcessing, sess.State)
+	}
+
+	sess.PauseRequested = true
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update pause flag: %w", err)
+	}
+
+	return nil
+}
+
+func (l *Loop) Resume(sessionID string) error {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+
+	if sess.State != session.StatePaused {
+		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotPaused, sess.State)
+	}
+
+	oldState := string(sess.State)
+	sess.State = session.StateProcessing
+	sess.LastActiveAt = time.Now()
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update session state: %w", err)
+	}
+
+	eventBus, err := l.store.GetEventBus(sessionID)
+	if err == nil {
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": oldState,
+			"new_state": string(session.StateProcessing),
+			"reason":    "resumed",
+		})
+	}
+
+	return nil
+}
+
+func (l *Loop) Cancel(sessionID string) error {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+
+	if sess.State != session.StateProcessing && sess.State != session.StateAwaitingApproval {
+		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotCancellable, sess.State)
+	}
+
+	childPID := sess.ChildPID
+
+	sess.CancelRequested = true
+	sess.PauseRequested = false
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update cancel flag: %w", err)
+	}
+
+	if childPID != nil {
+		killChildProcess(*childPID)
+		sess, err := l.store.Get(sessionID)
+		if err == nil {
+			sess.ChildPID = nil
+			l.store.Update(sess)
+		}
+	}
+
+	return nil
+}
+
+func (l *Loop) Complete(sessionID string) error {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+
+	if sess.State == session.StateArchived {
+		return fmt.Errorf("%w: session is archived", session.ErrSessionArchived)
+	}
+
+	if sess.State == session.StateProcessing || sess.State == session.StateAwaitingApproval {
+		childPID := sess.ChildPID
+		sess.CancelRequested = true
+		sess.PauseRequested = false
+		if err := l.store.Update(sess); err != nil {
+			return fmt.Errorf("update cancel flag: %w", err)
+		}
+
+		if childPID != nil {
+			killChildProcess(*childPID)
+			sess, err := l.store.Get(sessionID)
+			if err == nil {
+				sess.ChildPID = nil
+				l.store.Update(sess)
+			}
+		}
+	}
+
+	sess, err = l.store.Get(sessionID)
+	if err != nil {
+		return fmt.Errorf("get session after cancel: %w", err)
+	}
+
+	oldState := string(sess.State)
+	sess.State = session.StateCompleted
+	sess.CancelRequested = false
+	sess.PauseRequested = false
+	sess.LastActiveAt = time.Now()
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update session to completed: %w", err)
+	}
+
+	eventBus, err := l.store.GetEventBus(sessionID)
+	if err == nil {
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": oldState,
+			"new_state": string(session.StateCompleted),
+			"reason":    "completed",
+		})
+	}
+
+	return nil
+}
+
+func (l *Loop) Archive(sessionID string) error {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+
+	if sess.State != session.StateCompleted {
+		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotCompleted, sess.State)
+	}
+
+	oldState := string(sess.State)
+	sess.State = session.StateArchived
+	sess.LastActiveAt = time.Now()
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update session to archived: %w", err)
+	}
+
+	eventBus, err := l.store.GetEventBus(sessionID)
+	if err == nil {
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": oldState,
+			"new_state": string(session.StateArchived),
+			"reason":    "archived",
+		})
+	}
+
+	return nil
+}
+
+func (l *Loop) checkControlFlags(sessionID string, eventBus *session.EventBus) (shouldStop bool) {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return false
+	}
+
+	if sess.CancelRequested {
+		oldState := string(sess.State)
+		sess.State = session.StateIdle
+		sess.CancelRequested = false
+		sess.PauseRequested = false
+		sess.LastActiveAt = time.Now()
+		l.store.Update(sess)
+
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": oldState,
+			"new_state": string(session.StateIdle),
+			"reason":    "cancelled",
+		})
+		return true
+	}
+
+	if sess.PauseRequested {
+		oldState := string(sess.State)
+		sess.State = session.StatePaused
+		sess.PauseRequested = false
+		sess.CancelRequested = false
+		sess.LastActiveAt = time.Now()
+		l.store.Update(sess)
+
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": oldState,
+			"new_state": string(session.StatePaused),
+			"reason":    "paused",
+		})
+		return true
+	}
+
+	return false
+}
+
+func killChildProcess(pid int) {
+	if pid <= 0 {
+		return
+	}
+
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("taskkill", "/F", "/PID", fmt.Sprintf("%d", pid))
+	} else {
+		cmd = exec.Command("kill", "-9", fmt.Sprintf("%d", pid))
+	}
+
+	if err := cmd.Run(); err != nil {
+		log.Printf("failed to kill child process %d: %v", pid, err)
+	}
+}
+
 func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *session.EventBus) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -178,6 +410,10 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 		msgs, _, err := l.store.GetMessages(sessionID, 0, 0)
 		if err != nil {
 			l.handleLoopError(sessionID, fmt.Errorf("get messages: %w", err))
+			return
+		}
+
+		if l.checkControlFlags(sessionID, eventBus) {
 			return
 		}
 
@@ -348,6 +584,10 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 					"success":   toolResult.Success,
 					"summary":   summary,
 				})
+
+				if l.checkControlFlags(sessionID, eventBus) {
+					return
+				}
 			}
 
 			continue
@@ -469,9 +709,35 @@ func (l *Loop) handleApproval(sessionID, workingDir string, tc session.ToolCall,
 	}
 	timeoutCh := time.After(time.Duration(timeoutSeconds) * time.Second)
 
-	select {
-	case decision := <-ch:
-		if decision.Decision == "approve" {
+	cancelTicker := time.NewTicker(500 * time.Millisecond)
+	defer cancelTicker.Stop()
+
+	var result bool
+	var resultErr error
+
+loop:
+	for {
+		select {
+		case decision := <-ch:
+			if decision.Decision == "approve" {
+				sess, err := l.store.Get(sessionID)
+				if err == nil {
+					sess.State = session.StateProcessing
+					sess.LastActiveAt = time.Now()
+					l.store.Update(sess)
+				}
+
+				eventBus.Publish("session_state_change", map[string]any{
+					"old_state": string(session.StateAwaitingApproval),
+					"new_state": string(session.StateProcessing),
+					"reason":    "approval_granted",
+				})
+
+				result = true
+				resultErr = nil
+				break loop
+			}
+
 			sess, err := l.store.Get(sessionID)
 			if err == nil {
 				sess.State = session.StateProcessing
@@ -482,51 +748,68 @@ func (l *Loop) handleApproval(sessionID, workingDir string, tc session.ToolCall,
 			eventBus.Publish("session_state_change", map[string]any{
 				"old_state": string(session.StateAwaitingApproval),
 				"new_state": string(session.StateProcessing),
-				"reason":    "approval_granted",
+				"reason":    "approval_denied",
 			})
 
-			return true, nil
+			result = false
+			resultErr = nil
+			break loop
+
+		case <-cancelTicker.C:
+			sess, err := l.store.Get(sessionID)
+			if err == nil && sess.CancelRequested {
+				l.approvalManager.ResolveWithSource(req.ID, approval.StatusRejected, approval.SourceUser)
+
+				sess.State = session.StateProcessing
+				sess.LastActiveAt = time.Now()
+				l.store.Update(sess)
+
+				eventBus.Publish("approval_resolved", map[string]any{
+					"approval_id": req.ID,
+					"decision":    "reject",
+					"source":      "cancelled",
+				})
+
+				eventBus.Publish("session_state_change", map[string]any{
+					"old_state": string(session.StateAwaitingApproval),
+					"new_state": string(session.StateProcessing),
+					"reason":    "approval_cancelled",
+				})
+
+				result = false
+				resultErr = nil
+				break loop
+			}
+
+		case <-timeoutCh:
+			l.approvalManager.ResolveWithSource(req.ID, approval.StatusRejected, approval.SourceTimeout)
+
+			sess, err := l.store.Get(sessionID)
+			if err == nil {
+				sess.State = session.StateProcessing
+				sess.LastActiveAt = time.Now()
+				l.store.Update(sess)
+			}
+
+			eventBus.Publish("approval_resolved", map[string]any{
+				"approval_id": req.ID,
+				"decision":    "reject",
+				"source":      "timeout",
+			})
+
+			eventBus.Publish("session_state_change", map[string]any{
+				"old_state": string(session.StateAwaitingApproval),
+				"new_state": string(session.StateProcessing),
+				"reason":    "approval_timeout",
+			})
+
+			result = false
+			resultErr = nil
+			break loop
 		}
-
-		sess, err := l.store.Get(sessionID)
-		if err == nil {
-			sess.State = session.StateProcessing
-			sess.LastActiveAt = time.Now()
-			l.store.Update(sess)
-		}
-
-		eventBus.Publish("session_state_change", map[string]any{
-			"old_state": string(session.StateAwaitingApproval),
-			"new_state": string(session.StateProcessing),
-			"reason":    "approval_denied",
-		})
-
-		return false, nil
-
-	case <-timeoutCh:
-		l.approvalManager.ResolveWithSource(req.ID, approval.StatusRejected, approval.SourceTimeout)
-
-		sess, err := l.store.Get(sessionID)
-		if err == nil {
-			sess.State = session.StateProcessing
-			sess.LastActiveAt = time.Now()
-			l.store.Update(sess)
-		}
-
-		eventBus.Publish("approval_resolved", map[string]any{
-			"approval_id": req.ID,
-			"decision":    "reject",
-			"source":      "timeout",
-		})
-
-		eventBus.Publish("session_state_change", map[string]any{
-			"old_state": string(session.StateAwaitingApproval),
-			"new_state": string(session.StateProcessing),
-			"reason":    "approval_timeout",
-		})
-
-		return false, nil
 	}
+
+	return result, resultErr
 }
 
 func (l *Loop) determineOperationType(tool tools.Tool, workingDir string, params map[string]interface{}) string {
