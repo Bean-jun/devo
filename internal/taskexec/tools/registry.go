@@ -9,6 +9,12 @@ const (
 	RiskLevelHigh   RiskLevel = "high"
 )
 
+const (
+	OpFileWriteNew       = "file_write_new"
+	OpFileWriteOverwrite = "file_write_overwrite"
+	OpFileEdit           = "file_edit"
+)
+
 type Tool interface {
 	Name() string
 	Description() string

@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
+	"devo/internal/core/approval"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
@@ -19,27 +21,40 @@ type ToolExecutor interface {
 	ListTools() []tools.Tool
 }
 
+type ApprovalDecision struct {
+	ApprovalID string
+	Decision   string
+	ResultCh   chan error
+}
+
 type Loop struct {
-	store        session.SessionStore
-	llmClient    llmclient.Client
-	systemPrompt string
-	toolExecutor ToolExecutor
+	store            session.SessionStore
+	llmClient        llmclient.Client
+	systemPrompt     string
+	toolExecutor     ToolExecutor
+	approvalManager  *approval.Manager
+	approvalChannels map[string]chan ApprovalDecision
+	mu               sync.Mutex
 }
 
 func New(store session.SessionStore, llmClient llmclient.Client) *Loop {
 	return &Loop{
-		store:        store,
-		llmClient:    llmClient,
-		systemPrompt: defaultSystemPrompt,
+		store:            store,
+		llmClient:        llmClient,
+		systemPrompt:     defaultSystemPrompt,
+		approvalManager:  approval.NewManager(),
+		approvalChannels: make(map[string]chan ApprovalDecision),
 	}
 }
 
 func NewWithTools(store session.SessionStore, llmClient llmclient.Client, toolExecutor ToolExecutor) *Loop {
 	return &Loop{
-		store:        store,
-		llmClient:    llmClient,
-		systemPrompt: defaultSystemPrompt,
-		toolExecutor: toolExecutor,
+		store:            store,
+		llmClient:        llmClient,
+		systemPrompt:     defaultSystemPrompt,
+		toolExecutor:     toolExecutor,
+		approvalManager:  approval.NewManager(),
+		approvalChannels: make(map[string]chan ApprovalDecision),
 	}
 }
 
@@ -80,6 +95,56 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 
 	go l.runAgentLoop(context.Background(), sessionID, eventBus)
 
+	return nil
+}
+
+func (l *Loop) ResolveApproval(sessionID, approvalID, decision string) error {
+	req, ok := l.approvalManager.GetRequest(approvalID)
+	if !ok {
+		return fmt.Errorf("approval request not found: %s", approvalID)
+	}
+
+	if req.SessionID != sessionID {
+		return fmt.Errorf("approval request %s does not belong to session %s", approvalID, sessionID)
+	}
+
+	var status approval.Status
+	switch decision {
+	case "approve":
+		status = approval.StatusApproved
+	case "reject":
+		status = approval.StatusRejected
+	default:
+		return fmt.Errorf("invalid decision: %s (must be 'approve' or 'reject')", decision)
+	}
+
+	resolved, ok := l.approvalManager.Resolve(approvalID, status)
+	if !ok {
+		return fmt.Errorf("approval request %s is not pending", approvalID)
+	}
+
+	eventBus, err := l.store.GetEventBus(sessionID)
+	if err == nil {
+		eventBus.Publish("approval_resolved", map[string]any{
+			"approval_id": approvalID,
+			"decision":    decision,
+			"source":      "user",
+		})
+	}
+
+	l.mu.Lock()
+	ch, exists := l.approvalChannels[approvalID]
+	l.mu.Unlock()
+
+	if exists {
+		ch <- ApprovalDecision{
+			ApprovalID: approvalID,
+			Decision:   decision,
+			ResultCh:   nil,
+		}
+	}
+
+	_ = resolved
 	return nil
 }
 
@@ -150,12 +215,63 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 					continue
 				}
 
+				tool, ok := l.toolExecutor.GetTool(tc.ToolName)
+				if !ok {
+					eventBus.Publish("tool_call_request", map[string]any{
+						"tool_name":         tc.ToolName,
+						"params":            tc.Params,
+						"requires_approval": false,
+						"risk_level":        "-",
+					})
+
+					toolResult := &tools.ToolResult{
+						ToolCallID: tc.ID,
+						Success:    false,
+						Error:      "unknown tool: " + tc.ToolName,
+					}
+					toolMsg := l.toolResultToMessage(toolResult)
+					l.store.AddMessage(sessionID, toolMsg)
+					eventBus.Publish("tool_result", map[string]any{
+						"tool_name": tc.ToolName,
+						"success":   false,
+						"summary":   "unknown tool: " + tc.ToolName,
+					})
+					continue
+				}
+
+				riskLevel := tool.RiskLevel()
+
+				requiresApproval := riskLevel == tools.RiskLevelMedium || riskLevel == tools.RiskLevelHigh
+
 				eventBus.Publish("tool_call_request", map[string]any{
 					"tool_name":         tc.ToolName,
 					"params":            tc.Params,
-					"requires_approval": false,
-					"risk_level":        "-",
+					"requires_approval": requiresApproval,
+					"risk_level":        string(riskLevel),
 				})
+
+				if requiresApproval {
+					approved, err := l.handleApproval(sessionID, sess.WorkingDirectory, tc, tool, eventBus)
+					if err != nil {
+						eventBus.Publish("tool_result", map[string]any{
+							"tool_name": tc.ToolName,
+							"success":   false,
+							"summary":   fmt.Sprintf("error: %v", err),
+						})
+						continue
+					}
+
+					if !approved {
+						rejectionMsg := l.rejectionMessage(tc)
+						l.store.AddMessage(sessionID, rejectionMsg)
+						eventBus.Publish("tool_result", map[string]any{
+							"tool_name": tc.ToolName,
+							"success":   false,
+							"summary":   "操作被用户拒绝",
+						})
+						continue
+					}
+				}
 
 				toolResult, err := l.toolExecutor.Execute(sess.WorkingDirectory, tc.ToolName, tc.Params)
 				if err != nil {
@@ -220,6 +336,110 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 		})
 
 		return
+	}
+}
+
+func (l *Loop) handleApproval(sessionID, workingDir string, tc session.ToolCall, tool tools.Tool, eventBus *session.EventBus) (bool, error) {
+	opType := l.determineOperationType(tool, workingDir, tc.Params)
+
+	details := map[string]any{
+		"path": tc.Params["path"],
+	}
+	if mode, ok := tc.Params["mode"]; ok {
+		details["mode"] = mode
+	}
+
+	req := l.approvalManager.CreateRequest(sessionID, tc.ID, approval.OperationType(opType), details)
+
+	ch := make(chan ApprovalDecision, 1)
+	l.mu.Lock()
+	l.approvalChannels[req.ID] = ch
+	l.mu.Unlock()
+
+	defer func() {
+		l.mu.Lock()
+		delete(l.approvalChannels, req.ID)
+		l.mu.Unlock()
+	}()
+
+	sess, err := l.store.Get(sessionID)
+	if err == nil {
+		sess.State = session.StateAwaitingApproval
+		sess.LastActiveAt = time.Now()
+		l.store.Update(sess)
+	}
+
+	eventBus.Publish("session_state_change", map[string]any{
+		"old_state": string(session.StateProcessing),
+		"new_state": string(session.StateAwaitingApproval),
+		"reason":    "awaiting_approval",
+	})
+
+	eventBus.Publish("approval_required", map[string]any{
+		"approval_id":    req.ID,
+		"operation_type": string(req.OperationType),
+		"risk_level":     string(req.RiskLevel),
+		"details":        req.Details,
+	})
+
+	select {
+	case decision := <-ch:
+		if decision.Decision == "approve" {
+			sess, err := l.store.Get(sessionID)
+			if err == nil {
+				sess.State = session.StateProcessing
+				sess.LastActiveAt = time.Now()
+				l.store.Update(sess)
+			}
+
+			eventBus.Publish("session_state_change", map[string]any{
+				"old_state": string(session.StateAwaitingApproval),
+				"new_state": string(session.StateProcessing),
+				"reason":    "approval_granted",
+			})
+
+			return true, nil
+		}
+
+		sess, err := l.store.Get(sessionID)
+		if err == nil {
+			sess.State = session.StateProcessing
+			sess.LastActiveAt = time.Now()
+			l.store.Update(sess)
+		}
+
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": string(session.StateAwaitingApproval),
+			"new_state": string(session.StateProcessing),
+			"reason":    "approval_denied",
+		})
+
+		return false, nil
+	}
+}
+
+func (l *Loop) determineOperationType(tool tools.Tool, workingDir string, params map[string]interface{}) string {
+	if opProvider, ok := tool.(tools.OperationTypeProvider); ok {
+		return opProvider.OperationType(workingDir, params)
+	}
+
+	switch tool.RiskLevel() {
+	case tools.RiskLevelMedium:
+		return "file_write"
+	case tools.RiskLevelHigh:
+		return "execute_command"
+	default:
+		return "unknown"
+	}
+}
+
+func (l *Loop) rejectionMessage(tc session.ToolCall) session.Message {
+	return session.Message{
+		ID:         session.GenerateID("msg"),
+		Role:       session.RoleTool,
+		Content:    "操作被用户拒绝",
+		ToolCallID: tc.ID,
+		CreatedAt:  time.Now(),
 	}
 }
 

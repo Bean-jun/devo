@@ -11,9 +11,10 @@ import (
 type State string
 
 const (
-	StateIdle       State = "Idle"
-	StateProcessing State = "Processing"
-	StatePaused     State = "Paused"
+	StateIdle             State = "Idle"
+	StateProcessing       State = "Processing"
+	StatePaused           State = "Paused"
+	StateAwaitingApproval State = "AwaitingApproval"
 )
 
 type Role string

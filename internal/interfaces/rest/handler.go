@@ -32,6 +32,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sessions/{id}/messages", h.PostMessage)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/messages", h.GetMessages)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", h.SSEEvents)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/approve/{approval_id}", h.Approve)
 }
 
 type createSessionRequest struct {
@@ -480,5 +481,57 @@ func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
 		Type:    "file",
 		Content: string(data),
 		Size:    info.Size(),
+	})
+}
+
+type approveRequest struct {
+	Decision string `json:"decision"`
+}
+
+type approveResponse struct {
+	ApprovalID string `json:"approval_id"`
+	Decision   string `json:"decision"`
+	ResolvedAt string `json:"resolved_at"`
+}
+
+func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	approvalID := r.PathValue("approval_id")
+
+	sess, err := h.store.Get(id)
+	if err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if sess.State != session.StateAwaitingApproval {
+		writeError(w, http.StatusConflict, "session is not in AwaitingApproval state")
+		return
+	}
+
+	var req approveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Decision != "approve" && req.Decision != "reject" {
+		writeError(w, http.StatusBadRequest, "decision must be 'approve' or 'reject'")
+		return
+	}
+
+	if err := h.loop.ResolveApproval(id, approvalID, req.Decision); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, approveResponse{
+		ApprovalID: approvalID,
+		Decision:   req.Decision,
+		ResolvedAt: time.Now().Format(time.RFC3339),
 	})
 }
