@@ -108,6 +108,14 @@ func (l *Loop) ResolveApproval(sessionID, approvalID, decision string) error {
 		return fmt.Errorf("approval request %s does not belong to session %s", approvalID, sessionID)
 	}
 
+	if req.Status != approval.StatusPending {
+		return fmt.Errorf("approval request %s is not pending", approvalID)
+	}
+
+	if l.approvalManager.IsExpired(approvalID) {
+		return fmt.Errorf("approval request %s has expired", approvalID)
+	}
+
 	var status approval.Status
 	switch decision {
 	case "approve":
@@ -270,25 +278,45 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 						}
 					}
 
-					approved, err := l.handleApproval(sessionID, sess.WorkingDirectory, tc, tool, eventBus)
-					if err != nil {
-						eventBus.Publish("tool_result", map[string]any{
-							"tool_name": tc.ToolName,
-							"success":   false,
-							"summary":   fmt.Sprintf("error: %v", err),
-						})
-						continue
-					}
+					opType := l.determineOperationType(tool, sess.WorkingDirectory, tc.Params)
+					effectivePolicy := l.resolveEffectivePolicy(sess, approval.OperationType(opType))
 
-					if !approved {
-						rejectionMsg := l.rejectionMessage(tc)
-						l.store.AddMessage(sessionID, rejectionMsg)
-						eventBus.Publish("tool_result", map[string]any{
-							"tool_name": tc.ToolName,
-							"success":   false,
-							"summary":   "操作被用户拒绝",
+					if l.approvalManager.IsAutoApproved(effectivePolicy) {
+						policyLevelStr := string(effectivePolicy)
+						eventBus.Publish("approval_auto", map[string]any{
+							"operation_type": opType,
+							"summary":        fmt.Sprintf("根据策略 %s 自动批准操作 %s", policyLevelStr, opType),
+							"policy_level":   policyLevelStr,
 						})
-						continue
+
+						systemNote := session.Message{
+							ID:        session.GenerateID("msg"),
+							Role:      session.RoleSystem,
+							Content:   fmt.Sprintf("已根据信任策略（%s）自动批准 %s 操作", policyLevelStr, opType),
+							CreatedAt: time.Now(),
+						}
+						l.store.AddMessage(sessionID, systemNote)
+					} else {
+						approved, err := l.handleApproval(sessionID, sess.WorkingDirectory, tc, tool, eventBus)
+						if err != nil {
+							eventBus.Publish("tool_result", map[string]any{
+								"tool_name": tc.ToolName,
+								"success":   false,
+								"summary":   fmt.Sprintf("error: %v", err),
+							})
+							continue
+						}
+
+						if !approved {
+							rejectionMsg := l.rejectionMessage(tc)
+							l.store.AddMessage(sessionID, rejectionMsg)
+							eventBus.Publish("tool_result", map[string]any{
+								"tool_name": tc.ToolName,
+								"success":   false,
+								"summary":   "操作被用户拒绝",
+							})
+							continue
+						}
 					}
 				}
 
@@ -360,6 +388,15 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 	}
 }
 
+func (l *Loop) resolveEffectivePolicy(sess *session.Session, opType approval.OperationType) approval.PolicyLevel {
+	sessionPolicy := make(map[approval.OperationType]approval.PolicyLevel)
+	for k, v := range sess.ApprovalPolicy {
+		sessionPolicy[approval.OperationType(k)] = approval.PolicyLevel(v)
+	}
+
+	return l.approvalManager.ResolveEffectivePolicy(sessionPolicy, opType)
+}
+
 func (l *Loop) handleApproval(sessionID, workingDir string, tc session.ToolCall, tool tools.Tool, eventBus *session.EventBus) (bool, error) {
 	opType := l.determineOperationType(tool, workingDir, tc.Params)
 
@@ -368,6 +405,16 @@ func (l *Loop) handleApproval(sessionID, workingDir string, tc session.ToolCall,
 	riskLevel := l.determineRiskLevel(tool)
 
 	req := l.approvalManager.CreateRequest(sessionID, tc.ID, approval.OperationType(opType), riskLevel, details)
+
+	sess, err := l.store.Get(sessionID)
+	if err == nil {
+		timeoutSeconds := sess.ApprovalTimeoutSeconds
+		if timeoutSeconds <= 0 {
+			timeoutSeconds = 300
+		}
+		timeoutAt := time.Now().Add(time.Duration(timeoutSeconds) * time.Second)
+		l.approvalManager.SetTimeout(req.ID, timeoutAt)
+	}
 
 	ch := make(chan ApprovalDecision, 1)
 	l.mu.Lock()
@@ -380,7 +427,7 @@ func (l *Loop) handleApproval(sessionID, workingDir string, tc session.ToolCall,
 		l.mu.Unlock()
 	}()
 
-	sess, err := l.store.Get(sessionID)
+	sess, err = l.store.Get(sessionID)
 	if err == nil {
 		sess.State = session.StateAwaitingApproval
 		sess.LastActiveAt = time.Now()
@@ -399,6 +446,12 @@ func (l *Loop) handleApproval(sessionID, workingDir string, tc session.ToolCall,
 		"risk_level":     string(req.RiskLevel),
 		"details":        req.Details,
 	})
+
+	timeoutSeconds := 300
+	if sess != nil && sess.ApprovalTimeoutSeconds > 0 {
+		timeoutSeconds = sess.ApprovalTimeoutSeconds
+	}
+	timeoutCh := time.After(time.Duration(timeoutSeconds) * time.Second)
 
 	select {
 	case decision := <-ch:
@@ -430,6 +483,30 @@ func (l *Loop) handleApproval(sessionID, workingDir string, tc session.ToolCall,
 			"old_state": string(session.StateAwaitingApproval),
 			"new_state": string(session.StateProcessing),
 			"reason":    "approval_denied",
+		})
+
+		return false, nil
+
+	case <-timeoutCh:
+		l.approvalManager.ResolveWithSource(req.ID, approval.StatusRejected, approval.SourceTimeout)
+
+		sess, err := l.store.Get(sessionID)
+		if err == nil {
+			sess.State = session.StateProcessing
+			sess.LastActiveAt = time.Now()
+			l.store.Update(sess)
+		}
+
+		eventBus.Publish("approval_resolved", map[string]any{
+			"approval_id": req.ID,
+			"decision":    "reject",
+			"source":      "timeout",
+		})
+
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": string(session.StateAwaitingApproval),
+			"new_state": string(session.StateProcessing),
+			"reason":    "approval_timeout",
 		})
 
 		return false, nil

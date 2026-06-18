@@ -10,13 +10,16 @@ import (
 )
 
 type SessionModel struct {
-	ID                   string    `gorm:"primaryKey;size:64"`
-	Title                string    `gorm:"size:256"`
-	WorkingDirectory     string    `gorm:"size:512;index:idx_working_dir"`
-	State                string    `gorm:"size:32;index:idx_state"`
-	CreatedAt            time.Time `gorm:"autoCreateTime"`
-	LastActiveAt         time.Time
-	ActiveSSEConnections int
+	ID                     string    `gorm:"primaryKey;size:64"`
+	Title                  string    `gorm:"size:256"`
+	WorkingDirectory       string    `gorm:"size:512;index:idx_working_dir"`
+	State                  string    `gorm:"size:32;index:idx_state"`
+	CreatedAt              time.Time `gorm:"autoCreateTime"`
+	LastActiveAt           time.Time
+	ActiveSSEConnections   int
+	TrustLevel             string `gorm:"size:32;default:normal"`
+	ApprovalPolicyJSON     string `gorm:"type:text"`
+	ApprovalTimeoutSeconds int    `gorm:"default:300"`
 }
 
 type MessageModel struct {
@@ -40,27 +43,50 @@ type EventModel struct {
 }
 
 func (m *SessionModel) ToDomain() *session.Session {
-	return &session.Session{
-		ID:                   m.ID,
-		Title:                m.Title,
-		WorkingDirectory:     m.WorkingDirectory,
-		State:                session.State(m.State),
-		CreatedAt:            m.CreatedAt,
-		LastActiveAt:         m.LastActiveAt,
-		ActiveSSEConnections: m.ActiveSSEConnections,
+	sess := &session.Session{
+		ID:                     m.ID,
+		Title:                  m.Title,
+		WorkingDirectory:       m.WorkingDirectory,
+		State:                  session.State(m.State),
+		CreatedAt:              m.CreatedAt,
+		LastActiveAt:           m.LastActiveAt,
+		ActiveSSEConnections:   m.ActiveSSEConnections,
+		TrustLevel:             m.TrustLevel,
+		ApprovalPolicy:         make(map[string]string),
+		ApprovalTimeoutSeconds: m.ApprovalTimeoutSeconds,
 	}
+
+	if m.ApprovalPolicyJSON != "" {
+		var policy map[string]string
+		if err := json.Unmarshal([]byte(m.ApprovalPolicyJSON), &policy); err == nil {
+			sess.ApprovalPolicy = policy
+		}
+	}
+
+	return sess
 }
 
 func fromDomain(s *session.Session) *SessionModel {
-	return &SessionModel{
-		ID:                   s.ID,
-		Title:                s.Title,
-		WorkingDirectory:     s.WorkingDirectory,
-		State:                string(s.State),
-		CreatedAt:            s.CreatedAt,
-		LastActiveAt:         s.LastActiveAt,
-		ActiveSSEConnections: s.ActiveSSEConnections,
+	model := &SessionModel{
+		ID:                     s.ID,
+		Title:                  s.Title,
+		WorkingDirectory:       s.WorkingDirectory,
+		State:                  string(s.State),
+		CreatedAt:              s.CreatedAt,
+		LastActiveAt:           s.LastActiveAt,
+		ActiveSSEConnections:   s.ActiveSSEConnections,
+		TrustLevel:             s.TrustLevel,
+		ApprovalTimeoutSeconds: s.ApprovalTimeoutSeconds,
 	}
+
+	if s.ApprovalPolicy != nil && len(s.ApprovalPolicy) > 0 {
+		data, err := json.Marshal(s.ApprovalPolicy)
+		if err == nil {
+			model.ApprovalPolicyJSON = string(data)
+		}
+	}
+
+	return model
 }
 
 func (m *MessageModel) ToDomain() session.Message {
@@ -133,5 +159,10 @@ func fromEvent(sessionID string, e session.Event) (*EventModel, error) {
 }
 
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&SessionModel{}, &MessageModel{}, &EventModel{})
+	return db.AutoMigrate(&SessionModel{}, &MessageModel{}, &EventModel{}, &UserConfigModel{})
+}
+
+type UserConfigModel struct {
+	Key   string `gorm:"primaryKey;size:128"`
+	Value string `gorm:"type:text"`
 }

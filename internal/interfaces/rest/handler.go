@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"devo/internal/core/agentloop"
+	"devo/internal/core/approval"
 	"devo/internal/core/session"
 )
 
@@ -33,19 +34,25 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/sessions/{id}/messages", h.GetMessages)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", h.SSEEvents)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/approve/{approval_id}", h.Approve)
+	mux.HandleFunc("PUT /api/v1/sessions/{id}/trust", h.SetTrustLevel)
+	mux.HandleFunc("PUT /api/v1/sessions/{id}/approval-policy", h.SetApprovalPolicy)
 }
 
 type createSessionRequest struct {
-	WorkingDirectory string `json:"working_directory"`
-	Title            string `json:"title,omitempty"`
+	WorkingDirectory       string `json:"working_directory"`
+	Title                  string `json:"title,omitempty"`
+	ApprovalTimeoutSeconds int    `json:"approval_timeout_seconds,omitempty"`
 }
 
 type createSessionResponse struct {
-	ID               string `json:"id"`
-	Title            string `json:"title"`
-	WorkingDirectory string `json:"working_directory"`
-	State            string `json:"state"`
-	CreatedAt        string `json:"created_at"`
+	ID                     string            `json:"id"`
+	Title                  string            `json:"title"`
+	WorkingDirectory       string            `json:"working_directory"`
+	State                  string            `json:"state"`
+	CreatedAt              string            `json:"created_at"`
+	TrustLevel             string            `json:"trust_level"`
+	ApprovalPolicy         map[string]string `json:"approval_policy,omitempty"`
+	ApprovalTimeoutSeconds int               `json:"approval_timeout_seconds"`
 }
 
 func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
@@ -72,13 +79,21 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
+	timeoutSeconds := req.ApprovalTimeoutSeconds
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 300
+	}
+
 	sess := &session.Session{
-		ID:               session.GenerateID("sess"),
-		Title:            title,
-		WorkingDirectory: req.WorkingDirectory,
-		State:            session.StateIdle,
-		CreatedAt:        now,
-		LastActiveAt:     now,
+		ID:                     session.GenerateID("sess"),
+		Title:                  title,
+		WorkingDirectory:       req.WorkingDirectory,
+		State:                  session.StateIdle,
+		CreatedAt:              now,
+		LastActiveAt:           now,
+		TrustLevel:             string(approval.TrustNormal),
+		ApprovalPolicy:         make(map[string]string),
+		ApprovalTimeoutSeconds: timeoutSeconds,
 	}
 
 	if err := h.store.Create(sess); err != nil {
@@ -87,21 +102,27 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, createSessionResponse{
-		ID:               sess.ID,
-		Title:            sess.Title,
-		WorkingDirectory: sess.WorkingDirectory,
-		State:            string(sess.State),
-		CreatedAt:        sess.CreatedAt.Format(time.RFC3339),
+		ID:                     sess.ID,
+		Title:                  sess.Title,
+		WorkingDirectory:       sess.WorkingDirectory,
+		State:                  string(sess.State),
+		CreatedAt:              sess.CreatedAt.Format(time.RFC3339),
+		TrustLevel:             sess.TrustLevel,
+		ApprovalPolicy:         sess.ApprovalPolicy,
+		ApprovalTimeoutSeconds: sess.ApprovalTimeoutSeconds,
 	})
 }
 
 type getSessionResponse struct {
-	ID               string `json:"id"`
-	Title            string `json:"title"`
-	WorkingDirectory string `json:"working_directory"`
-	State            string `json:"state"`
-	CreatedAt        string `json:"created_at"`
-	LastActiveAt     string `json:"last_active_at"`
+	ID                     string            `json:"id"`
+	Title                  string            `json:"title"`
+	WorkingDirectory       string            `json:"working_directory"`
+	State                  string            `json:"state"`
+	CreatedAt              string            `json:"created_at"`
+	LastActiveAt           string            `json:"last_active_at"`
+	TrustLevel             string            `json:"trust_level"`
+	ApprovalPolicy         map[string]string `json:"approval_policy,omitempty"`
+	ApprovalTimeoutSeconds int               `json:"approval_timeout_seconds"`
 }
 
 func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
@@ -122,12 +143,15 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, getSessionResponse{
-		ID:               sess.ID,
-		Title:            sess.Title,
-		WorkingDirectory: sess.WorkingDirectory,
-		State:            string(sess.State),
-		CreatedAt:        sess.CreatedAt.Format(time.RFC3339),
-		LastActiveAt:     sess.LastActiveAt.Format(time.RFC3339),
+		ID:                     sess.ID,
+		Title:                  sess.Title,
+		WorkingDirectory:       sess.WorkingDirectory,
+		State:                  string(sess.State),
+		CreatedAt:              sess.CreatedAt.Format(time.RFC3339),
+		LastActiveAt:           sess.LastActiveAt.Format(time.RFC3339),
+		TrustLevel:             sess.TrustLevel,
+		ApprovalPolicy:         sess.ApprovalPolicy,
+		ApprovalTimeoutSeconds: sess.ApprovalTimeoutSeconds,
 	})
 }
 
@@ -525,7 +549,12 @@ func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.loop.ResolveApproval(id, approvalID, req.Decision); err != nil {
-		writeError(w, http.StatusConflict, err.Error())
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "has expired") {
+			writeError(w, http.StatusConflict, errMsg)
+			return
+		}
+		writeError(w, http.StatusConflict, errMsg)
 		return
 	}
 
@@ -533,5 +562,96 @@ func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
 		ApprovalID: approvalID,
 		Decision:   req.Decision,
 		ResolvedAt: time.Now().Format(time.RFC3339),
+	})
+}
+
+type setTrustLevelRequest struct {
+	TrustLevel string `json:"trust_level"`
+}
+
+func (h *Handler) SetTrustLevel(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var req setTrustLevelRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if !approval.IsValidTrustLevel(req.TrustLevel) {
+		writeError(w, http.StatusBadRequest, "trust_level must be one of: low, normal, elevated")
+		return
+	}
+
+	sess, err := h.store.Get(id)
+	if err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	sess.TrustLevel = req.TrustLevel
+	sess.LastActiveAt = time.Now()
+
+	if err := h.store.Update(sess); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update session")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"trust_level": req.TrustLevel})
+}
+
+type setApprovalPolicyRequest map[string]string
+
+func (h *Handler) SetApprovalPolicy(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var req setApprovalPolicyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	for opType, policyLevel := range req {
+		if !approval.IsValidOperationType(opType) {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid operation_type: %s", opType))
+			return
+		}
+		if !approval.IsValidPolicyLevel(policyLevel) {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid policy_level: %s", policyLevel))
+			return
+		}
+	}
+
+	sess, err := h.store.Get(id)
+	if err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if sess.ApprovalPolicy == nil {
+		sess.ApprovalPolicy = make(map[string]string)
+	}
+
+	for opType, policyLevel := range req {
+		sess.ApprovalPolicy[opType] = policyLevel
+	}
+
+	sess.LastActiveAt = time.Now()
+
+	if err := h.store.Update(sess); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update session")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"approval_policy": sess.ApprovalPolicy,
 	})
 }

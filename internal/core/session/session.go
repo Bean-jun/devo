@@ -42,16 +42,19 @@ type Message struct {
 }
 
 type Session struct {
-	ID                   string    `json:"id"`
-	Title                string    `json:"title"`
-	WorkingDirectory     string    `json:"working_directory"`
-	State                State     `json:"state"`
-	CreatedAt            time.Time `json:"created_at"`
-	LastActiveAt         time.Time `json:"last_active_at"`
-	Messages             []Message `json:"messages,omitempty"`
-	ActiveSSEConnections int       `json:"active_sse_connections"`
-	ChildPID             *int      `json:"child_pid,omitempty"`
-	EventBus             *EventBus `json:"-"`
+	ID                     string            `json:"id"`
+	Title                  string            `json:"title"`
+	WorkingDirectory       string            `json:"working_directory"`
+	State                  State             `json:"state"`
+	CreatedAt              time.Time         `json:"created_at"`
+	LastActiveAt           time.Time         `json:"last_active_at"`
+	Messages               []Message         `json:"messages,omitempty"`
+	ActiveSSEConnections   int               `json:"active_sse_connections"`
+	ChildPID               *int              `json:"child_pid,omitempty"`
+	EventBus               *EventBus         `json:"-"`
+	TrustLevel             string            `json:"trust_level"`
+	ApprovalPolicy         map[string]string `json:"approval_policy,omitempty"`
+	ApprovalTimeoutSeconds int               `json:"approval_timeout_seconds"`
 }
 
 var (

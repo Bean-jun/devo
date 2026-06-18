@@ -3,6 +3,7 @@ package rest
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"devo/internal/core/agentloop"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/llmclient"
+	"devo/internal/taskexec/tools"
 )
 
 func setupTestServer() (*httptest.Server, *session.InMemoryStore) {
@@ -28,6 +30,60 @@ func setupTestServer() (*httptest.Server, *session.InMemoryStore) {
 	handler.RegisterRoutes(mux)
 
 	return httptest.NewServer(mux), store
+}
+
+func setupTestServerWithTools() (*httptest.Server, *session.InMemoryStore, *agentloop.Loop) {
+	store := session.NewInMemoryStore()
+
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register(&tools.WriteFileTool{})
+
+	llm := &approvalMockClient{}
+	loop := agentloop.NewWithTools(store, llm, toolRegistry)
+	handler := NewHandler(store, loop)
+
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	return httptest.NewServer(mux), store, loop
+}
+
+type approvalMockClient struct {
+	callCount int
+}
+
+func (m *approvalMockClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
+	m.callCount++
+
+	lastMsg := messages[len(messages)-1]
+
+	if lastMsg.Role == session.RoleTool {
+		return &llmclient.CompleteResult{
+			Text: "I received the tool result: " + lastMsg.Content,
+		}, nil
+	}
+
+	if lastMsg.Role == session.RoleUser || lastMsg.Role == session.RoleSystem {
+		if m.callCount == 1 {
+			return &llmclient.CompleteResult{
+				ToolCalls: []session.ToolCall{
+					{
+						ID:       "call-1",
+						ToolName: "write_file",
+						Params: map[string]interface{}{
+							"path":    "test_approve.txt",
+							"content": "Hello from approve test",
+						},
+					},
+				},
+			}, nil
+		}
+		return &llmclient.CompleteResult{
+			Text: "Task completed.",
+		}, nil
+	}
+
+	return &llmclient.CompleteResult{Text: "OK"}, nil
 }
 
 func TestCreateSession_Success(t *testing.T) {
@@ -817,5 +873,544 @@ func TestListSessionsEmptyResult(t *testing.T) {
 	}
 	if len(result.Sessions) != 0 {
 		t.Errorf("expected empty sessions array, got %d", len(result.Sessions))
+	}
+}
+
+func TestSetTrustLevel_Success(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+	}
+	store.Create(sess)
+
+	body := map[string]string{"trust_level": "elevated"}
+	jsonBody, _ := json.Marshal(body)
+
+	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/sess-test-1/trust", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result map[string]string
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result["trust_level"] != "elevated" {
+		t.Errorf("expected trust_level elevated, got %q", result["trust_level"])
+	}
+
+	sessGot, _ := store.Get("sess-test-1")
+	if sessGot.TrustLevel != "elevated" {
+		t.Errorf("expected trust_level elevated in store, got %q", sessGot.TrustLevel)
+	}
+}
+
+func TestSetTrustLevel_InvalidValue(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+	}
+	store.Create(sess)
+
+	body := map[string]string{"trust_level": "super_trusted"}
+	jsonBody, _ := json.Marshal(body)
+
+	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/sess-test-1/trust", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid trust_level, got %d", resp.StatusCode)
+	}
+}
+
+func TestSetTrustLevel_NotFound(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	body := map[string]string{"trust_level": "normal"}
+	jsonBody, _ := json.Marshal(body)
+
+	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/nonexistent/trust", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestSetApprovalPolicy_Success(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+	}
+	store.Create(sess)
+
+	body := map[string]string{
+		"file_write_new":  "session_trust",
+		"execute_command": "always_ask",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/sess-test-1/approval-policy", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	policy, ok := result["approval_policy"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected approval_policy in response")
+	}
+	if policy["file_write_new"] != "session_trust" {
+		t.Errorf("expected file_write_new to be session_trust, got %v", policy["file_write_new"])
+	}
+
+	sessGot, _ := store.Get("sess-test-1")
+	if sessGot.ApprovalPolicy["file_write_new"] != "session_trust" {
+		t.Errorf("expected file_write_new session_trust in store, got %q", sessGot.ApprovalPolicy["file_write_new"])
+	}
+}
+
+func TestSetApprovalPolicy_PartialUpdate(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+		ApprovalPolicy: map[string]string{
+			"file_write_new":  "always_ask",
+			"execute_command": "always_ask",
+		},
+	}
+	store.Create(sess)
+
+	body := map[string]string{
+		"file_write_new": "session_trust",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/sess-test-1/approval-policy", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	sessGot, _ := store.Get("sess-test-1")
+	if sessGot.ApprovalPolicy["file_write_new"] != "session_trust" {
+		t.Errorf("expected file_write_new updated to session_trust, got %q", sessGot.ApprovalPolicy["file_write_new"])
+	}
+	if sessGot.ApprovalPolicy["execute_command"] != "always_ask" {
+		t.Errorf("expected execute_command to remain always_ask, got %q", sessGot.ApprovalPolicy["execute_command"])
+	}
+}
+
+func TestSetApprovalPolicy_InvalidOperationType(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+	}
+	store.Create(sess)
+
+	body := map[string]string{
+		"invalid_op": "session_trust",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/sess-test-1/approval-policy", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid operation_type, got %d", resp.StatusCode)
+	}
+}
+
+func TestSetApprovalPolicy_InvalidPolicyLevel(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+	}
+	store.Create(sess)
+
+	body := map[string]string{
+		"file_write_new": "super_trust",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/sess-test-1/approval-policy", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid policy_level, got %d", resp.StatusCode)
+	}
+}
+
+func TestSetApprovalPolicy_NotFound(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	body := map[string]string{
+		"file_write_new": "session_trust",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/nonexistent/approval-policy", bytes.NewReader(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestCreateSession_WithApprovalTimeout(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+
+	body := map[string]interface{}{
+		"working_directory":        tmpDir,
+		"approval_timeout_seconds": 120,
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, err := http.Post(server.URL+"/api/v1/sessions", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected 201, got %d", resp.StatusCode)
+	}
+
+	var result createSessionResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	if result.ApprovalTimeoutSeconds != 120 {
+		t.Errorf("expected approval_timeout_seconds 120, got %d", result.ApprovalTimeoutSeconds)
+	}
+	if result.TrustLevel != "normal" {
+		t.Errorf("expected default trust_level normal, got %q", result.TrustLevel)
+	}
+}
+
+func TestCreateSession_DefaultTimeout(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+
+	body := map[string]string{
+		"working_directory": tmpDir,
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, _ := http.Post(server.URL+"/api/v1/sessions", "application/json", bytes.NewReader(jsonBody))
+	defer resp.Body.Close()
+
+	var result createSessionResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	if result.ApprovalTimeoutSeconds != 300 {
+		t.Errorf("expected default approval_timeout_seconds 300, got %d", result.ApprovalTimeoutSeconds)
+	}
+}
+
+func TestApprove_ApproveDecision(t *testing.T) {
+	server, store, loop := setupTestServerWithTools()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+	}
+	store.Create(sess)
+
+	eventBus, _ := store.GetEventBus("sess-test-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	go loop.ProcessMessage(context.Background(), "sess-test-1", "Create a file")
+
+	evt, ok := waitForEvent(ch, "approval_required", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for approval_required")
+	}
+	data := evt.Data.(map[string]any)
+	approvalID := data["approval_id"].(string)
+
+	body := map[string]string{"decision": "approve"}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/approve/"+approvalID, "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result approveResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.Decision != "approve" {
+		t.Errorf("expected decision 'approve', got %q", result.Decision)
+	}
+	if result.ApprovalID != approvalID {
+		t.Errorf("expected approval_id %q, got %q", approvalID, result.ApprovalID)
+	}
+}
+
+func TestApprove_RejectDecision(t *testing.T) {
+	server, store, loop := setupTestServerWithTools()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+	}
+	store.Create(sess)
+
+	eventBus, _ := store.GetEventBus("sess-test-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	go loop.ProcessMessage(context.Background(), "sess-test-1", "Create a file")
+
+	evt, ok := waitForEvent(ch, "approval_required", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for approval_required")
+	}
+	data := evt.Data.(map[string]any)
+	approvalID := data["approval_id"].(string)
+
+	body := map[string]string{"decision": "reject"}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/approve/"+approvalID, "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result approveResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.Decision != "reject" {
+		t.Errorf("expected decision 'reject', got %q", result.Decision)
+	}
+}
+
+func TestApprove_InvalidDecision(t *testing.T) {
+	server, store, loop := setupTestServerWithTools()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+	}
+	store.Create(sess)
+
+	eventBus, _ := store.GetEventBus("sess-test-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	go loop.ProcessMessage(context.Background(), "sess-test-1", "Create a file")
+
+	evt, ok := waitForEvent(ch, "approval_required", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for approval_required")
+	}
+	data := evt.Data.(map[string]any)
+	approvalID := data["approval_id"].(string)
+
+	body := map[string]string{"decision": "maybe"}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/approve/"+approvalID, "application/json", bytes.NewReader(jsonBody))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid decision, got %d", resp.StatusCode)
+	}
+}
+
+func TestApprove_TimeoutReturns409(t *testing.T) {
+	server, store, loop := setupTestServerWithTools()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:                     "sess-test-1",
+		Title:                  "Test",
+		WorkingDirectory:       tmpDir,
+		State:                  session.StateIdle,
+		ApprovalTimeoutSeconds: 1,
+	}
+	store.Create(sess)
+
+	eventBus, _ := store.GetEventBus("sess-test-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	go loop.ProcessMessage(context.Background(), "sess-test-1", "Create a file")
+
+	evt, ok := waitForEvent(ch, "approval_required", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for approval_required")
+	}
+	data := evt.Data.(map[string]any)
+	approvalID := data["approval_id"].(string)
+
+	evt, ok = waitForEvent(ch, "approval_resolved", 5*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for approval_resolved (timeout)")
+	}
+	resolvedData := evt.Data.(map[string]any)
+	if resolvedData["source"] != "timeout" {
+		t.Fatalf("expected timeout source, got %v", resolvedData["source"])
+	}
+
+	body := map[string]string{"decision": "approve"}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/approve/"+approvalID, "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Errorf("expected 409 after timeout, got %d", resp.StatusCode)
+	}
+}
+
+func TestApprove_SessionNotFound(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	body := map[string]string{"decision": "approve"}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, _ := http.Post(server.URL+"/api/v1/sessions/nonexistent/approve/approval-1", "application/json", bytes.NewReader(jsonBody))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestApprove_NotAwaitingApproval(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+	}
+	store.Create(sess)
+
+	body := map[string]string{"decision": "approve"}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/approve/approval-1", "application/json", bytes.NewReader(jsonBody))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Errorf("expected 409 for non-AwaitingApproval state, got %d", resp.StatusCode)
+	}
+}
+
+func waitForEvent(ch chan session.Event, eventType string, timeout time.Duration) (*session.Event, bool) {
+	timer := time.After(timeout)
+	for {
+		select {
+		case <-timer:
+			return nil, false
+		case evt, ok := <-ch:
+			if !ok {
+				return nil, false
+			}
+			if eventType == "" || evt.Type == eventType {
+				return &evt, true
+			}
+		}
 	}
 }
