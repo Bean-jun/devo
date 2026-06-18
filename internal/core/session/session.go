@@ -22,13 +22,22 @@ const (
 	RoleUser      Role = "user"
 	RoleAssistant Role = "assistant"
 	RoleSystem    Role = "system"
+	RoleTool      Role = "tool"
 )
 
+type ToolCall struct {
+	ID       string                 `json:"id"`
+	ToolName string                 `json:"tool_name"`
+	Params   map[string]interface{} `json:"params"`
+}
+
 type Message struct {
-	ID        string    `json:"id"`
-	Role      Role      `json:"role"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         string     `json:"id"`
+	Role       Role       `json:"role"`
+	Content    string     `json:"content"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 type Session struct {

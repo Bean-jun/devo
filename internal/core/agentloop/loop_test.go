@@ -189,9 +189,9 @@ func TestStateTransitions(t *testing.T) {
 
 type slowLLMClient struct{}
 
-func (s *slowLLMClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (string, error) {
+func (s *slowLLMClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
 	time.Sleep(200 * time.Millisecond)
-	return "Slow reply", nil
+	return &llmclient.CompleteResult{Text: "Slow reply"}, nil
 }
 
 func TestProcessMessageConflictDuringProcessing(t *testing.T) {
@@ -220,8 +220,8 @@ func TestProcessMessageConflictDuringProcessing(t *testing.T) {
 
 type errorLLMClient struct{}
 
-func (e *errorLLMClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (string, error) {
-	return "", context.DeadlineExceeded
+func (e *errorLLMClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
+	return nil, context.DeadlineExceeded
 }
 
 func TestStateRevertsOnLLMError(t *testing.T) {

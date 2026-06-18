@@ -1,0 +1,50 @@
+package tools
+
+import (
+	"fmt"
+	"os"
+
+	"devo/internal/taskexec/pathsec"
+)
+
+type ReadFileTool struct{}
+
+func (t *ReadFileTool) Name() string {
+	return "read_file"
+}
+
+func (t *ReadFileTool) Description() string {
+	return "Read the contents of a file at the given path"
+}
+
+func (t *ReadFileTool) RiskLevel() RiskLevel {
+	return RiskLevelNone
+}
+
+func (t *ReadFileTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
+	path, ok := params["path"].(string)
+	if !ok || path == "" {
+		return "", fmt.Errorf("missing required parameter: path")
+	}
+
+	safePath, err := pathsec.CheckPath(workingDir, path)
+	if err != nil {
+		return "", fmt.Errorf("path security check failed")
+	}
+
+	info, err := os.Stat(safePath)
+	if err != nil {
+		return "", fmt.Errorf("file not found or not accessible: %s", path)
+	}
+
+	if info.IsDir() {
+		return "", fmt.Errorf("path is a directory, not a file: %s", path)
+	}
+
+	data, err := os.ReadFile(safePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %s", path)
+	}
+
+	return string(data), nil
+}

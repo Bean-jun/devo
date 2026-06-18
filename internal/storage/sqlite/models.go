@@ -20,12 +20,14 @@ type SessionModel struct {
 }
 
 type MessageModel struct {
-	ID        string `gorm:"primaryKey;size:64"`
-	SessionID string `gorm:"size:64;index:idx_msg_session_id;not null"`
-	Role      string `gorm:"size:16"`
-	Content   string `gorm:"type:text"`
-	Seq       int    `gorm:"index:idx_msg_seq"`
-	CreatedAt time.Time
+	ID            string `gorm:"primaryKey;size:64"`
+	SessionID     string `gorm:"size:64;index:idx_msg_session_id;not null"`
+	Role          string `gorm:"size:16"`
+	Content       string `gorm:"type:text"`
+	ToolCallsJSON string `gorm:"type:text"`
+	ToolCallID    string `gorm:"size:64"`
+	Seq           int    `gorm:"index:idx_msg_seq"`
+	CreatedAt     time.Time
 }
 
 type EventModel struct {
@@ -62,23 +64,43 @@ func fromDomain(s *session.Session) *SessionModel {
 }
 
 func (m *MessageModel) ToDomain() session.Message {
-	return session.Message{
-		ID:        m.ID,
-		Role:      session.Role(m.Role),
-		Content:   m.Content,
-		CreatedAt: m.CreatedAt,
+	msg := session.Message{
+		ID:         m.ID,
+		Role:       session.Role(m.Role),
+		Content:    m.Content,
+		ToolCallID: m.ToolCallID,
+		CreatedAt:  m.CreatedAt,
 	}
+
+	if m.ToolCallsJSON != "" {
+		var toolCalls []session.ToolCall
+		if err := json.Unmarshal([]byte(m.ToolCallsJSON), &toolCalls); err == nil {
+			msg.ToolCalls = toolCalls
+		}
+	}
+
+	return msg
 }
 
 func fromMessage(sessionID string, seq int, m session.Message) *MessageModel {
-	return &MessageModel{
-		ID:        m.ID,
-		SessionID: sessionID,
-		Role:      string(m.Role),
-		Content:   m.Content,
-		Seq:       seq,
-		CreatedAt: m.CreatedAt,
+	model := &MessageModel{
+		ID:         m.ID,
+		SessionID:  sessionID,
+		Role:       string(m.Role),
+		Content:    m.Content,
+		ToolCallID: m.ToolCallID,
+		Seq:        seq,
+		CreatedAt:  m.CreatedAt,
 	}
+
+	if len(m.ToolCalls) > 0 {
+		data, err := json.Marshal(m.ToolCalls)
+		if err == nil {
+			model.ToolCallsJSON = string(data)
+		}
+	}
+
+	return model
 }
 
 func (m *EventModel) ToDomain() (session.Event, error) {

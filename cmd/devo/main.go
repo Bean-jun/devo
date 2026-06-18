@@ -11,6 +11,7 @@ import (
 	"devo/internal/interfaces/rest"
 	"devo/internal/storage/sqlite"
 	"devo/internal/taskexec/llmclient"
+	"devo/internal/taskexec/tools"
 
 	gormsqlite "github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -48,8 +49,13 @@ func main() {
 
 	var _ session.SessionStore = store
 
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register(&tools.ReadFileTool{})
+	toolRegistry.Register(&tools.ListFilesTool{})
+	toolRegistry.Register(&tools.SearchCodebaseTool{})
+
 	llm := llmclient.NewMockClient()
-	loop := agentloop.New(store, llm)
+	loop := agentloop.NewWithTools(store, llm, toolRegistry)
 	handler := rest.NewHandler(store, loop)
 
 	mux := http.NewServeMux()
