@@ -2,8 +2,10 @@ package agentloop
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -229,5 +231,373 @@ func TestAgentLoopWithoutToolExecutor(t *testing.T) {
 	_, ok := waitForEvent(ch, "tool_result", 3*time.Second)
 	if !ok {
 		t.Fatal("expected tool_result event even without executor")
+	}
+}
+
+type limitedToolMockClient struct {
+	callCount int
+	maxCalls  int
+}
+
+func (m *limitedToolMockClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
+	m.callCount++
+
+	lastMsg := messages[len(messages)-1]
+
+	if lastMsg.Role == session.RoleTool {
+		if m.callCount >= m.maxCalls {
+			return &llmclient.CompleteResult{
+				Text: "I have completed all the tool calls.",
+			}, nil
+		}
+		return &llmclient.CompleteResult{
+			ToolCalls: []session.ToolCall{
+				{
+					ID:       fmt.Sprintf("call-%d", m.callCount),
+					ToolName: "read_file",
+					Params: map[string]interface{}{
+						"path": "test.txt",
+					},
+				},
+			},
+		}, nil
+	}
+
+	if lastMsg.Role == session.RoleUser || lastMsg.Role == session.RoleSystem {
+		if m.callCount >= m.maxCalls {
+			return &llmclient.CompleteResult{
+				Text: "No more tool calls needed.",
+			}, nil
+		}
+		return &llmclient.CompleteResult{
+			ToolCalls: []session.ToolCall{
+				{
+					ID:       fmt.Sprintf("call-%d", m.callCount),
+					ToolName: "read_file",
+					Params: map[string]interface{}{
+						"path": "test.txt",
+					},
+				},
+			},
+		}, nil
+	}
+
+	return &llmclient.CompleteResult{Text: "OK"}, nil
+}
+
+func TestToolCallLimitReached(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("test content"), 0644)
+
+	store := session.NewInMemoryStore()
+
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register(&tools.ReadFileTool{})
+
+	loop := NewWithTools(store, &limitedToolMockClient{maxCalls: 100}, toolRegistry)
+
+	createTestSession(store, "sess-1")
+	sess, _ := store.Get("sess-1")
+	sess.WorkingDirectory = tmpDir
+	sess.ToolCallLimit = 3
+	store.Update(sess)
+
+	eventBus, _ := store.GetEventBus("sess-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "Do many operations"); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	stateChangeCount := 0
+	for {
+		evt, ok := waitForEvent(ch, "", 3*time.Second)
+		if !ok {
+			break
+		}
+		if evt.Type == "session_state_change" {
+			stateChangeCount++
+			data, _ := evt.Data.(map[string]any)
+			t.Logf("State change: %v", data)
+			if data["reason"] == "tool_limit_reached" {
+				t.Log("Got tool_limit_reached event")
+				break
+			}
+		}
+	}
+
+	sess, _ = store.Get("sess-1")
+	if sess.State != session.StateIdle {
+		t.Errorf("expected state Idle after tool limit reached, got %q", sess.State)
+	}
+	if sess.LastLoopTerminationReason != session.LoopTerminationToolLimitReached {
+		t.Errorf("expected termination reason tool_limit_reached, got %q", sess.LastLoopTerminationReason)
+	}
+	if sess.ToolCallCount < 3 {
+		t.Errorf("expected tool_call_count >= 3, got %d", sess.ToolCallCount)
+	}
+
+	msgs, total, _ := store.GetMessages("sess-1", 0, 0)
+	t.Logf("Total messages: %d", total)
+	hasLimitMessage := false
+	for _, m := range msgs {
+		if m.Role == session.RoleSystem && strings.Contains(m.Content, "达到上限暂停") {
+			hasLimitMessage = true
+		}
+	}
+	if !hasLimitMessage {
+		t.Error("expected system message about tool call limit reached")
+	}
+}
+
+func TestContinuationAfterToolLimit(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("continuation test"), 0644)
+
+	store := session.NewInMemoryStore()
+
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register(&tools.ReadFileTool{})
+
+	loop := NewWithTools(store, &limitedToolMockClient{maxCalls: 100}, toolRegistry)
+
+	createTestSession(store, "sess-1")
+	sess, _ := store.Get("sess-1")
+	sess.WorkingDirectory = tmpDir
+	sess.ToolCallLimit = 2
+	store.Update(sess)
+
+	eventBus, _ := store.GetEventBus("sess-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "Do operations"); err != nil {
+		t.Fatalf("first message: %v", err)
+	}
+
+	for {
+		evt, ok := waitForEvent(ch, "session_state_change", 3*time.Second)
+		if !ok {
+			break
+		}
+		data, _ := evt.Data.(map[string]any)
+		if data["reason"] == "tool_limit_reached" {
+			break
+		}
+	}
+
+	sess, _ = store.Get("sess-1")
+	if sess.LastLoopTerminationReason != session.LoopTerminationToolLimitReached {
+		t.Fatal("expected tool_limit_reached termination reason")
+	}
+
+	msgsBeforeContinue, _, _ := store.GetMessages("sess-1", 0, 0)
+	msgCountBefore := len(msgsBeforeContinue)
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "继续"); err != nil {
+		t.Fatalf("continuation message: %v", err)
+	}
+
+	msgsAfterContinue, _, _ := store.GetMessages("sess-1", 0, 0)
+	msgCountAfter := len(msgsAfterContinue)
+
+	hasContinuationMsg := false
+	for i := msgCountBefore; i < msgCountAfter; i++ {
+		m := msgsAfterContinue[i]
+		t.Logf("New message %d: role=%s content=%s", i, m.Role, m.Content)
+		if m.Role == session.RoleSystem && strings.Contains(m.Content, "从中断点继续") {
+			hasContinuationMsg = true
+		}
+	}
+	if !hasContinuationMsg {
+		t.Error("expected continuation system message")
+	}
+
+	sess, _ = store.Get("sess-1")
+	if sess.ToolCallCount != 0 {
+		t.Errorf("expected tool_call_count reset to 0, got %d", sess.ToolCallCount)
+	}
+	if sess.LastLoopTerminationReason != "" {
+		t.Errorf("expected termination reason cleared, got %q", sess.LastLoopTerminationReason)
+	}
+
+	for {
+		evt, ok := waitForEvent(ch, "session_state_change", 3*time.Second)
+		if !ok {
+			break
+		}
+		data, _ := evt.Data.(map[string]any)
+		t.Logf("Continuation state change: %v", data)
+		if data["reason"] == "tool_limit_reached" {
+			break
+		}
+	}
+}
+
+func TestUpdateConfigToolCallLimit(t *testing.T) {
+	store := session.NewInMemoryStore()
+	loop := New(store, llmclient.NewMockClient())
+
+	createTestSession(store, "sess-1")
+	sess, _ := store.Get("sess-1")
+	sess.ToolCallLimit = 50
+	store.Update(sess)
+
+	err := loop.UpdateConfig("sess-1", 80)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	sess, _ = store.Get("sess-1")
+	if sess.ToolCallLimit != 80 {
+		t.Errorf("expected tool_call_limit 80, got %d", sess.ToolCallLimit)
+	}
+}
+
+func TestUpdateConfigInvalidValue(t *testing.T) {
+	store := session.NewInMemoryStore()
+	loop := New(store, llmclient.NewMockClient())
+
+	createTestSession(store, "sess-1")
+
+	err := loop.UpdateConfig("sess-1", 0)
+	if err == nil {
+		t.Fatal("expected error for tool_call_limit <= 0")
+	}
+
+	err = loop.UpdateConfig("sess-1", -5)
+	if err == nil {
+		t.Fatal("expected error for negative tool_call_limit")
+	}
+}
+
+func TestUpdateConfigSessionNotFound(t *testing.T) {
+	store := session.NewInMemoryStore()
+	loop := New(store, llmclient.NewMockClient())
+
+	err := loop.UpdateConfig("nonexistent", 80)
+	if err == nil {
+		t.Fatal("expected error for nonexistent session")
+	}
+}
+
+func TestDefaultToolCallLimit(t *testing.T) {
+	if session.DefaultToolCallLimit != 50 {
+		t.Errorf("expected DefaultToolCallLimit 50, got %d", session.DefaultToolCallLimit)
+	}
+}
+
+func TestToolCallCountResetsOnNewLoop(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("hello"), 0644)
+
+	store := session.NewInMemoryStore()
+
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register(&tools.ReadFileTool{})
+
+	loop := NewWithTools(store, &limitedToolMockClient{maxCalls: 2}, toolRegistry)
+
+	createTestSession(store, "sess-1")
+	sess, _ := store.Get("sess-1")
+	sess.WorkingDirectory = tmpDir
+	sess.ToolCallLimit = 1
+	store.Update(sess)
+
+	eventBus, _ := store.GetEventBus("sess-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "Do one thing"); err != nil {
+		t.Fatalf("first message: %v", err)
+	}
+
+	for {
+		evt, ok := waitForEvent(ch, "session_state_change", 3*time.Second)
+		if !ok {
+			break
+		}
+		data, _ := evt.Data.(map[string]any)
+		if data["reason"] == "tool_limit_reached" {
+			break
+		}
+	}
+
+	sess, _ = store.Get("sess-1")
+	t.Logf("After first loop: tool_call_count=%d, termination_reason=%s", sess.ToolCallCount, sess.LastLoopTerminationReason)
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "继续"); err != nil {
+		t.Fatalf("continuation: %v", err)
+	}
+
+	sess, _ = store.Get("sess-1")
+	if sess.ToolCallCount != 0 {
+		t.Errorf("expected tool_call_count reset to 0 on new loop, got %d", sess.ToolCallCount)
+	}
+}
+
+func TestContinuationWithNewTask(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("test content"), 0644)
+
+	store := session.NewInMemoryStore()
+
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register(&tools.ReadFileTool{})
+
+	loop := NewWithTools(store, &limitedToolMockClient{maxCalls: 100}, toolRegistry)
+
+	createTestSession(store, "sess-1")
+	sess, _ := store.Get("sess-1")
+	sess.WorkingDirectory = tmpDir
+	sess.ToolCallLimit = 2
+	store.Update(sess)
+
+	eventBus, _ := store.GetEventBus("sess-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "First task"); err != nil {
+		t.Fatalf("first message: %v", err)
+	}
+
+	for {
+		evt, ok := waitForEvent(ch, "session_state_change", 3*time.Second)
+		if !ok {
+			break
+		}
+		data, _ := evt.Data.(map[string]any)
+		if data["reason"] == "tool_limit_reached" {
+			break
+		}
+	}
+
+	msgsBeforeContinue, _, _ := store.GetMessages("sess-1", 0, 0)
+	msgCountBefore := len(msgsBeforeContinue)
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "Do a completely different task now"); err != nil {
+		t.Fatalf("new task message: %v", err)
+	}
+
+	msgsAfterContinue, _, _ := store.GetMessages("sess-1", 0, 0)
+	msgCountAfter := len(msgsAfterContinue)
+
+	hasContinuationMsg := false
+	hasNewTaskMsg := false
+	for i := msgCountBefore; i < msgCountAfter; i++ {
+		m := msgsAfterContinue[i]
+		if m.Role == session.RoleSystem && strings.Contains(m.Content, "从中断点继续") {
+			hasContinuationMsg = true
+		}
+		if m.Role == session.RoleUser && m.Content == "Do a completely different task now" {
+			hasNewTaskMsg = true
+		}
+	}
+	if !hasContinuationMsg {
+		t.Error("expected continuation context message even with new task")
+	}
+	if !hasNewTaskMsg {
+		t.Error("expected new task user message")
 	}
 }

@@ -30,6 +30,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/sessions", h.ListSessions)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/files", h.GetFiles)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", h.GetSession)
+	mux.HandleFunc("PUT /api/v1/sessions/{id}/config", h.UpdateConfig)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/messages", h.PostMessage)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/messages", h.GetMessages)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", h.SSEEvents)
@@ -128,6 +129,8 @@ type getSessionResponse struct {
 	TrustLevel             string            `json:"trust_level"`
 	ApprovalPolicy         map[string]string `json:"approval_policy,omitempty"`
 	ApprovalTimeoutSeconds int               `json:"approval_timeout_seconds"`
+	ToolCallLimit          int               `json:"tool_call_limit"`
+	ToolCallCount          int               `json:"tool_call_count"`
 }
 
 func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
@@ -157,6 +160,8 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 		TrustLevel:             sess.TrustLevel,
 		ApprovalPolicy:         sess.ApprovalPolicy,
 		ApprovalTimeoutSeconds: sess.ApprovalTimeoutSeconds,
+		ToolCallLimit:          sess.ToolCallLimit,
+		ToolCallCount:          sess.ToolCallCount,
 	})
 }
 
@@ -675,6 +680,49 @@ func (h *Handler) SetApprovalPolicy(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"approval_policy": sess.ApprovalPolicy,
+	})
+}
+
+type updateConfigRequest struct {
+	ToolCallLimit *int `json:"tool_call_limit,omitempty"`
+}
+
+type updateConfigResponse struct {
+	ToolCallLimit int `json:"tool_call_limit"`
+}
+
+func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var req updateConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.ToolCallLimit != nil {
+		if *req.ToolCallLimit <= 0 {
+			writeError(w, http.StatusBadRequest, "tool_call_limit must be greater than 0")
+			return
+		}
+		if err := h.loop.UpdateConfig(id, *req.ToolCallLimit); err != nil {
+			if errors.Is(err, session.ErrSessionNotFound) {
+				writeError(w, http.StatusNotFound, "session not found")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+
+	sess, err := h.store.Get(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, updateConfigResponse{
+		ToolCallLimit: sess.ToolCallLimit,
 	})
 }
 

@@ -104,13 +104,16 @@ func (s *GormStore) Update(sess *session.Session) error {
 	}
 
 	updates := map[string]interface{}{
-		"title":                    sess.Title,
-		"working_directory":        sess.WorkingDirectory,
-		"state":                    string(sess.State),
-		"last_active_at":           sess.LastActiveAt,
-		"active_sse_connections":   sess.ActiveSSEConnections,
-		"trust_level":              sess.TrustLevel,
-		"approval_timeout_seconds": sess.ApprovalTimeoutSeconds,
+		"title":                        sess.Title,
+		"working_directory":            sess.WorkingDirectory,
+		"state":                        string(sess.State),
+		"last_active_at":               sess.LastActiveAt,
+		"active_sse_connections":       sess.ActiveSSEConnections,
+		"trust_level":                  sess.TrustLevel,
+		"approval_timeout_seconds":     sess.ApprovalTimeoutSeconds,
+		"tool_call_limit":              sess.ToolCallLimit,
+		"tool_call_count":              sess.ToolCallCount,
+		"last_loop_termination_reason": string(sess.LastLoopTerminationReason),
 	}
 
 	if sess.ApprovalPolicy != nil {

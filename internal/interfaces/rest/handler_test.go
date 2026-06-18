@@ -1921,3 +1921,129 @@ func waitForEvent(ch chan session.Event, eventType string, timeout time.Duration
 		}
 	}
 }
+
+func doPut(t *testing.T, url string, body []byte) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest("PUT", url, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+	return resp
+}
+
+func TestUpdateConfig_ToolCallLimit(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+		ToolCallLimit:    50,
+	}
+	store.Create(sess)
+
+	body := map[string]int{"tool_call_limit": 80}
+	jsonBody, _ := json.Marshal(body)
+
+	resp := doPut(t, server.URL+"/api/v1/sessions/sess-test-1/config", jsonBody)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result updateConfigResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.ToolCallLimit != 80 {
+		t.Errorf("expected tool_call_limit 80, got %d", result.ToolCallLimit)
+	}
+
+	sessGot, _ := store.Get("sess-test-1")
+	if sessGot.ToolCallLimit != 80 {
+		t.Errorf("expected tool_call_limit 80 in store, got %d", sessGot.ToolCallLimit)
+	}
+}
+
+func TestUpdateConfig_InvalidValue(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+		ToolCallLimit:    50,
+	}
+	store.Create(sess)
+
+	body := map[string]int{"tool_call_limit": 0}
+	jsonBody, _ := json.Marshal(body)
+
+	resp := doPut(t, server.URL+"/api/v1/sessions/sess-test-1/config", jsonBody)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400 for tool_call_limit=0, got %d", resp.StatusCode)
+	}
+}
+
+func TestUpdateConfig_NotFound(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	body := map[string]int{"tool_call_limit": 80}
+	jsonBody, _ := json.Marshal(body)
+
+	resp := doPut(t, server.URL+"/api/v1/sessions/nonexistent/config", jsonBody)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestGetSession_IncludesToolCallFields(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+		ToolCallLimit:    50,
+		ToolCallCount:    3,
+	}
+	store.Create(sess)
+
+	resp, err := http.Get(server.URL + "/api/v1/sessions/sess-test-1")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result getSessionResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	if result.ToolCallLimit != 50 {
+		t.Errorf("expected tool_call_limit 50, got %d", result.ToolCallLimit)
+	}
+	if result.ToolCallCount != 3 {
+		t.Errorf("expected tool_call_count 3, got %d", result.ToolCallCount)
+	}
+}

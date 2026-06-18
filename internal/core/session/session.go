@@ -43,22 +43,36 @@ type Message struct {
 	CreatedAt  time.Time  `json:"created_at"`
 }
 
+type LoopTerminationReason string
+
+const (
+	LoopTerminationCompleted        LoopTerminationReason = "completed"
+	LoopTerminationCancelled        LoopTerminationReason = "cancelled"
+	LoopTerminationToolLimitReached LoopTerminationReason = "tool_limit_reached"
+	LoopTerminationError            LoopTerminationReason = "error"
+)
+
+const DefaultToolCallLimit = 50
+
 type Session struct {
-	ID                     string            `json:"id"`
-	Title                  string            `json:"title"`
-	WorkingDirectory       string            `json:"working_directory"`
-	State                  State             `json:"state"`
-	CreatedAt              time.Time         `json:"created_at"`
-	LastActiveAt           time.Time         `json:"last_active_at"`
-	Messages               []Message         `json:"messages,omitempty"`
-	ActiveSSEConnections   int               `json:"active_sse_connections"`
-	ChildPID               *int              `json:"child_pid,omitempty"`
-	EventBus               *EventBus         `json:"-"`
-	TrustLevel             string            `json:"trust_level"`
-	ApprovalPolicy         map[string]string `json:"approval_policy,omitempty"`
-	ApprovalTimeoutSeconds int               `json:"approval_timeout_seconds"`
-	CancelRequested        bool              `json:"cancel_requested"`
-	PauseRequested         bool              `json:"pause_requested"`
+	ID                        string                `json:"id"`
+	Title                     string                `json:"title"`
+	WorkingDirectory          string                `json:"working_directory"`
+	State                     State                 `json:"state"`
+	CreatedAt                 time.Time             `json:"created_at"`
+	LastActiveAt              time.Time             `json:"last_active_at"`
+	Messages                  []Message             `json:"messages,omitempty"`
+	ActiveSSEConnections      int                   `json:"active_sse_connections"`
+	ChildPID                  *int                  `json:"child_pid,omitempty"`
+	EventBus                  *EventBus             `json:"-"`
+	TrustLevel                string                `json:"trust_level"`
+	ApprovalPolicy            map[string]string     `json:"approval_policy,omitempty"`
+	ApprovalTimeoutSeconds    int                   `json:"approval_timeout_seconds"`
+	CancelRequested           bool                  `json:"cancel_requested"`
+	PauseRequested            bool                  `json:"pause_requested"`
+	ToolCallLimit             int                   `json:"tool_call_limit"`
+	ToolCallCount             int                   `json:"tool_call_count"`
+	LastLoopTerminationReason LoopTerminationReason `json:"last_loop_termination_reason,omitempty"`
 }
 
 var (

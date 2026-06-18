@@ -10,16 +10,19 @@ import (
 )
 
 type SessionModel struct {
-	ID                     string    `gorm:"primaryKey;size:64"`
-	Title                  string    `gorm:"size:256"`
-	WorkingDirectory       string    `gorm:"size:512;index:idx_working_dir"`
-	State                  string    `gorm:"size:32;index:idx_state"`
-	CreatedAt              time.Time `gorm:"autoCreateTime"`
-	LastActiveAt           time.Time
-	ActiveSSEConnections   int
-	TrustLevel             string `gorm:"size:32;default:normal"`
-	ApprovalPolicyJSON     string `gorm:"type:text"`
-	ApprovalTimeoutSeconds int    `gorm:"default:300"`
+	ID                        string    `gorm:"primaryKey;size:64"`
+	Title                     string    `gorm:"size:256"`
+	WorkingDirectory          string    `gorm:"size:512;index:idx_working_dir"`
+	State                     string    `gorm:"size:32;index:idx_state"`
+	CreatedAt                 time.Time `gorm:"autoCreateTime"`
+	LastActiveAt              time.Time
+	ActiveSSEConnections      int
+	TrustLevel                string `gorm:"size:32;default:normal"`
+	ApprovalPolicyJSON        string `gorm:"type:text"`
+	ApprovalTimeoutSeconds    int    `gorm:"default:300"`
+	ToolCallLimit             int    `gorm:"default:50"`
+	ToolCallCount             int    `gorm:"default:0"`
+	LastLoopTerminationReason string `gorm:"size:32"`
 }
 
 type MessageModel struct {
@@ -44,16 +47,19 @@ type EventModel struct {
 
 func (m *SessionModel) ToDomain() *session.Session {
 	sess := &session.Session{
-		ID:                     m.ID,
-		Title:                  m.Title,
-		WorkingDirectory:       m.WorkingDirectory,
-		State:                  session.State(m.State),
-		CreatedAt:              m.CreatedAt,
-		LastActiveAt:           m.LastActiveAt,
-		ActiveSSEConnections:   m.ActiveSSEConnections,
-		TrustLevel:             m.TrustLevel,
-		ApprovalPolicy:         make(map[string]string),
-		ApprovalTimeoutSeconds: m.ApprovalTimeoutSeconds,
+		ID:                        m.ID,
+		Title:                     m.Title,
+		WorkingDirectory:          m.WorkingDirectory,
+		State:                     session.State(m.State),
+		CreatedAt:                 m.CreatedAt,
+		LastActiveAt:              m.LastActiveAt,
+		ActiveSSEConnections:      m.ActiveSSEConnections,
+		TrustLevel:                m.TrustLevel,
+		ApprovalPolicy:            make(map[string]string),
+		ApprovalTimeoutSeconds:    m.ApprovalTimeoutSeconds,
+		ToolCallLimit:             m.ToolCallLimit,
+		ToolCallCount:             m.ToolCallCount,
+		LastLoopTerminationReason: session.LoopTerminationReason(m.LastLoopTerminationReason),
 	}
 
 	if m.ApprovalPolicyJSON != "" {
@@ -68,15 +74,18 @@ func (m *SessionModel) ToDomain() *session.Session {
 
 func fromDomain(s *session.Session) *SessionModel {
 	model := &SessionModel{
-		ID:                     s.ID,
-		Title:                  s.Title,
-		WorkingDirectory:       s.WorkingDirectory,
-		State:                  string(s.State),
-		CreatedAt:              s.CreatedAt,
-		LastActiveAt:           s.LastActiveAt,
-		ActiveSSEConnections:   s.ActiveSSEConnections,
-		TrustLevel:             s.TrustLevel,
-		ApprovalTimeoutSeconds: s.ApprovalTimeoutSeconds,
+		ID:                        s.ID,
+		Title:                     s.Title,
+		WorkingDirectory:          s.WorkingDirectory,
+		State:                     string(s.State),
+		CreatedAt:                 s.CreatedAt,
+		LastActiveAt:              s.LastActiveAt,
+		ActiveSSEConnections:      s.ActiveSSEConnections,
+		TrustLevel:                s.TrustLevel,
+		ApprovalTimeoutSeconds:    s.ApprovalTimeoutSeconds,
+		ToolCallLimit:             s.ToolCallLimit,
+		ToolCallCount:             s.ToolCallCount,
+		LastLoopTerminationReason: string(s.LastLoopTerminationReason),
 	}
 
 	if s.ApprovalPolicy != nil && len(s.ApprovalPolicy) > 0 {

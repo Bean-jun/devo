@@ -74,6 +74,8 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotIdle, sess.State)
 	}
 
+	isContinuation := sess.LastLoopTerminationReason == session.LoopTerminationToolLimitReached
+
 	if sess.State == session.StatePaused {
 		sess.State = session.StateProcessing
 		sess.LastActiveAt = time.Now()
@@ -86,6 +88,23 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		if err := l.store.Update(sess); err != nil {
 			return fmt.Errorf("update session state to processing: %w", err)
 		}
+	}
+
+	if isContinuation {
+		pauseMsg := session.Message{
+			ID:        session.GenerateID("msg"),
+			Role:      session.RoleSystem,
+			Content:   fmt.Sprintf("上一次任务因达到工具调用上限（%d 次）而暂停。当前任务尚未完成，请从中断点继续。已完成的工作保留在文件系统中，无需重复执行。", sess.ToolCallCount),
+			CreatedAt: time.Now(),
+		}
+		if err := l.store.AddMessage(sessionID, pauseMsg); err != nil {
+			sess.State = session.StateIdle
+			l.store.Update(sess)
+			return fmt.Errorf("add continuation system message: %w", err)
+		}
+		sess.ToolCallCount = 0
+		sess.LastLoopTerminationReason = ""
+		l.store.Update(sess)
 	}
 
 	userMsg := session.Message{
@@ -406,6 +425,13 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 		return
 	}
 
+	sess.ToolCallCount = 0
+	sess.LastLoopTerminationReason = ""
+	if err := l.store.Update(sess); err != nil {
+		l.handleLoopError(sessionID, fmt.Errorf("update session: %w", err))
+		return
+	}
+
 	for {
 		msgs, _, err := l.store.GetMessages(sessionID, 0, 0)
 		if err != nil {
@@ -563,6 +589,11 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 						"success":   false,
 						"summary":   fmt.Sprintf("error: %v", err),
 					})
+
+					if l.incrementToolCallCount(sessionID, eventBus) {
+						return
+					}
+
 					continue
 				}
 
@@ -584,6 +615,10 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 					"success":   toolResult.Success,
 					"summary":   summary,
 				})
+
+				if l.incrementToolCallCount(sessionID, eventBus) {
+					return
+				}
 
 				if l.checkControlFlags(sessionID, eventBus) {
 					return
@@ -923,6 +958,69 @@ func (l *Loop) toolResultToMessage(tr *tools.ToolResult) session.Message {
 		ToolCallID: tr.ToolCallID,
 		CreatedAt:  time.Now(),
 	}
+}
+
+func (l *Loop) incrementToolCallCount(sessionID string, eventBus *session.EventBus) (shouldStop bool) {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return false
+	}
+
+	sess.ToolCallCount++
+	if sess.ToolCallLimit <= 0 {
+		sess.ToolCallLimit = session.DefaultToolCallLimit
+	}
+	l.store.Update(sess)
+
+	if sess.ToolCallCount >= sess.ToolCallLimit {
+		sess, err = l.store.Get(sessionID)
+		if err != nil {
+			return false
+		}
+
+		limitMsg := session.Message{
+			ID:        session.GenerateID("msg"),
+			Role:      session.RoleSystem,
+			Content:   fmt.Sprintf("AI 已进行 %d 次工具调用，达到上限暂停。任务尚未完成，是否继续？", sess.ToolCallCount),
+			CreatedAt: time.Now(),
+		}
+		l.store.AddMessage(sessionID, limitMsg)
+
+		oldState := string(sess.State)
+		sess.State = session.StateIdle
+		sess.LastLoopTerminationReason = session.LoopTerminationToolLimitReached
+		sess.LastActiveAt = time.Now()
+		l.store.Update(sess)
+
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": oldState,
+			"new_state": string(session.StateIdle),
+			"reason":    "tool_limit_reached",
+		})
+
+		return true
+	}
+
+	return false
+}
+
+func (l *Loop) UpdateConfig(sessionID string, toolCallLimit int) error {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+
+	if toolCallLimit <= 0 {
+		return fmt.Errorf("tool_call_limit must be greater than 0")
+	}
+
+	sess.ToolCallLimit = toolCallLimit
+	sess.LastActiveAt = time.Now()
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update session config: %w", err)
+	}
+
+	return nil
 }
 
 func (l *Loop) handleLoopError(sessionID string, err error) {
