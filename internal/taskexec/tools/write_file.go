@@ -9,6 +9,35 @@ import (
 	"devo/internal/taskexec/pathsec"
 )
 
+func (t *WriteFileTool) PreviewDiff(workingDir string, params map[string]interface{}) (string, error) {
+	path, ok := params["path"].(string)
+	if !ok || path == "" {
+		return "", fmt.Errorf("missing required parameter: path")
+	}
+
+	content, ok := params["content"].(string)
+	if !ok {
+		return "", fmt.Errorf("missing required parameter: content")
+	}
+
+	safePath, err := pathsec.CheckPath(workingDir, path)
+	if err != nil {
+		return "", fmt.Errorf("path security check failed")
+	}
+
+	oldData, err := os.ReadFile(safePath)
+	if err != nil {
+		return "", nil
+	}
+
+	oldContent := string(oldData)
+	if oldContent == content {
+		return "", nil
+	}
+
+	return generateUnifiedDiff(oldContent, content), nil
+}
+
 type WriteFileTool struct{}
 
 func (t *WriteFileTool) Name() string {
@@ -267,4 +296,104 @@ func applyHunk(original []string, origIdx, hunkOrigStart int, hunkLines []string
 	}
 
 	return result, origLineIdx, nil
+}
+
+func (t *EditFileTool) PreCheck(params map[string]interface{}) error {
+	path, ok := params["path"].(string)
+	if !ok || path == "" {
+		return fmt.Errorf("missing required parameter: path")
+	}
+
+	mode, ok := params["mode"].(string)
+	if !ok {
+		return fmt.Errorf("missing required parameter: mode")
+	}
+
+	switch mode {
+	case "replace":
+		oldStr, ok := params["old_str"].(string)
+		if !ok || oldStr == "" {
+			return fmt.Errorf("missing required parameter: old_str")
+		}
+		_ = oldStr
+	case "patch":
+		patchData, ok := params["patch"].(string)
+		if !ok || patchData == "" {
+			return fmt.Errorf("missing required parameter: patch")
+		}
+		_ = patchData
+	default:
+		return fmt.Errorf("unknown edit mode: %s (supported: replace, patch)", mode)
+	}
+
+	return nil
+}
+
+func (t *EditFileTool) PreviewDiff(workingDir string, params map[string]interface{}) (string, error) {
+	path, ok := params["path"].(string)
+	if !ok || path == "" {
+		return "", fmt.Errorf("missing required parameter: path")
+	}
+
+	mode, ok := params["mode"].(string)
+	if !ok {
+		return "", fmt.Errorf("missing required parameter: mode")
+	}
+
+	safePath, err := pathsec.CheckPath(workingDir, path)
+	if err != nil {
+		return "", fmt.Errorf("path security check failed")
+	}
+
+	oldData, err := os.ReadFile(safePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %v", err)
+	}
+	oldContent := string(oldData)
+
+	var newContent string
+
+	switch mode {
+	case "replace":
+		oldStr, ok := params["old_str"].(string)
+		if !ok || oldStr == "" {
+			return "", fmt.Errorf("missing required parameter: old_str")
+		}
+
+		newStr, ok := params["new_str"].(string)
+		if !ok {
+			newStr = ""
+		}
+
+		count := strings.Count(oldContent, oldStr)
+		if count == 0 {
+			return "", fmt.Errorf("old_str not found in file")
+		}
+		if count > 1 {
+			return "", fmt.Errorf("old_str matches %d unique locations in the file, please provide more context to make the replacement unique", count)
+		}
+
+		newContent = strings.Replace(oldContent, oldStr, newStr, 1)
+
+	case "patch":
+		patchData, ok := params["patch"].(string)
+		if !ok || patchData == "" {
+			return "", fmt.Errorf("missing required parameter: patch")
+		}
+
+		patched, err := applyUnifiedDiff(oldContent, patchData)
+		if err != nil {
+			return "", fmt.Errorf("patch application failed: %v", err)
+		}
+		newContent = patched
+
+	default:
+		return "", fmt.Errorf("unknown edit mode: %s", mode)
+	}
+
+	if oldContent == newContent {
+		return "", nil
+	}
+
+	return generateUnifiedDiff(oldContent, newContent), nil
 }

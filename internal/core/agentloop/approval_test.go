@@ -654,3 +654,494 @@ func TestResolveApproval_Expired(t *testing.T) {
 		t.Errorf("expected 'expired' in error message, got: %v", err)
 	}
 }
+
+type overwriteApprovalMockClient struct {
+	callCount int
+}
+
+func (m *overwriteApprovalMockClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
+	m.callCount++
+
+	lastMsg := messages[len(messages)-1]
+
+	if lastMsg.Role == session.RoleTool {
+		return &llmclient.CompleteResult{
+			Text: "I received the tool result: " + lastMsg.Content,
+		}, nil
+	}
+
+	if lastMsg.Role == session.RoleUser {
+		if m.callCount == 1 {
+			return &llmclient.CompleteResult{
+				ToolCalls: []session.ToolCall{
+					{
+						ID:       "call-1",
+						ToolName: "write_file",
+						Params: map[string]interface{}{
+							"path":    "existing.txt",
+							"content": "new line1\nnew line2\n",
+						},
+					},
+				},
+			}, nil
+		}
+
+		return &llmclient.CompleteResult{
+			Text: "Echo: " + lastMsg.Content,
+		}, nil
+	}
+
+	return &llmclient.CompleteResult{Text: "OK"}, nil
+}
+
+func TestApprovalRequest_WriteFileDiff(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "existing.txt"), []byte("old line1\nold line2\n"), 0644)
+
+	store := session.NewInMemoryStore()
+
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register(&tools.WriteFileTool{})
+
+	loop := NewWithTools(store, &overwriteApprovalMockClient{}, toolRegistry)
+
+	createTestSession(store, "sess-1")
+	sess, _ := store.Get("sess-1")
+	sess.WorkingDirectory = tmpDir
+	store.Update(sess)
+
+	eventBus, _ := store.GetEventBus("sess-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "Overwrite the file"); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	evt, ok := waitForEvent(ch, "approval_required", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for approval_required event")
+	}
+
+	data, ok := evt.Data.(map[string]any)
+	if !ok {
+		t.Fatal("expected approval_required data to be a map")
+	}
+
+	details, ok := data["details"].(map[string]any)
+	if !ok {
+		t.Fatal("expected details to be a map")
+	}
+
+	if details["path"] != "existing.txt" {
+		t.Errorf("expected path 'existing.txt', got %v", details["path"])
+	}
+
+	diff, ok := details["diff"].(string)
+	if !ok || diff == "" {
+		t.Fatal("expected diff in details for overwrite operation")
+	}
+
+	if !strings.Contains(diff, "@@") {
+		t.Error("diff should contain @@ header")
+	}
+	if !strings.Contains(diff, "old line") {
+		t.Error("diff should mention old content")
+	}
+	if !strings.Contains(diff, "new line") {
+		t.Error("diff should mention new content")
+	}
+
+	t.Logf("Diff:\n%s", diff)
+
+	approvalID, ok := data["approval_id"].(string)
+	if !ok || approvalID == "" {
+		t.Fatal("expected approval_id in approval_required event")
+	}
+
+	if err := loop.ResolveApproval("sess-1", approvalID, "approve"); err != nil {
+		t.Fatalf("failed to resolve approval: %v", err)
+	}
+
+	_, ok = waitForEvent(ch, "session_state_change", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for session_state_change (completed)")
+	}
+}
+
+type editApprovalMockClient struct {
+	callCount int
+}
+
+func (m *editApprovalMockClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
+	m.callCount++
+
+	lastMsg := messages[len(messages)-1]
+
+	if lastMsg.Role == session.RoleTool {
+		if strings.Contains(lastMsg.Content, "错误") {
+			return &llmclient.CompleteResult{
+				Text: "The edit failed: " + lastMsg.Content,
+			}, nil
+		}
+		return &llmclient.CompleteResult{
+			Text: "Edit completed: " + lastMsg.Content,
+		}, nil
+	}
+
+	if lastMsg.Role == session.RoleUser {
+		if m.callCount == 1 {
+			return &llmclient.CompleteResult{
+				ToolCalls: []session.ToolCall{
+					{
+						ID:       "call-1",
+						ToolName: "edit_file",
+						Params: map[string]interface{}{
+							"path":    "app.go",
+							"mode":    "replace",
+							"old_str": "old_func",
+							"new_str": "new_func",
+						},
+					},
+				},
+			}, nil
+		}
+
+		return &llmclient.CompleteResult{
+			Text: "Done.",
+		}, nil
+	}
+
+	return &llmclient.CompleteResult{Text: "OK"}, nil
+}
+
+func TestApprovalRequest_EditFileDiff(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalContent := "package main\n\nfunc old_func() {\n\treturn\n}\n"
+	os.WriteFile(filepath.Join(tmpDir, "app.go"), []byte(originalContent), 0644)
+
+	store := session.NewInMemoryStore()
+
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register(&tools.EditFileTool{})
+
+	loop := NewWithTools(store, &editApprovalMockClient{}, toolRegistry)
+
+	createTestSession(store, "sess-1")
+	sess, _ := store.Get("sess-1")
+	sess.WorkingDirectory = tmpDir
+	store.Update(sess)
+
+	eventBus, _ := store.GetEventBus("sess-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "Edit the file"); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	evt, ok := waitForEvent(ch, "approval_required", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for approval_required event")
+	}
+
+	data, ok := evt.Data.(map[string]any)
+	if !ok {
+		t.Fatal("expected approval_required data to be a map")
+	}
+
+	details, ok := data["details"].(map[string]any)
+	if !ok {
+		t.Fatal("expected details to be a map")
+	}
+
+	if details["path"] != "app.go" {
+		t.Errorf("expected path 'app.go', got %v", details["path"])
+	}
+	if details["mode"] != "replace" {
+		t.Errorf("expected mode 'replace', got %v", details["mode"])
+	}
+
+	diff, ok := details["diff"].(string)
+	if !ok || diff == "" {
+		t.Fatal("expected diff in details for edit_file operation")
+	}
+
+	if !strings.Contains(diff, "@@") {
+		t.Error("diff should contain @@ header")
+	}
+	if !strings.Contains(diff, "old_func") {
+		t.Error("diff should mention old_func")
+	}
+	if !strings.Contains(diff, "new_func") {
+		t.Error("diff should mention new_func")
+	}
+
+	t.Logf("Edit Diff:\n%s", diff)
+
+	approvalID, ok := data["approval_id"].(string)
+	if !ok || approvalID == "" {
+		t.Fatal("expected approval_id in approval_required event")
+	}
+
+	if err := loop.ResolveApproval("sess-1", approvalID, "approve"); err != nil {
+		t.Fatalf("failed to resolve approval: %v", err)
+	}
+
+	_, ok = waitForEvent(ch, "session_state_change", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for session_state_change (completed)")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	fileData, err := os.ReadFile(filepath.Join(tmpDir, "app.go"))
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if !strings.Contains(string(fileData), "new_func") {
+		t.Error("file should contain new_func after edit")
+	}
+}
+
+type editFailureMockClient struct {
+	callCount int
+}
+
+func (m *editFailureMockClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
+	m.callCount++
+
+	lastMsg := messages[len(messages)-1]
+
+	if lastMsg.Role == session.RoleTool {
+		if strings.Contains(lastMsg.Content, "错误") {
+			return &llmclient.CompleteResult{
+				Text: "The edit failed, I'll try a different approach.",
+			}, nil
+		}
+		return &llmclient.CompleteResult{
+			Text: "Edit completed: " + lastMsg.Content,
+		}, nil
+	}
+
+	if lastMsg.Role == session.RoleUser {
+		if m.callCount == 1 {
+			return &llmclient.CompleteResult{
+				ToolCalls: []session.ToolCall{
+					{
+						ID:       "call-1",
+						ToolName: "edit_file",
+						Params: map[string]interface{}{
+							"path":    "dup.txt",
+							"mode":    "replace",
+							"old_str": "hello",
+							"new_str": "hi",
+						},
+					},
+				},
+			}, nil
+		}
+
+		return &llmclient.CompleteResult{
+			Text: "Done.",
+		}, nil
+	}
+
+	return &llmclient.CompleteResult{Text: "OK"}, nil
+}
+
+func TestApprovalRequest_EditFileDiffFailureNoApproval(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.WriteFile(filepath.Join(tmpDir, "dup.txt"), []byte("hello\nhello\n"), 0644)
+
+	store := session.NewInMemoryStore()
+
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register(&tools.EditFileTool{})
+
+	loop := NewWithTools(store, &editFailureMockClient{}, toolRegistry)
+
+	createTestSession(store, "sess-1")
+	sess, _ := store.Get("sess-1")
+	sess.WorkingDirectory = tmpDir
+	store.Update(sess)
+
+	eventBus, _ := store.GetEventBus("sess-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "Edit the file"); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	var evt session.Event
+	var foundApproval, foundToolResult bool
+	timeout := time.After(3 * time.Second)
+loop:
+	for {
+		select {
+		case <-timeout:
+			break loop
+		case e, ok := <-ch:
+			if !ok {
+				break loop
+			}
+			if e.Type == "approval_required" {
+				foundApproval = true
+			}
+			if e.Type == "tool_result" {
+				evt = e
+				foundToolResult = true
+				break loop
+			}
+		}
+	}
+
+	if foundApproval {
+		t.Fatal("should NOT have received approval_required event for failed edit")
+	}
+	if !foundToolResult {
+		t.Fatal("timed out waiting for tool_result event")
+	}
+
+	toolResultData, ok := evt.Data.(map[string]any)
+	if !ok {
+		t.Fatal("expected tool_result data to be a map")
+	}
+	if toolResultData["success"] != false {
+		t.Error("expected tool_result success=false for failed edit")
+	}
+
+	_, ok = waitForEvent(ch, "session_state_change", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for session_state_change (completed)")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	data, _ := os.ReadFile(filepath.Join(tmpDir, "dup.txt"))
+	if string(data) != "hello\nhello\n" {
+		t.Error("file should NOT have been modified")
+	}
+}
+
+type execCommandApprovalMockClient struct {
+	callCount int
+}
+
+func (m *execCommandApprovalMockClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
+	m.callCount++
+
+	lastMsg := messages[len(messages)-1]
+
+	if lastMsg.Role == session.RoleTool {
+		return &llmclient.CompleteResult{
+			Text: "Command executed: " + lastMsg.Content,
+		}, nil
+	}
+
+	if lastMsg.Role == session.RoleUser {
+		if m.callCount == 1 {
+			return &llmclient.CompleteResult{
+				ToolCalls: []session.ToolCall{
+					{
+						ID:       "call-1",
+						ToolName: "execute_command",
+						Params: map[string]interface{}{
+							"command":         "echo hello",
+							"timeout_seconds": float64(60),
+						},
+					},
+				},
+			}, nil
+		}
+
+		return &llmclient.CompleteResult{
+			Text: "Done.",
+		}, nil
+	}
+
+	return &llmclient.CompleteResult{Text: "OK"}, nil
+}
+
+func TestApprovalRequest_ExecuteCommandContext(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	store := session.NewInMemoryStore()
+
+	toolRegistry := tools.NewRegistry()
+	toolRegistry.Register(tools.NewExecuteCommandTool())
+
+	loop := NewWithTools(store, &execCommandApprovalMockClient{}, toolRegistry)
+
+	createTestSession(store, "sess-1")
+	sess, _ := store.Get("sess-1")
+	sess.WorkingDirectory = tmpDir
+	store.Update(sess)
+
+	eventBus, _ := store.GetEventBus("sess-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	if err := loop.ProcessMessage(context.Background(), "sess-1", "Run a command"); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	evt, ok := waitForEvent(ch, "approval_required", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for approval_required event")
+	}
+
+	data, ok := evt.Data.(map[string]any)
+	if !ok {
+		t.Fatal("expected approval_required data to be a map")
+	}
+
+	details, ok := data["details"].(map[string]any)
+	if !ok {
+		t.Fatal("expected details to be a map")
+	}
+
+	if details["command"] != "echo hello" {
+		t.Errorf("expected command 'echo hello', got %v", details["command"])
+	}
+
+	cmdCtx, ok := details["command_context"].(map[string]any)
+	if !ok {
+		t.Fatal("expected command_context in details")
+	}
+
+	if cmdCtx["working_directory"] != tmpDir {
+		t.Errorf("expected working_directory %s, got %v", tmpDir, cmdCtx["working_directory"])
+	}
+	if cmdCtx["invocation"] == nil {
+		t.Error("expected invocation in command_context")
+	}
+	if cmdCtx["timeout_seconds"] != 60 {
+		t.Errorf("expected timeout_seconds 60, got %v", cmdCtx["timeout_seconds"])
+	}
+
+	resourceLimits, ok := cmdCtx["resource_limits"].(map[string]any)
+	if !ok {
+		t.Fatal("expected resource_limits in command_context")
+	}
+	if resourceLimits["max_memory_mb"] == nil && resourceLimits["note"] == nil {
+		t.Error("expected either max_memory_mb or note in resource_limits")
+	}
+
+	t.Logf("command_context: %+v", cmdCtx)
+
+	approvalID, ok := data["approval_id"].(string)
+	if !ok || approvalID == "" {
+		t.Fatal("expected approval_id in approval_required event")
+	}
+
+	if err := loop.ResolveApproval("sess-1", approvalID, "approve"); err != nil {
+		t.Fatalf("failed to resolve approval: %v", err)
+	}
+
+	_, ok = waitForEvent(ch, "session_state_change", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for session_state_change (completed)")
+	}
+}

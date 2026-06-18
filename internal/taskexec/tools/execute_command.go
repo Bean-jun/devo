@@ -58,6 +58,30 @@ func (t *ExecuteCommandTool) OperationType(workingDir string, params map[string]
 	return "execute_command"
 }
 
+func (t *ExecuteCommandTool) GetCommandContext(workingDir string, params map[string]interface{}) map[string]any {
+	timeoutSeconds := 30
+	if ts, ok := params["timeout_seconds"].(float64); ok && ts > 0 {
+		timeoutSeconds = int(ts)
+	}
+
+	ctx := map[string]any{
+		"working_directory": workingDir,
+		"invocation":        "python -c <内置脚本> (DEVO_COMMAND env)",
+		"timeout_seconds":   timeoutSeconds,
+	}
+
+	resourceLimits := map[string]any{
+		"max_memory_mb": 512,
+	}
+	if sandbox.PlatformResourceLimitsNote() != "" {
+		resourceLimits["note"] = sandbox.PlatformResourceLimitsNote()
+		resourceLimits["max_memory_mb"] = nil
+	}
+	ctx["resource_limits"] = resourceLimits
+
+	return ctx
+}
+
 func (t *ExecuteCommandTool) PreCheck(params map[string]interface{}) error {
 	command, ok := params["command"].(string)
 	if !ok || command == "" {

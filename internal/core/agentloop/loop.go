@@ -400,7 +400,23 @@ func (l *Loop) resolveEffectivePolicy(sess *session.Session, opType approval.Ope
 func (l *Loop) handleApproval(sessionID, workingDir string, tc session.ToolCall, tool tools.Tool, eventBus *session.EventBus) (bool, error) {
 	opType := l.determineOperationType(tool, workingDir, tc.Params)
 
-	details := l.buildApprovalDetails(opType, tc.Params)
+	details, err := l.buildApprovalDetails(tool, workingDir, opType, tc.Params)
+	if err != nil {
+		rejectionMsg := session.Message{
+			ID:         session.GenerateID("msg"),
+			Role:       session.RoleTool,
+			Content:    "错误: " + err.Error(),
+			ToolCallID: tc.ID,
+			CreatedAt:  time.Now(),
+		}
+		l.store.AddMessage(sessionID, rejectionMsg)
+		eventBus.Publish("tool_result", map[string]any{
+			"tool_name": tc.ToolName,
+			"success":   false,
+			"summary":   fmt.Sprintf("error: %v", err),
+		})
+		return false, err
+	}
 
 	riskLevel := l.determineRiskLevel(tool)
 
@@ -528,10 +544,46 @@ func (l *Loop) determineOperationType(tool tools.Tool, workingDir string, params
 	}
 }
 
-func (l *Loop) buildApprovalDetails(opType string, params map[string]interface{}) map[string]any {
+func (l *Loop) buildApprovalDetails(tool tools.Tool, workingDir string, opType string, params map[string]interface{}) (map[string]any, error) {
 	details := make(map[string]any)
 
 	switch opType {
+	case "file_write_new":
+		if path, ok := params["path"]; ok {
+			details["path"] = path
+		}
+
+	case "file_write_overwrite":
+		if path, ok := params["path"]; ok {
+			details["path"] = path
+		}
+		if diffPreviewer, ok := tool.(tools.DiffPreviewer); ok {
+			diff, err := diffPreviewer.PreviewDiff(workingDir, params)
+			if err != nil {
+				return nil, err
+			}
+			if diff != "" {
+				details["diff"] = diff
+			}
+		}
+
+	case "file_edit":
+		if path, ok := params["path"]; ok {
+			details["path"] = path
+		}
+		if mode, ok := params["mode"]; ok {
+			details["mode"] = mode
+		}
+		if diffPreviewer, ok := tool.(tools.DiffPreviewer); ok {
+			diff, err := diffPreviewer.PreviewDiff(workingDir, params)
+			if err != nil {
+				return nil, err
+			}
+			if diff != "" {
+				details["diff"] = diff
+			}
+		}
+
 	case "execute_command":
 		if cmd, ok := params["command"].(string); ok {
 			details["command"] = cmd
@@ -539,6 +591,10 @@ func (l *Loop) buildApprovalDetails(opType string, params map[string]interface{}
 		if ts, ok := params["timeout_seconds"]; ok {
 			details["timeout_seconds"] = ts
 		}
+		if ctxProvider, ok := tool.(tools.CommandContextProvider); ok {
+			details["command_context"] = ctxProvider.GetCommandContext(workingDir, params)
+		}
+
 	default:
 		if path, ok := params["path"]; ok {
 			details["path"] = path
@@ -548,7 +604,7 @@ func (l *Loop) buildApprovalDetails(opType string, params map[string]interface{}
 		}
 	}
 
-	return details
+	return details, nil
 }
 
 func (l *Loop) determineRiskLevel(tool tools.Tool) approval.RiskLevel {
