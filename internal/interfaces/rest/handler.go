@@ -24,6 +24,7 @@ func NewHandler(store session.SessionStore, loop *agentloop.Loop) *Handler {
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sessions", h.CreateSession)
+	mux.HandleFunc("GET /api/v1/sessions", h.ListSessions)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", h.GetSession)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/messages", h.PostMessage)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/messages", h.GetMessages)
@@ -111,6 +112,11 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := validateWorkingDirectory(sess); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
 	writeJSON(w, http.StatusOK, getSessionResponse{
 		ID:               sess.ID,
 		Title:            sess.Title,
@@ -118,6 +124,70 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 		State:            string(sess.State),
 		CreatedAt:        sess.CreatedAt.Format(time.RFC3339),
 		LastActiveAt:     sess.LastActiveAt.Format(time.RFC3339),
+	})
+}
+
+type listSessionsItem struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	ProjectPath  string `json:"project_path"`
+	State        string `json:"state"`
+	CreatedAt    string `json:"created_at"`
+	LastActiveAt string `json:"last_active_at"`
+}
+
+type listSessionsResponse struct {
+	Sessions []listSessionsItem `json:"sessions"`
+	Total    int                `json:"total"`
+}
+
+func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+	project := r.URL.Query().Get("project")
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 20
+	if limitStr != "" {
+		var err error
+		limit, err = strconv.Atoi(limitStr)
+		if err != nil || limit < 0 {
+			writeError(w, http.StatusBadRequest, "invalid limit")
+			return
+		}
+	}
+
+	offset := 0
+	if offsetStr != "" {
+		var err error
+		offset, err = strconv.Atoi(offsetStr)
+		if err != nil || offset < 0 {
+			writeError(w, http.StatusBadRequest, "invalid offset")
+			return
+		}
+	}
+
+	sessions, total, err := h.store.ListSessions(status, project, limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	items := make([]listSessionsItem, len(sessions))
+	for i, s := range sessions {
+		items[i] = listSessionsItem{
+			ID:           s.ID,
+			Title:        s.Title,
+			ProjectPath:  s.WorkingDirectory,
+			State:        string(s.State),
+			CreatedAt:    s.CreatedAt.Format(time.RFC3339),
+			LastActiveAt: s.LastActiveAt.Format(time.RFC3339),
+		}
+	}
+
+	writeJSON(w, http.StatusOK, listSessionsResponse{
+		Sessions: items,
+		Total:    total,
 	})
 }
 
@@ -293,4 +363,15 @@ func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
+}
+
+func validateWorkingDirectory(sess *session.Session) error {
+	info, err := os.Stat(sess.WorkingDirectory)
+	if err != nil || !info.IsDir() {
+		if sess.State != session.StatePaused {
+			sess.State = session.StatePaused
+			return nil
+		}
+	}
+	return nil
 }

@@ -4,11 +4,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"devo/internal/core/agentloop"
 	"devo/internal/core/session"
 	"devo/internal/interfaces/rest"
+	"devo/internal/storage/sqlite"
 	"devo/internal/taskexec/llmclient"
+
+	gormsqlite "github.com/glebarez/sqlite"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -17,7 +22,32 @@ func main() {
 		port = "8080"
 	}
 
-	store := session.NewInMemoryStore()
+	dbPath := os.Getenv("DEVO_DB_PATH")
+	if dbPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("failed to get home directory: %v", err)
+		}
+		devoDir := filepath.Join(homeDir, ".devo")
+		if err := os.MkdirAll(devoDir, 0755); err != nil {
+			log.Fatalf("failed to create .devo directory: %v", err)
+		}
+		dbPath = filepath.Join(devoDir, "devo.db")
+	}
+
+	db, err := gorm.Open(gormsqlite.Open(dbPath), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("failed to open database: %v", err)
+	}
+
+	store, err := sqlite.NewGormStore(db)
+	if err != nil {
+		log.Fatalf("failed to create store: %v", err)
+	}
+	defer store.Close()
+
+	var _ session.SessionStore = store
+
 	llm := llmclient.NewMockClient()
 	loop := agentloop.New(store, llm)
 	handler := rest.NewHandler(store, loop)

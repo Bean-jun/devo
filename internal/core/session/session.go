@@ -13,6 +13,7 @@ type State string
 const (
 	StateIdle       State = "Idle"
 	StateProcessing State = "Processing"
+	StatePaused     State = "Paused"
 )
 
 type Role string
@@ -52,11 +53,15 @@ type SessionStore interface {
 	Create(s *Session) error
 	Get(id string) (*Session, error)
 	Update(s *Session) error
+	ListSessions(status, project string, limit, offset int) ([]Session, int, error)
 	AddMessage(sessionID string, msg Message) error
 	GetMessages(sessionID string, limit, offset int) ([]Message, int, error)
 	GetEventBus(sessionID string) (*EventBus, error)
+	AddEvent(sessionID string, event Event) error
+	GetEvents(sessionID string, sinceID int64) ([]Event, error)
 	IncrementSSEConnections(sessionID string) error
 	DecrementSSEConnections(sessionID string) error
+	Close() error
 }
 
 type InMemoryStore struct {
@@ -188,6 +193,60 @@ func (s *InMemoryStore) DecrementSSEConnections(sessionID string) error {
 	if sess.ActiveSSEConnections > 0 {
 		sess.ActiveSSEConnections--
 	}
+	return nil
+}
+
+func (s *InMemoryStore) ListSessions(status, project string, limit, offset int) ([]Session, int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []Session
+	for _, sess := range s.sessions {
+		if status != "" && status != "all" && string(sess.State) != status {
+			continue
+		}
+		if project != "" && sess.WorkingDirectory != project {
+			continue
+		}
+		result = append(result, *sess)
+	}
+
+	total := len(result)
+
+	if offset >= total {
+		return []Session{}, total, nil
+	}
+
+	end := offset + limit
+	if limit <= 0 || end > total {
+		end = total
+	}
+
+	return result[offset:end], total, nil
+}
+
+func (s *InMemoryStore) AddEvent(sessionID string, event Event) error {
+	s.mu.RLock()
+	sess, ok := s.sessions[sessionID]
+	s.mu.RUnlock()
+	if !ok {
+		return ErrSessionNotFound
+	}
+	sess.EventBus.Publish(event.Type, event.Data)
+	return nil
+}
+
+func (s *InMemoryStore) GetEvents(sessionID string, sinceID int64) ([]Event, error) {
+	s.mu.RLock()
+	sess, ok := s.sessions[sessionID]
+	s.mu.RUnlock()
+	if !ok {
+		return nil, ErrSessionNotFound
+	}
+	return sess.EventBus.GetHistory(sinceID), nil
+}
+
+func (s *InMemoryStore) Close() error {
 	return nil
 }
 

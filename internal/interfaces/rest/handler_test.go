@@ -672,3 +672,150 @@ func TestMultipleSSEConnectionsSameSession(t *testing.T) {
 		t.Errorf("expected 202, got %d", postResp.StatusCode)
 	}
 }
+
+func TestListSessionsAll(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir1 := t.TempDir()
+	tmpDir2 := t.TempDir()
+
+	store.Create(&session.Session{
+		ID:               "sess-list-1",
+		Title:            "List Test 1",
+		WorkingDirectory: tmpDir1,
+		State:            session.StateIdle,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	})
+	store.Create(&session.Session{
+		ID:               "sess-list-2",
+		Title:            "List Test 2",
+		WorkingDirectory: tmpDir2,
+		State:            session.StateProcessing,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	})
+
+	resp, err := http.Get(server.URL + "/api/v1/sessions?status=all")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result listSessionsResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	if result.Total < 2 {
+		t.Errorf("expected at least 2 sessions, got %d", result.Total)
+	}
+	if len(result.Sessions) < 2 {
+		t.Errorf("expected at least 2 sessions in response, got %d", len(result.Sessions))
+	}
+}
+
+func TestListSessionsFilterByStatus(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir1 := t.TempDir()
+	tmpDir2 := t.TempDir()
+
+	store.Create(&session.Session{
+		ID:               "sess-filter-1",
+		Title:            "Idle Session",
+		WorkingDirectory: tmpDir1,
+		State:            session.StateIdle,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	})
+	store.Create(&session.Session{
+		ID:               "sess-filter-2",
+		Title:            "Processing Session",
+		WorkingDirectory: tmpDir2,
+		State:            session.StateProcessing,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	})
+
+	resp, err := http.Get(server.URL + "/api/v1/sessions?status=Idle")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result listSessionsResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	for _, s := range result.Sessions {
+		if s.State != "Idle" {
+			t.Errorf("expected all sessions to be Idle, got %q for %s", s.State, s.ID)
+		}
+	}
+}
+
+func TestListSessionsPagination(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	for i := 0; i < 5; i++ {
+		store.Create(&session.Session{
+			ID:               session.GenerateID("sess"),
+			Title:            "Test",
+			WorkingDirectory: t.TempDir(),
+			State:            session.StateIdle,
+			CreatedAt:        time.Now(),
+			LastActiveAt:     time.Now(),
+		})
+	}
+
+	resp, err := http.Get(server.URL + "/api/v1/sessions?limit=2&offset=0")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result listSessionsResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	if len(result.Sessions) > 2 {
+		t.Errorf("expected at most 2 sessions with limit=2, got %d", len(result.Sessions))
+	}
+}
+
+func TestListSessionsEmptyResult(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/v1/sessions?status=Paused")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result listSessionsResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	if result.Total != 0 {
+		t.Errorf("expected 0 sessions, got %d", result.Total)
+	}
+	if len(result.Sessions) != 0 {
+		t.Errorf("expected empty sessions array, got %d", len(result.Sessions))
+	}
+}
