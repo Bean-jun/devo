@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -26,6 +27,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/sessions/{id}", h.GetSession)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/messages", h.PostMessage)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/messages", h.GetMessages)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/events", h.SSEEvents)
 }
 
 type createSessionRequest struct {
@@ -123,13 +125,6 @@ type postMessageRequest struct {
 	Content string `json:"content"`
 }
 
-type postMessageResponse struct {
-	MessageID string `json:"message_id"`
-	Role      string `json:"role"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at"`
-}
-
 func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -144,8 +139,7 @@ func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, err := h.loop.ProcessMessage(r.Context(), id, req.Content)
-	if err != nil {
+	if err := h.loop.ProcessMessage(r.Context(), id, req.Content); err != nil {
 		if errors.Is(err, session.ErrSessionNotFound) {
 			writeError(w, http.StatusNotFound, "session not found")
 			return
@@ -158,12 +152,7 @@ func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, postMessageResponse{
-		MessageID: msg.ID,
-		Role:      string(msg.Role),
-		Content:   msg.Content,
-		CreatedAt: msg.CreatedAt.Format(time.RFC3339),
-	})
+	writeJSON(w, http.StatusAccepted, map[string]bool{"accepted": true})
 }
 
 type messageItem struct {
@@ -228,6 +217,72 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 		Messages: items,
 		Total:    total,
 	})
+}
+
+func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	eventBus, err := h.store.GetEventBus(id)
+	if err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if err := h.store.IncrementSSEConnections(id); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to increment connections")
+		return
+	}
+	defer h.store.DecrementSSEConnections(id)
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming not supported")
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	lastEventID := r.Header.Get("Last-Event-ID")
+	if lastEventID != "" {
+		sinceID, parseErr := strconv.ParseInt(lastEventID, 10, 64)
+		if parseErr == nil {
+			historyEvents := eventBus.GetHistory(sinceID)
+			for _, evt := range historyEvents {
+				writeSSEEvent(w, flusher, evt)
+			}
+		}
+	}
+
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case evt, ok := <-ch:
+			if !ok {
+				return
+			}
+			writeSSEEvent(w, flusher, evt)
+		}
+	}
+}
+
+func writeSSEEvent(w http.ResponseWriter, flusher http.Flusher, evt session.Event) {
+	dataJSON, _ := json.Marshal(evt.Data)
+	fmt.Fprintf(w, "id: %d\n", evt.ID)
+	fmt.Fprintf(w, "event: %s\n", evt.Type)
+	fmt.Fprintf(w, "data: %s\n\n", string(dataJSON))
+	flusher.Flush()
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

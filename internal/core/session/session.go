@@ -31,13 +31,15 @@ type Message struct {
 }
 
 type Session struct {
-	ID               string    `json:"id"`
-	Title            string    `json:"title"`
-	WorkingDirectory string    `json:"working_directory"`
-	State            State     `json:"state"`
-	CreatedAt        time.Time `json:"created_at"`
-	LastActiveAt     time.Time `json:"last_active_at"`
-	Messages         []Message `json:"messages,omitempty"`
+	ID                   string    `json:"id"`
+	Title                string    `json:"title"`
+	WorkingDirectory     string    `json:"working_directory"`
+	State                State     `json:"state"`
+	CreatedAt            time.Time `json:"created_at"`
+	LastActiveAt         time.Time `json:"last_active_at"`
+	Messages             []Message `json:"messages,omitempty"`
+	ActiveSSEConnections int       `json:"active_sse_connections"`
+	EventBus             *EventBus `json:"-"`
 }
 
 var (
@@ -52,6 +54,9 @@ type SessionStore interface {
 	Update(s *Session) error
 	AddMessage(sessionID string, msg Message) error
 	GetMessages(sessionID string, limit, offset int) ([]Message, int, error)
+	GetEventBus(sessionID string) (*EventBus, error)
+	IncrementSSEConnections(sessionID string) error
+	DecrementSSEConnections(sessionID string) error
 }
 
 type InMemoryStore struct {
@@ -75,6 +80,7 @@ func (s *InMemoryStore) Create(sess *Session) error {
 
 	cp := *sess
 	cp.Messages = make([]Message, 0)
+	cp.EventBus = NewEventBus(DefaultEventHistorySize)
 	s.sessions[sess.ID] = &cp
 	return nil
 }
@@ -103,6 +109,8 @@ func (s *InMemoryStore) Update(sess *Session) error {
 
 	cp := *sess
 	cp.Messages = existing.Messages
+	cp.EventBus = existing.EventBus
+	cp.ActiveSSEConnections = existing.ActiveSSEConnections
 	s.sessions[sess.ID] = &cp
 	return nil
 }
@@ -144,6 +152,43 @@ func (s *InMemoryStore) GetMessages(sessionID string, limit, offset int) ([]Mess
 	result := make([]Message, end-offset)
 	copy(result, msgs[offset:end])
 	return result, total, nil
+}
+
+func (s *InMemoryStore) GetEventBus(sessionID string) (*EventBus, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return nil, ErrSessionNotFound
+	}
+	return sess.EventBus, nil
+}
+
+func (s *InMemoryStore) IncrementSSEConnections(sessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return ErrSessionNotFound
+	}
+	sess.ActiveSSEConnections++
+	return nil
+}
+
+func (s *InMemoryStore) DecrementSSEConnections(sessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return ErrSessionNotFound
+	}
+	if sess.ActiveSSEConnections > 0 {
+		sess.ActiveSSEConnections--
+	}
+	return nil
 }
 
 var rng = rand.New(rand.NewSource(time.Now().UnixNano()))

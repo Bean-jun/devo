@@ -242,3 +242,214 @@ func TestSessionMutationIsolation(t *testing.T) {
 		t.Error("Get should return a copy, not a reference - store was mutated")
 	}
 }
+
+func TestEventBusCreatedOnSessionCreate(t *testing.T) {
+	store := NewInMemoryStore()
+
+	sess := &Session{
+		ID:               "sess-1",
+		Title:            "Test",
+		WorkingDirectory: "/tmp/test",
+		State:            StateIdle,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	}
+	store.Create(sess)
+
+	eventBus, err := store.GetEventBus("sess-1")
+	if err != nil {
+		t.Fatalf("expected event bus to exist, got: %v", err)
+	}
+	if eventBus == nil {
+		t.Fatal("expected non-nil event bus")
+	}
+}
+
+func TestGetEventBusNotFound(t *testing.T) {
+	store := NewInMemoryStore()
+
+	_, err := store.GetEventBus("nonexistent")
+	if err != ErrSessionNotFound {
+		t.Errorf("expected ErrSessionNotFound, got: %v", err)
+	}
+}
+
+func TestEventBusPublishAndSubscribe(t *testing.T) {
+	eb := NewEventBus(DefaultEventHistorySize)
+
+	ch, unsubscribe := eb.Subscribe()
+	defer unsubscribe()
+
+	eb.Publish("test_event", map[string]string{"key": "value"})
+
+	select {
+	case evt := <-ch:
+		if evt.Type != "test_event" {
+			t.Errorf("expected event type 'test_event', got %q", evt.Type)
+		}
+		data, ok := evt.Data.(map[string]string)
+		if !ok {
+			t.Fatal("expected data to be map[string]string")
+		}
+		if data["key"] != "value" {
+			t.Errorf("expected data key 'value', got %q", data["key"])
+		}
+	default:
+		t.Fatal("expected to receive event")
+	}
+}
+
+func TestEventBusHistory(t *testing.T) {
+	eb := NewEventBus(DefaultEventHistorySize)
+
+	eb.Publish("event1", map[string]string{"n": "1"})
+	eb.Publish("event2", map[string]string{"n": "2"})
+	eb.Publish("event3", map[string]string{"n": "3"})
+
+	history := eb.GetHistory(0)
+	if len(history) != 3 {
+		t.Fatalf("expected 3 events in history, got %d", len(history))
+	}
+
+	history = eb.GetHistory(1)
+	if len(history) != 2 {
+		t.Fatalf("expected 2 events after ID 1, got %d", len(history))
+	}
+	if history[0].Type != "event2" {
+		t.Errorf("expected event2, got %s", history[0].Type)
+	}
+
+	history = eb.GetHistory(3)
+	if len(history) != 0 {
+		t.Fatalf("expected 0 events after ID 3, got %d", len(history))
+	}
+}
+
+func TestEventBusHistoryRolling(t *testing.T) {
+	eb := NewEventBus(3)
+
+	for i := 0; i < 5; i++ {
+		eb.Publish("event", map[string]int{"n": i})
+	}
+
+	history := eb.GetHistory(0)
+	if len(history) != 3 {
+		t.Fatalf("expected 3 events in rolling history, got %d", len(history))
+	}
+}
+
+func TestEventBusMultipleSubscribers(t *testing.T) {
+	eb := NewEventBus(DefaultEventHistorySize)
+
+	ch1, unsub1 := eb.Subscribe()
+	defer unsub1()
+	ch2, unsub2 := eb.Subscribe()
+	defer unsub2()
+
+	eb.Publish("event", map[string]string{"msg": "hello"})
+
+	for i, ch := range []chan Event{ch1, ch2} {
+		select {
+		case evt := <-ch:
+			if evt.Type != "event" {
+				t.Errorf("subscriber %d: expected event type 'event', got %q", i, evt.Type)
+			}
+		default:
+			t.Errorf("subscriber %d: expected to receive event", i)
+		}
+	}
+}
+
+func TestSSEConnectionsIncrementDecrement(t *testing.T) {
+	store := NewInMemoryStore()
+
+	sess := &Session{
+		ID:               "sess-1",
+		Title:            "Test",
+		WorkingDirectory: "/tmp/test",
+		State:            StateIdle,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	}
+	store.Create(sess)
+
+	if err := store.IncrementSSEConnections("sess-1"); err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+	if err := store.IncrementSSEConnections("sess-1"); err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+
+	sess, _ = store.Get("sess-1")
+	if sess.ActiveSSEConnections != 2 {
+		t.Errorf("expected 2 connections, got %d", sess.ActiveSSEConnections)
+	}
+
+	if err := store.DecrementSSEConnections("sess-1"); err != nil {
+		t.Fatalf("decrement: %v", err)
+	}
+
+	sess, _ = store.Get("sess-1")
+	if sess.ActiveSSEConnections != 1 {
+		t.Errorf("expected 1 connection after decrement, got %d", sess.ActiveSSEConnections)
+	}
+}
+
+func TestSSEConnectionsDecrementBelowZero(t *testing.T) {
+	store := NewInMemoryStore()
+
+	sess := &Session{
+		ID:               "sess-1",
+		Title:            "Test",
+		WorkingDirectory: "/tmp/test",
+		State:            StateIdle,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	}
+	store.Create(sess)
+
+	store.DecrementSSEConnections("sess-1")
+
+	sess, _ = store.Get("sess-1")
+	if sess.ActiveSSEConnections < 0 {
+		t.Errorf("ActiveSSEConnections should not go below 0, got %d", sess.ActiveSSEConnections)
+	}
+}
+
+func TestSSEConnectionsNotFound(t *testing.T) {
+	store := NewInMemoryStore()
+
+	err := store.IncrementSSEConnections("nonexistent")
+	if err != ErrSessionNotFound {
+		t.Errorf("expected ErrSessionNotFound, got: %v", err)
+	}
+
+	err = store.DecrementSSEConnections("nonexistent")
+	if err != ErrSessionNotFound {
+		t.Errorf("expected ErrSessionNotFound, got: %v", err)
+	}
+}
+
+func TestUpdatePreservesEventBus(t *testing.T) {
+	store := NewInMemoryStore()
+
+	sess := &Session{
+		ID:               "sess-1",
+		Title:            "Test",
+		WorkingDirectory: "/tmp/test",
+		State:            StateIdle,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	}
+	store.Create(sess)
+
+	originalEB, _ := store.GetEventBus("sess-1")
+
+	sess.State = StateProcessing
+	store.Update(sess)
+
+	updatedEB, _ := store.GetEventBus("sess-1")
+	if originalEB != updatedEB {
+		t.Error("EventBus should be preserved across Update calls")
+	}
+}
