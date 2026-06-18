@@ -268,7 +268,3 @@ func applyHunk(original []string, origIdx, hunkOrigStart int, hunkLines []string
 
 	return result, origLineIdx, nil
 }
-
-type OperationTypeProvider interface {
-	OperationType(workingDir string, params map[string]interface{}) string
-}

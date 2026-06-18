@@ -50,6 +50,7 @@ type Session struct {
 	LastActiveAt         time.Time `json:"last_active_at"`
 	Messages             []Message `json:"messages,omitempty"`
 	ActiveSSEConnections int       `json:"active_sse_connections"`
+	ChildPID             *int      `json:"child_pid,omitempty"`
 	EventBus             *EventBus `json:"-"`
 }
 

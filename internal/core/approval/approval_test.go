@@ -6,7 +6,7 @@ import (
 
 func TestCreateRequest(t *testing.T) {
 	mgr := NewManager()
-	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, map[string]any{"path": "test.txt"})
+	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, RiskMedium, map[string]any{"path": "test.txt"})
 
 	if req.ID == "" {
 		t.Error("expected non-empty ID")
@@ -33,7 +33,7 @@ func TestCreateRequest(t *testing.T) {
 
 func TestGetRequest(t *testing.T) {
 	mgr := NewManager()
-	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, map[string]any{"path": "test.txt"})
+	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, RiskMedium, map[string]any{"path": "test.txt"})
 
 	got, ok := mgr.GetRequest(req.ID)
 	if !ok {
@@ -55,7 +55,7 @@ func TestGetRequestNotFound(t *testing.T) {
 
 func TestResolveApproved(t *testing.T) {
 	mgr := NewManager()
-	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, map[string]any{"path": "test.txt"})
+	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, RiskMedium, map[string]any{"path": "test.txt"})
 
 	resolved, ok := mgr.Resolve(req.ID, StatusApproved)
 	if !ok {
@@ -75,7 +75,7 @@ func TestResolveApproved(t *testing.T) {
 
 func TestResolveRejected(t *testing.T) {
 	mgr := NewManager()
-	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, map[string]any{"path": "test.txt"})
+	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, RiskMedium, map[string]any{"path": "test.txt"})
 
 	resolved, ok := mgr.Resolve(req.ID, StatusRejected)
 	if !ok {
@@ -89,7 +89,7 @@ func TestResolveRejected(t *testing.T) {
 
 func TestResolveAlreadyResolved(t *testing.T) {
 	mgr := NewManager()
-	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, map[string]any{"path": "test.txt"})
+	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, RiskMedium, map[string]any{"path": "test.txt"})
 
 	_, ok := mgr.Resolve(req.ID, StatusApproved)
 	if !ok {
@@ -105,8 +105,8 @@ func TestResolveAlreadyResolved(t *testing.T) {
 func TestGetPendingRequest(t *testing.T) {
 	mgr := NewManager()
 
-	mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, map[string]any{"path": "test.txt"})
-	mgr.CreateRequest("sess-2", "tool-2", OpFileWriteOverwrite, map[string]any{"path": "test2.txt"})
+	mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, RiskMedium, map[string]any{"path": "test.txt"})
+	mgr.CreateRequest("sess-2", "tool-2", OpFileWriteOverwrite, RiskMedium, map[string]any{"path": "test2.txt"})
 
 	pending := mgr.GetPendingRequest("sess-1")
 	if pending == nil {
@@ -129,7 +129,7 @@ func TestGetPendingRequest(t *testing.T) {
 
 func TestGetPendingAfterResolve(t *testing.T) {
 	mgr := NewManager()
-	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, map[string]any{"path": "test.txt"})
+	req := mgr.CreateRequest("sess-1", "tool-1", OpFileWriteNew, RiskMedium, map[string]any{"path": "test.txt"})
 
 	mgr.Resolve(req.ID, StatusApproved)
 

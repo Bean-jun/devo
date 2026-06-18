@@ -251,6 +251,25 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 				})
 
 				if requiresApproval {
+					if checker, ok := tool.(tools.PreChecker); ok {
+						if err := checker.PreCheck(tc.Params); err != nil {
+							rejectionMsg := session.Message{
+								ID:         session.GenerateID("msg"),
+								Role:       session.RoleTool,
+								Content:    "安全错误: " + err.Error(),
+								ToolCallID: tc.ID,
+								CreatedAt:  time.Now(),
+							}
+							l.store.AddMessage(sessionID, rejectionMsg)
+							eventBus.Publish("tool_result", map[string]any{
+								"tool_name": tc.ToolName,
+								"success":   false,
+								"summary":   fmt.Sprintf("security error: %v", err),
+							})
+							continue
+						}
+					}
+
 					approved, err := l.handleApproval(sessionID, sess.WorkingDirectory, tc, tool, eventBus)
 					if err != nil {
 						eventBus.Publish("tool_result", map[string]any{
@@ -282,6 +301,8 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 					})
 					continue
 				}
+
+				l.recordChildPID(sessionID, tc.ToolName, toolResult)
 
 				toolResult.ToolCallID = tc.ID
 				toolMsg := l.toolResultToMessage(toolResult)
@@ -342,14 +363,11 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 func (l *Loop) handleApproval(sessionID, workingDir string, tc session.ToolCall, tool tools.Tool, eventBus *session.EventBus) (bool, error) {
 	opType := l.determineOperationType(tool, workingDir, tc.Params)
 
-	details := map[string]any{
-		"path": tc.Params["path"],
-	}
-	if mode, ok := tc.Params["mode"]; ok {
-		details["mode"] = mode
-	}
+	details := l.buildApprovalDetails(opType, tc.Params)
 
-	req := l.approvalManager.CreateRequest(sessionID, tc.ID, approval.OperationType(opType), details)
+	riskLevel := l.determineRiskLevel(tool)
+
+	req := l.approvalManager.CreateRequest(sessionID, tc.ID, approval.OperationType(opType), riskLevel, details)
 
 	ch := make(chan ApprovalDecision, 1)
 	l.mu.Lock()
@@ -433,6 +451,40 @@ func (l *Loop) determineOperationType(tool tools.Tool, workingDir string, params
 	}
 }
 
+func (l *Loop) buildApprovalDetails(opType string, params map[string]interface{}) map[string]any {
+	details := make(map[string]any)
+
+	switch opType {
+	case "execute_command":
+		if cmd, ok := params["command"].(string); ok {
+			details["command"] = cmd
+		}
+		if ts, ok := params["timeout_seconds"]; ok {
+			details["timeout_seconds"] = ts
+		}
+	default:
+		if path, ok := params["path"]; ok {
+			details["path"] = path
+		}
+		if mode, ok := params["mode"]; ok {
+			details["mode"] = mode
+		}
+	}
+
+	return details
+}
+
+func (l *Loop) determineRiskLevel(tool tools.Tool) approval.RiskLevel {
+	switch tool.RiskLevel() {
+	case tools.RiskLevelHigh:
+		return approval.RiskHigh
+	case tools.RiskLevelMedium:
+		return approval.RiskMedium
+	default:
+		return approval.RiskMedium
+	}
+}
+
 func (l *Loop) rejectionMessage(tc session.ToolCall) session.Message {
 	return session.Message{
 		ID:         session.GenerateID("msg"),
@@ -467,4 +519,56 @@ func (l *Loop) handleLoopError(sessionID string, err error) {
 
 	sess.State = session.StateIdle
 	l.store.Update(sess)
+}
+
+func (l *Loop) recordChildPID(sessionID, toolName string, tr *tools.ToolResult) {
+	if toolName != "execute_command" {
+		return
+	}
+
+	pid := extractPIDFromContent(tr.Content)
+	if pid <= 0 {
+		return
+	}
+
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return
+	}
+
+	sess.ChildPID = &pid
+	l.store.Update(sess)
+}
+
+func extractPIDFromContent(content string) int {
+	marker := "__DEVO_CHILD_PID__="
+	idx := findLastIndex(content, marker)
+	if idx < 0 {
+		return 0
+	}
+
+	start := idx + len(marker)
+	end := start
+	for end < len(content) && content[end] >= '0' && content[end] <= '9' {
+		end++
+	}
+
+	if end == start {
+		return 0
+	}
+
+	pid := 0
+	for i := start; i < end; i++ {
+		pid = pid*10 + int(content[i]-'0')
+	}
+	return pid
+}
+
+func findLastIndex(s, substr string) int {
+	for i := len(s) - len(substr); i >= 0; i-- {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }

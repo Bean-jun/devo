@@ -13,12 +13,14 @@ const (
 	OpFileWriteNew       OperationType = "file_write_new"
 	OpFileWriteOverwrite OperationType = "file_write_overwrite"
 	OpFileEdit           OperationType = "file_edit"
+	OpExecuteCommand     OperationType = "execute_command"
 )
 
 type RiskLevel string
 
 const (
 	RiskMedium RiskLevel = "medium"
+	RiskHigh   RiskLevel = "high"
 )
 
 type Status string
@@ -52,16 +54,20 @@ func NewManager() *Manager {
 	}
 }
 
-func (m *Manager) CreateRequest(sessionID, toolCallID string, opType OperationType, details map[string]any) *ApprovalRequest {
+func (m *Manager) CreateRequest(sessionID, toolCallID string, opType OperationType, riskLevel RiskLevel, details map[string]any) *ApprovalRequest {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if riskLevel == "" {
+		riskLevel = RiskMedium
+	}
 
 	req := &ApprovalRequest{
 		ID:            session.GenerateID("approval"),
 		SessionID:     sessionID,
 		ToolCallID:    toolCallID,
 		OperationType: opType,
-		RiskLevel:     RiskMedium,
+		RiskLevel:     riskLevel,
 		Details:       details,
 		Status:        StatusPending,
 		CreatedAt:     time.Now(),

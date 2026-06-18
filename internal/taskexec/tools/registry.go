@@ -13,6 +13,7 @@ const (
 	OpFileWriteNew       = "file_write_new"
 	OpFileWriteOverwrite = "file_write_overwrite"
 	OpFileEdit           = "file_edit"
+	OpExecuteCommand     = "execute_command"
 )
 
 type Tool interface {
@@ -20,6 +21,14 @@ type Tool interface {
 	Description() string
 	RiskLevel() RiskLevel
 	Execute(workingDir string, params map[string]interface{}) (string, error)
+}
+
+type PreChecker interface {
+	PreCheck(params map[string]interface{}) error
+}
+
+type OperationTypeProvider interface {
+	OperationType(workingDir string, params map[string]interface{}) string
 }
 
 type Registry struct {
@@ -82,4 +91,9 @@ type ToolResult struct {
 	Success    bool   `json:"success"`
 	Content    string `json:"content"`
 	Error      string `json:"error,omitempty"`
+
+	ExitCode int    `json:"exit_code,omitempty"`
+	Stdout   string `json:"stdout,omitempty"`
+	Stderr   string `json:"stderr,omitempty"`
+	TimedOut bool   `json:"timed_out,omitempty"`
 }
