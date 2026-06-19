@@ -10,7 +10,7 @@ import (
 	"devo/internal/core/session"
 	"devo/internal/interfaces/rest"
 	"devo/internal/storage/sqlite"
-	"devo/internal/taskexec/llmclient"
+	"devo/internal/taskexec/llmclient/providers"
 	"devo/internal/taskexec/tools"
 
 	gormsqlite "github.com/glebarez/sqlite"
@@ -53,8 +53,10 @@ func main() {
 	toolRegistry.Register(&tools.ReadFileTool{})
 	toolRegistry.Register(&tools.ListFilesTool{})
 	toolRegistry.Register(&tools.SearchCodebaseTool{})
+	toolRegistry.Register(&tools.WriteFileTool{})
+	toolRegistry.Register(tools.NewExecuteCommandTool())
 
-	llm := llmclient.NewMockClient()
+	llm := providers.NewClientFromEnv(toolRegistry)
 	loop := agentloop.NewWithTools(store, llm, toolRegistry)
 	handler := rest.NewHandler(store, loop)
 

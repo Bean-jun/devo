@@ -24,6 +24,26 @@ func (t *ListFilesTool) RiskLevel() RiskLevel {
 	return RiskLevelNone
 }
 
+func (t *ListFilesTool) ParamsSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"path": map[string]interface{}{
+				"type":        "string",
+				"description": "目录路径（相对于工作目录或绝对路径），默认为工作目录根目录",
+			},
+			"max_depth": map[string]interface{}{
+				"type":        "integer",
+				"description": "最大遍历深度，默认 1",
+			},
+			"max_files": map[string]interface{}{
+				"type":        "integer",
+				"description": "最大返回文件数，默认 500",
+			},
+		},
+	}
+}
+
 func (t *ListFilesTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
 	path, _ := params["path"].(string)
 	if path == "" {

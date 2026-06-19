@@ -54,6 +54,23 @@ func (t *ExecuteCommandTool) RiskLevel() RiskLevel {
 	return RiskLevelHigh
 }
 
+func (t *ExecuteCommandTool) ParamsSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"command": map[string]interface{}{
+				"type":        "string",
+				"description": "要执行的 shell 命令",
+			},
+			"timeout_seconds": map[string]interface{}{
+				"type":        "integer",
+				"description": "命令执行超时时间（秒），默认 30",
+			},
+		},
+		"required": []string{"command"},
+	}
+}
+
 func (t *ExecuteCommandTool) OperationType(workingDir string, params map[string]interface{}) string {
 	return "execute_command"
 }

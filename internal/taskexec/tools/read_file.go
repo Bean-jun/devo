@@ -21,6 +21,19 @@ func (t *ReadFileTool) RiskLevel() RiskLevel {
 	return RiskLevelNone
 }
 
+func (t *ReadFileTool) ParamsSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"path": map[string]interface{}{
+				"type":        "string",
+				"description": "文件路径（相对于工作目录或绝对路径）",
+			},
+		},
+		"required": []string{"path"},
+	}
+}
+
 func (t *ReadFileTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
 	path, ok := params["path"].(string)
 	if !ok || path == "" {

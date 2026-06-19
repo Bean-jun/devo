@@ -24,6 +24,23 @@ func (t *SearchCodebaseTool) RiskLevel() RiskLevel {
 	return RiskLevelNone
 }
 
+func (t *SearchCodebaseTool) ParamsSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"pattern": map[string]interface{}{
+				"type":        "string",
+				"description": "搜索的正则表达式模式",
+			},
+			"path": map[string]interface{}{
+				"type":        "string",
+				"description": "搜索路径（相对于工作目录），默认为工作目录",
+			},
+		},
+		"required": []string{"pattern"},
+	}
+}
+
 func (t *SearchCodebaseTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
 	pattern, ok := params["pattern"].(string)
 	if !ok || pattern == "" {

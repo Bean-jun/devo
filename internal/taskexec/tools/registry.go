@@ -20,6 +20,7 @@ type Tool interface {
 	Name() string
 	Description() string
 	RiskLevel() RiskLevel
+	ParamsSchema() map[string]interface{}
 	Execute(workingDir string, params map[string]interface{}) (string, error)
 }
 

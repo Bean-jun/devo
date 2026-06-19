@@ -52,6 +52,23 @@ func (t *WriteFileTool) RiskLevel() RiskLevel {
 	return RiskLevelMedium
 }
 
+func (t *WriteFileTool) ParamsSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"path": map[string]interface{}{
+				"type":        "string",
+				"description": "文件路径（相对于工作目录）",
+			},
+			"content": map[string]interface{}{
+				"type":        "string",
+				"description": "要写入的文件内容",
+			},
+		},
+		"required": []string{"path", "content"},
+	}
+}
+
 func (t *WriteFileTool) OperationType(workingDir string, params map[string]interface{}) string {
 	path, ok := params["path"].(string)
 	if !ok || path == "" {
@@ -115,6 +132,36 @@ func (t *EditFileTool) Description() string {
 
 func (t *EditFileTool) RiskLevel() RiskLevel {
 	return RiskLevelMedium
+}
+
+func (t *EditFileTool) ParamsSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"path": map[string]interface{}{
+				"type":        "string",
+				"description": "目标文件路径（相对于工作目录）",
+			},
+			"mode": map[string]interface{}{
+				"type":        "string",
+				"description": "编辑模式：replace（查找替换）或 patch（unified diff 补丁）",
+				"enum":        []string{"replace", "patch"},
+			},
+			"old_str": map[string]interface{}{
+				"type":        "string",
+				"description": "（mode=replace 时必填）要替换的原始文本，需在文件中唯一匹配",
+			},
+			"new_str": map[string]interface{}{
+				"type":        "string",
+				"description": "（mode=replace 时选填）替换后的新文本，默认为空字符串",
+			},
+			"patch": map[string]interface{}{
+				"type":        "string",
+				"description": "（mode=patch 时必填）unified diff 格式的补丁内容",
+			},
+		},
+		"required": []string{"path", "mode"},
+	}
 }
 
 func (t *EditFileTool) OperationType(workingDir string, params map[string]interface{}) string {
