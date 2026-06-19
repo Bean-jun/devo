@@ -87,9 +87,9 @@ func NewAppWithURL(baseURL string) (*App, error) {
 func (a *App) Init() tea.Cmd {
 	a.apiClient = NewAPIClient(a.apiBaseURL)
 	Log("[TUI] Initializing, baseURL=%s, workingDir=%s", a.apiBaseURL, a.workingDir)
-	a.initStatus = "Creating session..."
+	a.initStatus = "Loading sessions..."
 	return tea.Batch(
-		a.initSessionCmd(),
+		a.refreshSessionCmd(),
 		tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
 			return messages.TickMsg(t)
 		}),
@@ -191,7 +191,49 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 
 	case messages.APIResponse:
-		if msg.Kind == "init_session" {
+		switch msg.Kind {
+		case "sessions_listed":
+			if msg.Err != nil {
+				a.initErr = msg.Err
+				a.initStatus = fmt.Sprintf("Failed: %v", msg.Err)
+				Log("[TUI] sessions_listed failed: %v", msg.Err)
+				return a, nil
+			}
+			sessions := msg.Data.([]types.SessionInfo)
+			a.sessions = sessions
+			a.sidebar.SetSessions(sessions)
+			if len(sessions) > 0 {
+				Log("[TUI] Found %d existing sessions, loading most recent", len(sessions))
+				a.initStatus = "Loading session..."
+				return a, a.switchSessionCmd(sessions[0].ID)
+			}
+			Log("[TUI] No existing sessions, creating new one")
+			a.initStatus = "Creating session..."
+			return a, a.initSessionCmd()
+
+		case "session_loaded":
+			if msg.Err != nil {
+				Log("[TUI] session_loaded failed: %v, falling back to new session", msg.Err)
+				a.initStatus = "Creating session..."
+				return a, a.initSessionCmd()
+			}
+			sess := msg.Data.(*types.SessionInfo)
+			a.activeSession = sess
+			a.sidebar.ActiveID = sess.ID
+			a.statusBar.SessionTitle = sess.Title
+			a.statusBar.SessionState = sess.State
+			if sess.TokenUsage.Total > 0 {
+				a.statusBar.TokenUsage = fmt.Sprintf("%d tok (↑%d ↓%d)",
+					sess.TokenUsage.Total, sess.TokenUsage.Input, sess.TokenUsage.Output)
+			}
+			a.ready = true
+			a.tickCount = 0
+			a.layout()
+			a.focusInput()
+			Log("[TUI] Session loaded: id=%s, title=%s", sess.ID, sess.Title)
+			return a, tea.Batch(a.connectSSECmd(), a.loadMessagesCmd(sess.ID))
+
+		case "init_session":
 			if msg.Err != nil {
 				a.initErr = msg.Err
 				a.initStatus = fmt.Sprintf("Failed: %v", msg.Err)

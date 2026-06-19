@@ -22,6 +22,7 @@ func NewCommandPalette() CommandPalette {
 	return CommandPalette{
 		Items: []CommandItem{
 			{Label: "/new", Description: "新建会话", Action: "new"},
+			{Label: "/usage", Description: "查看 Token 用量", Action: "usage"},
 			{Label: "/cancel", Description: "取消当前操作", Action: "cancel"},
 			{Label: "/pause", Description: "暂停/恢复", Action: "pause"},
 			{Label: "/clear", Description: "清屏", Action: "clear"},

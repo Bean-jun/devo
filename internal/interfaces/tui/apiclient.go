@@ -36,9 +36,10 @@ func (c *APIClient) CreateSession(workingDir, title string) (*types.SessionInfo,
 	return &sess, nil
 }
 
-func (c *APIClient) ListSessions() ([]types.SessionInfo, error) {
+func (c *APIClient) ListSessions(limit, offset int) ([]types.SessionInfo, error) {
+	url := fmt.Sprintf("/api/v1/sessions?limit=%d&offset=%d", limit, offset)
 	var resp types.ListSessionsResponse
-	if err := c.doJSON("GET", "/api/v1/sessions", nil, &resp); err != nil {
+	if err := c.doJSON("GET", url, nil, &resp); err != nil {
 		return nil, err
 	}
 	return resp.Sessions, nil

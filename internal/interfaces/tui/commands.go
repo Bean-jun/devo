@@ -131,7 +131,7 @@ func (a *App) newSessionCmd() tea.Cmd {
 
 func (a *App) refreshSessionCmd() tea.Cmd {
 	return func() tea.Msg {
-		sessions, err := a.apiClient.ListSessions()
+		sessions, err := a.apiClient.ListSessions(20, 0)
 		if err != nil {
 			return messages.APIResponse{Kind: "sessions_listed", Err: err}
 		}

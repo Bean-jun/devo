@@ -118,6 +118,13 @@ func (a *App) executeCommand(action string) tea.Cmd {
 	switch action {
 	case "new":
 		return a.newSessionCmd()
+	case "usage":
+		usage := a.statusBar.TokenUsage
+		if usage == "" || usage == "0 tok" {
+			usage = "暂无 Token 消耗数据"
+		}
+		a.toast.Show("Token 用量: "+usage, false)
+		return nil
 	case "cancel":
 		return a.cancelCmd()
 	case "pause":
