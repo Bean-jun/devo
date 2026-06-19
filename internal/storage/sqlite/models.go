@@ -26,6 +26,10 @@ type SessionModel struct {
 	TokenUsageInput           int    `gorm:"default:0"`
 	TokenUsageOutput          int    `gorm:"default:0"`
 	TokenUsageTotal           int    `gorm:"default:0"`
+	CompressionStateJSON      string `gorm:"type:text"`
+	CompressionCount          int    `gorm:"default:0"`
+	CompressThreshold         int    `gorm:"default:0"`
+	KeepRecent                int    `gorm:"default:0"`
 }
 
 type MessageModel struct {
@@ -68,12 +72,22 @@ func (m *SessionModel) ToDomain() *session.Session {
 			Output: m.TokenUsageOutput,
 			Total:  m.TokenUsageTotal,
 		},
+		CompressionCount:  m.CompressionCount,
+		CompressThreshold: m.CompressThreshold,
+		KeepRecent:        m.KeepRecent,
 	}
 
 	if m.ApprovalPolicyJSON != "" {
 		var policy map[string]string
 		if err := json.Unmarshal([]byte(m.ApprovalPolicyJSON), &policy); err == nil {
 			sess.ApprovalPolicy = policy
+		}
+	}
+
+	if m.CompressionStateJSON != "" {
+		var state session.CompressionState
+		if err := json.Unmarshal([]byte(m.CompressionStateJSON), &state); err == nil {
+			sess.CompressionState = &state
 		}
 	}
 
@@ -97,12 +111,22 @@ func fromDomain(s *session.Session) *SessionModel {
 		TokenUsageInput:           s.TokenUsage.Input,
 		TokenUsageOutput:          s.TokenUsage.Output,
 		TokenUsageTotal:           s.TokenUsage.Total,
+		CompressionCount:          s.CompressionCount,
+		CompressThreshold:         s.CompressThreshold,
+		KeepRecent:                s.KeepRecent,
 	}
 
 	if s.ApprovalPolicy != nil && len(s.ApprovalPolicy) > 0 {
 		data, err := json.Marshal(s.ApprovalPolicy)
 		if err == nil {
 			model.ApprovalPolicyJSON = string(data)
+		}
+	}
+
+	if s.CompressionState != nil {
+		data, err := json.Marshal(s.CompressionState)
+		if err == nil {
+			model.CompressionStateJSON = string(data)
 		}
 	}
 

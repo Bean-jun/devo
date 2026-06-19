@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"devo/internal/core/approval"
+	"devo/internal/core/compressor"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/tools"
 )
@@ -50,7 +51,24 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 			return
 		}
 
-		result, err := l.llmClient.Complete(ctx, msgs, l.systemPrompt)
+		if _, err := l.compressor.Compress(ctx, sessionID, eventBus); err != nil {
+			log.Printf("context compression warning for session %s: %v", sessionID, err)
+		}
+
+		msgs, _, err = l.store.GetMessages(sessionID, 0, 0)
+		if err != nil {
+			l.handleLoopError(sessionID, fmt.Errorf("get messages after compress: %w", err))
+			return
+		}
+
+		sess, err := l.store.Get(sessionID)
+		if err != nil {
+			l.handleLoopError(sessionID, fmt.Errorf("get session: %w", err))
+			return
+		}
+		activeMsgs := compressor.FilterActiveMessages(msgs, sess.CompressionState)
+
+		result, err := l.llmClient.Complete(ctx, activeMsgs, l.systemPrompt)
 		if err != nil {
 			l.handleLoopError(sessionID, fmt.Errorf("llm complete: %w", err))
 			return

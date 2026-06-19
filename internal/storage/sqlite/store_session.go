@@ -62,11 +62,19 @@ func (s *GormStore) Update(sess *session.Session) error {
 		"token_usage_input":            sess.TokenUsage.Input,
 		"token_usage_output":           sess.TokenUsage.Output,
 		"token_usage_total":            sess.TokenUsage.Total,
+		"compression_count":            sess.CompressionCount,
+		"compress_threshold":           sess.CompressThreshold,
+		"keep_recent":                  sess.KeepRecent,
 	}
 
 	if sess.ApprovalPolicy != nil {
 		data, _ := json.Marshal(sess.ApprovalPolicy)
 		updates["approval_policy_json"] = string(data)
+	}
+
+	if sess.CompressionState != nil {
+		data, _ := json.Marshal(sess.CompressionState)
+		updates["compression_state_json"] = string(data)
 	}
 
 	if err := s.db.Model(&model).Updates(updates).Error; err != nil {

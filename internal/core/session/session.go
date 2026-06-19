@@ -59,6 +59,22 @@ type TokenUsage struct {
 	Total  int `json:"total"`
 }
 
+type CompressedRange struct {
+	StartMessageID string `json:"start_message_id"`
+	EndMessageID   string `json:"end_message_id"`
+}
+
+type CompressionSummary struct {
+	SummaryText string          `json:"summary_text"`
+	CoversRange CompressedRange `json:"covers_range"`
+	CreatedAt   time.Time       `json:"created_at"`
+}
+
+type CompressionState struct {
+	CompressedRanges []CompressedRange    `json:"compressed_ranges"`
+	Summaries        []CompressionSummary `json:"summaries"`
+}
+
 type Session struct {
 	ID                        string                `json:"id"`
 	Title                     string                `json:"title"`
@@ -79,6 +95,10 @@ type Session struct {
 	ToolCallCount             int                   `json:"tool_call_count"`
 	LastLoopTerminationReason LoopTerminationReason `json:"last_loop_termination_reason,omitempty"`
 	TokenUsage                TokenUsage            `json:"token_usage"`
+	CompressionState          *CompressionState     `json:"compression_state,omitempty"`
+	CompressionCount          int                   `json:"compression_count"`
+	CompressThreshold         int                   `json:"compress_threshold"`
+	KeepRecent                int                   `json:"keep_recent"`
 }
 
 var (
