@@ -110,7 +110,15 @@ var (
 	ErrSessionNotCompleted   = errors.New("session is not completed")
 	ErrSessionNotProcessing  = errors.New("session is not processing")
 	ErrSessionNotCancellable = errors.New("session is not in a cancellable state")
+	ErrMessageNotFound       = errors.New("message not found")
 )
+
+type FileModificationRecord struct {
+	SessionID         string    `json:"session_id"`
+	FilePath          string    `json:"file_path"`
+	ModifiedAt        time.Time `json:"modified_at"`
+	CausedByMessageID string    `json:"caused_by_message_id"`
+}
 
 type SessionStore interface {
 	Create(s *Session) error
@@ -129,6 +137,12 @@ type SessionStore interface {
 	UpdateSessionUsage(sessionID string, inputTokens, outputTokens int) error
 	GetUsageStats(groupBy, dateRange, project string) (*UsageStatsResult, error)
 	Close() error
+
+	DeleteMessagesAfter(sessionID string, messageID string) (int, error)
+	GetMessageByID(sessionID string, messageID string) (*Message, error)
+	RecordFileModification(record FileModificationRecord) error
+	GetFileModifications(sessionID string) ([]FileModificationRecord, error)
+	DeleteFileModificationsAfter(sessionID string, afterTime time.Time) error
 }
 
 type UsageStepRecord struct {

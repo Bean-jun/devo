@@ -293,3 +293,63 @@ func (s *InMemoryStore) GetUsageStats(groupBy, dateRange, project string) (*Usag
 func (s *InMemoryStore) Close() error {
 	return nil
 }
+
+func (s *InMemoryStore) GetMessageByID(sessionID string, messageID string) (*Message, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return nil, ErrSessionNotFound
+	}
+
+	for i := range sess.Messages {
+		if sess.Messages[i].ID == messageID {
+			cp := sess.Messages[i]
+			return &cp, nil
+		}
+	}
+
+	return nil, ErrMessageNotFound
+}
+
+func (s *InMemoryStore) DeleteMessagesAfter(sessionID string, messageID string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return 0, ErrSessionNotFound
+	}
+
+	cutoffIdx := -1
+	for i := range sess.Messages {
+		if sess.Messages[i].ID == messageID {
+			cutoffIdx = i
+			break
+		}
+	}
+
+	if cutoffIdx == -1 {
+		return 0, ErrMessageNotFound
+	}
+
+	deletedCount := len(sess.Messages) - cutoffIdx - 1
+	if deletedCount > 0 {
+		sess.Messages = sess.Messages[:cutoffIdx+1]
+	}
+
+	return deletedCount, nil
+}
+
+func (s *InMemoryStore) RecordFileModification(record FileModificationRecord) error {
+	return nil
+}
+
+func (s *InMemoryStore) GetFileModifications(sessionID string) ([]FileModificationRecord, error) {
+	return nil, nil
+}
+
+func (s *InMemoryStore) DeleteFileModificationsAfter(sessionID string, afterTime time.Time) error {
+	return nil
+}

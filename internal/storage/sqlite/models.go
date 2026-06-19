@@ -203,7 +203,7 @@ func fromEvent(sessionID string, e session.Event) (*EventModel, error) {
 }
 
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&SessionModel{}, &MessageModel{}, &EventModel{}, &UserConfigModel{}, &TokenUsageStepModel{})
+	return db.AutoMigrate(&SessionModel{}, &MessageModel{}, &EventModel{}, &UserConfigModel{}, &TokenUsageStepModel{}, &FileModificationLogModel{})
 }
 
 type TokenUsageStepModel struct {
@@ -219,4 +219,12 @@ type TokenUsageStepModel struct {
 type UserConfigModel struct {
 	Key   string `gorm:"primaryKey;size:128"`
 	Value string `gorm:"type:text"`
+}
+
+type FileModificationLogModel struct {
+	ID                uint      `gorm:"primaryKey;autoIncrement"`
+	SessionID         string    `gorm:"size:64;index:idx_fml_session;not null"`
+	FilePath          string    `gorm:"size:512"`
+	ModifiedAt        time.Time `gorm:"index:idx_fml_time"`
+	CausedByMessageID string    `gorm:"size:64"`
 }

@@ -238,6 +238,17 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 
 				l.recordChildPID(sessionID, tc.ToolName, toolResult)
 
+				if toolResult.Success && (tc.ToolName == "write_file" || tc.ToolName == "edit_file") {
+					if path, ok := tc.Params["path"].(string); ok && path != "" {
+						l.store.RecordFileModification(session.FileModificationRecord{
+							SessionID:         sessionID,
+							FilePath:          path,
+							ModifiedAt:        time.Now(),
+							CausedByMessageID: assistantMsg.ID,
+						})
+					}
+				}
+
 				toolResult.ToolCallID = tc.ID
 				toolMsg := l.toolResultToMessage(toolResult)
 				if err := l.store.AddMessage(sessionID, toolMsg); err != nil {
