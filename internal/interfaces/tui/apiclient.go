@@ -123,6 +123,15 @@ func (c *APIClient) UpdateConfig(sessionID string, toolCallLimit int) error {
 	return c.doJSON("PUT", "/api/v1/sessions/"+sessionID+"/config", req, nil)
 }
 
+func (c *APIClient) Rollback(sessionID string, targetMessageID string) (*types.RollbackResult, error) {
+	req := types.RollbackRequest{TargetMessageID: targetMessageID}
+	var result types.RollbackResult
+	if err := c.doJSON("POST", "/api/v1/sessions/"+sessionID+"/rollback", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) SSEEndpoint(sessionID string) string {
 	return fmt.Sprintf("%s/api/v1/sessions/%s/events", c.baseURL, sessionID)
 }

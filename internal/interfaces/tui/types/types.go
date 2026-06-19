@@ -77,6 +77,17 @@ type UpdateConfigRequest struct {
 	ToolCallLimit int `json:"tool_call_limit,omitempty"`
 }
 
+type RollbackRequest struct {
+	TargetMessageID string `json:"target_message_id"`
+}
+
+type RollbackResult struct {
+	ActualRollbackMessageID string `json:"actual_rollback_message_id"`
+	Adjusted                bool   `json:"adjusted"`
+	AdjustmentReason        string `json:"adjustment_reason,omitempty"`
+	DeletedCount            int    `json:"deleted_count"`
+}
+
 type ListSessionsResponse struct {
 	Sessions []SessionInfo `json:"sessions"`
 	Total    int           `json:"total"`

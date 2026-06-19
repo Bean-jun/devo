@@ -41,6 +41,7 @@ func (m *MessageViewport) SetMessages(messages []types.Message) {
 	m.Messages = messages
 	m.ToolCards = nil
 	m.renderContent()
+	m.viewport.GotoBottom()
 }
 
 func (m *MessageViewport) AddMessage(msg types.Message) {
@@ -125,6 +126,9 @@ func (m *MessageViewport) renderContent() {
 		case "user":
 			lines = append(lines, m.renderUserMessage(msg))
 		case "assistant":
+			if msg.Content == "" {
+				continue
+			}
 			lines = append(lines, m.renderAssistantMessage(msg))
 		case "system":
 			lines = append(lines, m.renderSystemMessage(msg))

@@ -65,7 +65,11 @@ func (l *Loop) Rollback(sessionID string, targetMessageID string) (*RollbackResu
 				"目标消息是一条工具结果消息，其前存在对应的工具调用请求（消息ID: %s），回滚点已自动前移至工具调用请求之前，以删除不完整的工具调用回合。",
 				msgs[targetIdx-1].ID,
 			)
-			actualRollbackMessageID = msgs[targetIdx-1].ID
+			if targetIdx > 1 {
+				actualRollbackMessageID = msgs[targetIdx-2].ID
+			} else {
+				actualRollbackMessageID = msgs[targetIdx-1].ID
+			}
 		}
 	}
 

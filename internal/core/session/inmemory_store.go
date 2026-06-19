@@ -8,9 +8,10 @@ import (
 )
 
 type InMemoryStore struct {
-	mu         sync.RWMutex
-	sessions   map[string]*Session
-	usageSteps map[string][]UsageStepRecord
+	mu                sync.RWMutex
+	sessions          map[string]*Session
+	usageSteps        map[string][]UsageStepRecord
+	fileModifications map[string][]FileModificationRecord
 }
 
 func NewInMemoryStore() *InMemoryStore {
@@ -343,13 +344,50 @@ func (s *InMemoryStore) DeleteMessagesAfter(sessionID string, messageID string) 
 }
 
 func (s *InMemoryStore) RecordFileModification(record FileModificationRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.sessions[record.SessionID]; !ok {
+		return ErrSessionNotFound
+	}
+
+	if s.fileModifications == nil {
+		s.fileModifications = make(map[string][]FileModificationRecord)
+	}
+
+	s.fileModifications[record.SessionID] = append(s.fileModifications[record.SessionID], record)
 	return nil
 }
 
 func (s *InMemoryStore) GetFileModifications(sessionID string) ([]FileModificationRecord, error) {
-	return nil, nil
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.fileModifications == nil {
+		return nil, nil
+	}
+
+	records := s.fileModifications[sessionID]
+	result := make([]FileModificationRecord, len(records))
+	copy(result, records)
+	return result, nil
 }
 
 func (s *InMemoryStore) DeleteFileModificationsAfter(sessionID string, afterTime time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.fileModifications == nil {
+		return nil
+	}
+
+	records := s.fileModifications[sessionID]
+	var filtered []FileModificationRecord
+	for _, r := range records {
+		if !r.ModifiedAt.After(afterTime) {
+			filtered = append(filtered, r)
+		}
+	}
+	s.fileModifications[sessionID] = filtered
 	return nil
 }

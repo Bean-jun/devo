@@ -157,3 +157,23 @@ func (a *App) loadMessagesCmd(sessionID string) tea.Cmd {
 		return messages.APIResponse{Kind: "messages_loaded", Data: msgs}
 	}
 }
+
+func (a *App) loadAllMessagesCmd(sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		msgs, err := a.apiClient.GetMessages(sessionID, 1000, 0)
+		if err != nil {
+			return messages.APIResponse{Kind: "rollback_messages_loaded", Err: err}
+		}
+		return messages.APIResponse{Kind: "rollback_messages_loaded", Data: msgs}
+	}
+}
+
+func (a *App) rollbackCmd(targetMessageID string) tea.Cmd {
+	return func() tea.Msg {
+		result, err := a.apiClient.Rollback(a.activeSession.ID, targetMessageID)
+		if err != nil {
+			return messages.APIResponse{Kind: "rollback_done", Err: err}
+		}
+		return messages.APIResponse{Kind: "rollback_done", Data: result}
+	}
+}

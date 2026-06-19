@@ -37,11 +37,13 @@ type App struct {
 	chatView       components.ChatView
 	approvalModal  components.ApprovalModal
 	commandPalette components.CommandPalette
+	rollbackPicker components.RollbackPicker
 	toast          components.Toast
 
 	state              AppState
 	showSidebar        bool
 	showCommandPalette bool
+	showRollbackPicker bool
 	width              int
 	height             int
 	workingDir         string
@@ -80,6 +82,7 @@ func NewAppWithURL(baseURL string) (*App, error) {
 		chatView:       components.NewChatView(),
 		approvalModal:  components.NewApprovalModal(),
 		commandPalette: components.NewCommandPalette(),
+		rollbackPicker: components.NewRollbackPicker(),
 		toast:          components.NewToast(),
 	}, nil
 }
@@ -149,6 +152,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if a.showCommandPalette {
+			return a, tea.Batch(cmds...)
+		}
+
+		if a.showRollbackPicker {
 			return a, tea.Batch(cmds...)
 		}
 
@@ -320,6 +327,13 @@ func (a *App) View() string {
 		}
 		a.commandPalette.Width = chatPaletteWidth
 		a.chatView.CommandPaletteView = a.commandPalette.View()
+	} else if a.showRollbackPicker {
+		chatPaletteWidth := a.width
+		if a.showSidebar {
+			chatPaletteWidth = a.width - 30 - 1
+		}
+		a.rollbackPicker.Width = chatPaletteWidth
+		a.chatView.CommandPaletteView = a.rollbackPicker.View()
 	} else {
 		a.chatView.CommandPaletteView = ""
 	}

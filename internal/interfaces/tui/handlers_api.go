@@ -76,6 +76,13 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 		a.chatView.MessageView.SetMessages(msgs)
 		return nil
 
+	case "rollback_messages_loaded":
+		msgs := msg.Data.([]types.Message)
+		a.msgs = msgs
+		a.showRollbackPicker = true
+		a.buildRollbackItems()
+		return nil
+
 	case "approval_done":
 		a.state = StateProcessing
 		a.statusBar.SessionState = "Processing"
@@ -84,6 +91,15 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 
 	case "pause_done", "resume_done", "cancel_done":
 		return a.refreshSessionCmd()
+
+	case "rollback_done":
+		result := msg.Data.(*types.RollbackResult)
+		toastMsg := fmt.Sprintf("已回滚，删除了 %d 条消息", result.DeletedCount)
+		if result.Adjusted {
+			toastMsg += "（吸附已自动调整）"
+		}
+		a.toast.Show(toastMsg, false)
+		return a.loadMessagesCmd(a.activeSession.ID)
 
 	case "trust_set", "policy_set":
 		a.toast.Show("设置已更新", false)
