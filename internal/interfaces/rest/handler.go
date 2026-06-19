@@ -35,6 +35,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sessions/{id}/resume", h.Resume)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/complete", h.Complete)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/archive", h.Archive)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/usage", h.GetSessionUsage)
+	mux.HandleFunc("GET /api/v1/usage/stats", h.GetUsageStats)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

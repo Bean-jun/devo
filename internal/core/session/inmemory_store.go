@@ -1,17 +1,22 @@
 package session
 
 import (
+	"fmt"
+	"sort"
 	"sync"
+	"time"
 )
 
 type InMemoryStore struct {
-	mu       sync.RWMutex
-	sessions map[string]*Session
+	mu         sync.RWMutex
+	sessions   map[string]*Session
+	usageSteps map[string][]UsageStepRecord
 }
 
 func NewInMemoryStore() *InMemoryStore {
 	return &InMemoryStore{
-		sessions: make(map[string]*Session),
+		sessions:   make(map[string]*Session),
+		usageSteps: make(map[string][]UsageStepRecord),
 	}
 }
 
@@ -184,6 +189,105 @@ func (s *InMemoryStore) GetEvents(sessionID string, sinceID int64) ([]Event, err
 		return nil, ErrSessionNotFound
 	}
 	return sess.EventBus.GetHistory(sinceID), nil
+}
+
+func (s *InMemoryStore) AddUsageStep(sessionID string, stepSeq int, inputTokens, outputTokens int, source string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.usageSteps[sessionID] = append(s.usageSteps[sessionID], UsageStepRecord{
+		SessionID:    sessionID,
+		StepSeq:      stepSeq,
+		InputTokens:  inputTokens,
+		OutputTokens: outputTokens,
+		Source:       source,
+		CreatedAt:    time.Now(),
+	})
+	return nil
+}
+
+func (s *InMemoryStore) GetUsageSteps(sessionID string) ([]UsageStepRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	steps := s.usageSteps[sessionID]
+	result := make([]UsageStepRecord, len(steps))
+	copy(result, steps)
+	return result, nil
+}
+
+func (s *InMemoryStore) UpdateSessionUsage(sessionID string, inputTokens, outputTokens int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return ErrSessionNotFound
+	}
+
+	sess.TokenUsage.Input += inputTokens
+	sess.TokenUsage.Output += outputTokens
+	sess.TokenUsage.Total = sess.TokenUsage.Input + sess.TokenUsage.Output
+	return nil
+}
+
+func (s *InMemoryStore) GetUsageStats(groupBy, dateRange, project string) (*UsageStatsResult, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := &UsageStatsResult{
+		Groups: make([]UsageGroup, 0),
+	}
+
+	groupMap := make(map[string]*TokenUsage)
+
+	for _, sess := range s.sessions {
+		if project != "" && sess.WorkingDirectory != project {
+			continue
+		}
+
+		var key string
+		switch groupBy {
+		case "project":
+			key = sess.WorkingDirectory
+		case "session":
+			key = sess.ID
+		case "date":
+			key = sess.CreatedAt.Format("2006-01-02")
+		default:
+			key = "all"
+		}
+
+		if _, ok := groupMap[key]; !ok {
+			groupMap[key] = &TokenUsage{}
+		}
+		groupMap[key].Input += sess.TokenUsage.Input
+		groupMap[key].Output += sess.TokenUsage.Output
+		groupMap[key].Total += sess.TokenUsage.Total
+	}
+
+	keys := make([]string, 0, len(groupMap))
+	for k := range groupMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		u := groupMap[k]
+		cost := float64(u.Total) / 1000.0 * 0.01
+		result.Groups = append(result.Groups, UsageGroup{
+			Key:           k,
+			InputTokens:   u.Input,
+			OutputTokens:  u.Output,
+			TotalTokens:   u.Total,
+			EstimatedCost: fmt.Sprintf("$%.4f", cost),
+		})
+		result.Summary.Input += u.Input
+		result.Summary.Output += u.Output
+		result.Summary.Total += u.Total
+	}
+
+	return result, nil
 }
 
 func (s *InMemoryStore) Close() error {

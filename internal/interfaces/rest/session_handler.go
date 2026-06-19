@@ -19,14 +19,15 @@ type createSessionRequest struct {
 }
 
 type createSessionResponse struct {
-	ID                     string            `json:"id"`
-	Title                  string            `json:"title"`
-	WorkingDirectory       string            `json:"working_directory"`
-	State                  string            `json:"state"`
-	CreatedAt              string            `json:"created_at"`
-	TrustLevel             string            `json:"trust_level"`
-	ApprovalPolicy         map[string]string `json:"approval_policy,omitempty"`
-	ApprovalTimeoutSeconds int               `json:"approval_timeout_seconds"`
+	ID                     string             `json:"id"`
+	Title                  string             `json:"title"`
+	WorkingDirectory       string             `json:"working_directory"`
+	State                  string             `json:"state"`
+	CreatedAt              string             `json:"created_at"`
+	TrustLevel             string             `json:"trust_level"`
+	ApprovalPolicy         map[string]string  `json:"approval_policy,omitempty"`
+	ApprovalTimeoutSeconds int                `json:"approval_timeout_seconds"`
+	TokenUsage             session.TokenUsage `json:"token_usage"`
 }
 
 func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
@@ -84,21 +85,23 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 		TrustLevel:             sess.TrustLevel,
 		ApprovalPolicy:         sess.ApprovalPolicy,
 		ApprovalTimeoutSeconds: sess.ApprovalTimeoutSeconds,
+		TokenUsage:             sess.TokenUsage,
 	})
 }
 
 type getSessionResponse struct {
-	ID                     string            `json:"id"`
-	Title                  string            `json:"title"`
-	WorkingDirectory       string            `json:"working_directory"`
-	State                  string            `json:"state"`
-	CreatedAt              string            `json:"created_at"`
-	LastActiveAt           string            `json:"last_active_at"`
-	TrustLevel             string            `json:"trust_level"`
-	ApprovalPolicy         map[string]string `json:"approval_policy,omitempty"`
-	ApprovalTimeoutSeconds int               `json:"approval_timeout_seconds"`
-	ToolCallLimit          int               `json:"tool_call_limit"`
-	ToolCallCount          int               `json:"tool_call_count"`
+	ID                     string             `json:"id"`
+	Title                  string             `json:"title"`
+	WorkingDirectory       string             `json:"working_directory"`
+	State                  string             `json:"state"`
+	CreatedAt              string             `json:"created_at"`
+	LastActiveAt           string             `json:"last_active_at"`
+	TrustLevel             string             `json:"trust_level"`
+	ApprovalPolicy         map[string]string  `json:"approval_policy,omitempty"`
+	ApprovalTimeoutSeconds int                `json:"approval_timeout_seconds"`
+	ToolCallLimit          int                `json:"tool_call_limit"`
+	ToolCallCount          int                `json:"tool_call_count"`
+	TokenUsage             session.TokenUsage `json:"token_usage"`
 }
 
 func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
@@ -130,16 +133,18 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 		ApprovalTimeoutSeconds: sess.ApprovalTimeoutSeconds,
 		ToolCallLimit:          sess.ToolCallLimit,
 		ToolCallCount:          sess.ToolCallCount,
+		TokenUsage:             sess.TokenUsage,
 	})
 }
 
 type listSessionsItem struct {
-	ID           string `json:"id"`
-	Title        string `json:"title"`
-	ProjectPath  string `json:"project_path"`
-	State        string `json:"state"`
-	CreatedAt    string `json:"created_at"`
-	LastActiveAt string `json:"last_active_at"`
+	ID           string             `json:"id"`
+	Title        string             `json:"title"`
+	ProjectPath  string             `json:"project_path"`
+	State        string             `json:"state"`
+	CreatedAt    string             `json:"created_at"`
+	LastActiveAt string             `json:"last_active_at"`
+	TokenUsage   session.TokenUsage `json:"token_usage"`
 }
 
 type listSessionsResponse struct {
@@ -188,6 +193,7 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 			State:        string(s.State),
 			CreatedAt:    s.CreatedAt.Format(time.RFC3339),
 			LastActiveAt: s.LastActiveAt.Format(time.RFC3339),
+			TokenUsage:   s.TokenUsage,
 		}
 	}
 

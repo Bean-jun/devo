@@ -36,6 +36,9 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 		return
 	}
 
+	var stepSeq int
+	var totalStepTokens int
+
 	for {
 		msgs, _, err := l.store.GetMessages(sessionID, 0, 0)
 		if err != nil {
@@ -51,6 +54,20 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 		if err != nil {
 			l.handleLoopError(sessionID, fmt.Errorf("llm complete: %w", err))
 			return
+		}
+
+		stepSeq++
+		if result.TokenUsage != nil {
+			l.tokenMeter.RecordStep(sessionID, stepSeq, result.TokenUsage)
+			totalStepTokens += result.TokenUsage.TotalTokens
+
+			sess, _ := l.store.Get(sessionID)
+			eventBus.Publish("token_usage", map[string]any{
+				"step":                 stepSeq,
+				"input_tokens":         result.TokenUsage.InputTokens,
+				"output_tokens":        result.TokenUsage.OutputTokens,
+				"session_total_tokens": sess.TokenUsage.Total,
+			})
 		}
 
 		if len(result.ToolCalls) > 0 {
@@ -246,13 +263,19 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 		eventBus.Publish("message_complete", map[string]any{
 			"message_id":        assistantMsg.ID,
 			"full_text":         result.Text,
-			"total_step_tokens": nil,
+			"total_step_tokens": totalStepTokens,
 		})
 
-		oldState := string(sess.State)
-		sess.State = session.StateIdle
-		sess.LastActiveAt = time.Now()
-		if err := l.store.Update(sess); err != nil {
+		freshSess, err := l.store.Get(sessionID)
+		if err != nil {
+			l.handleLoopError(sessionID, fmt.Errorf("get session for state update: %w", err))
+			return
+		}
+
+		oldState := string(freshSess.State)
+		freshSess.State = session.StateIdle
+		freshSess.LastActiveAt = time.Now()
+		if err := l.store.Update(freshSess); err != nil {
 			l.handleLoopError(sessionID, fmt.Errorf("update session state to idle: %w", err))
 			return
 		}

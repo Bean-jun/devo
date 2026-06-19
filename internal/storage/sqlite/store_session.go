@@ -59,6 +59,9 @@ func (s *GormStore) Update(sess *session.Session) error {
 		"tool_call_limit":              sess.ToolCallLimit,
 		"tool_call_count":              sess.ToolCallCount,
 		"last_loop_termination_reason": string(sess.LastLoopTerminationReason),
+		"token_usage_input":            sess.TokenUsage.Input,
+		"token_usage_output":           sess.TokenUsage.Output,
+		"token_usage_total":            sess.TokenUsage.Total,
 	}
 
 	if sess.ApprovalPolicy != nil {

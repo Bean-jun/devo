@@ -73,7 +73,11 @@ func (s *SessionSidebar) View() string {
 		stateStr := lipgloss.NewStyle().Foreground(stateColor).Render(string(sess.State))
 
 		title := sess.Title
-		maxTitleLen := s.Width - 12
+		tokStr := ""
+		if sess.TokenUsage.Total > 0 {
+			tokStr = fmt.Sprintf(" %d tok", sess.TokenUsage.Total)
+		}
+		maxTitleLen := s.Width - 12 - len(tokStr)
 		if maxTitleLen < 5 {
 			maxTitleLen = 5
 		}
@@ -81,7 +85,7 @@ func (s *SessionSidebar) View() string {
 			title = title[:maxTitleLen-1] + "…"
 		}
 
-		line := fmt.Sprintf("%s %s  %s", indicator, title, stateStr)
+		line := fmt.Sprintf("%s %s  %s%s", indicator, title, stateStr, tokStr)
 
 		if i == s.Cursor {
 			content += SidebarActiveStyle.Render(line) + "\n"

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"devo/internal/core/session"
+	"devo/internal/core/tokenmeter"
 	"devo/internal/taskexec/llmclient"
 )
 
@@ -174,6 +175,15 @@ func (c *Client) Complete(ctx context.Context, messages []session.Message, syste
 		}
 	}
 
+	if chatResp.Usage != nil {
+		result.TokenUsage = &tokenmeter.TokenUsage{
+			InputTokens:  chatResp.Usage.PromptTokens,
+			OutputTokens: chatResp.Usage.CompletionTokens,
+			TotalTokens:  chatResp.Usage.TotalTokens,
+			Source:       tokenmeter.SourceExact,
+		}
+	}
+
 	return result, nil
 }
 
@@ -215,6 +225,13 @@ type openaiFunctionDef struct {
 
 type openaiChatResponse struct {
 	Choices []openaiChoice `json:"choices"`
+	Usage   *openaiUsage   `json:"usage,omitempty"`
+}
+
+type openaiUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
 }
 
 type openaiChoice struct {

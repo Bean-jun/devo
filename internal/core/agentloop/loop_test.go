@@ -247,8 +247,8 @@ func TestEventTypesOrder(t *testing.T) {
 
 	loop.ProcessMessage(context.Background(), "sess-1", "Hello")
 
-	expectedOrder := []string{"thinking", "message_complete", "session_state_change"}
-	received := make([]string, 0, 3)
+	expectedOrder := []string{"thinking", "token_usage", "message_complete", "session_state_change"}
+	received := make([]string, 0, 4)
 
 	for range expectedOrder {
 		evt, ok := waitForEvent(ch, "", 2*time.Second)

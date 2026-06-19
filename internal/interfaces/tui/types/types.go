@@ -9,6 +9,13 @@ type SessionInfo struct {
 	LastActiveAt     string            `json:"last_active_at"`
 	TrustLevel       string            `json:"trust_level"`
 	ApprovalPolicy   map[string]string `json:"approval_policy,omitempty"`
+	TokenUsage       TokenUsage        `json:"token_usage"`
+}
+
+type TokenUsage struct {
+	Input  int `json:"input"`
+	Output int `json:"output"`
+	Total  int `json:"total"`
 }
 
 type Message struct {

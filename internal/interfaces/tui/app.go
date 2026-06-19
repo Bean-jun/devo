@@ -466,6 +466,9 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 			}
 			a.chatView.MessageView.AddMessage(assistantMsg)
 		}
+		if totalStepTokens, ok := msg.Data["total_step_tokens"].(float64); ok && totalStepTokens > 0 {
+			a.chatView.MessageView.AddSystemNotice(fmt.Sprintf("本轮消耗 %d tokens", int(totalStepTokens)))
+		}
 
 	case "approval_required":
 		approvalID, _ := msg.Data["approval_id"].(string)
@@ -497,8 +500,8 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 	case "token_usage":
 		inputTokens, _ := msg.Data["input_tokens"].(float64)
 		outputTokens, _ := msg.Data["output_tokens"].(float64)
-		total := int(inputTokens) + int(outputTokens)
-		a.statusBar.TokenUsage = fmt.Sprintf("%d tok", total)
+		sessionTotal, _ := msg.Data["session_total_tokens"].(float64)
+		a.statusBar.TokenUsage = fmt.Sprintf("%.0f tok (in:%.0f out:%.0f)", sessionTotal, inputTokens, outputTokens)
 
 	case "session_state_change":
 		oldState, _ := msg.Data["old_state"].(string)

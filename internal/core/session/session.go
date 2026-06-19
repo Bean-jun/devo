@@ -53,6 +53,12 @@ const (
 
 const DefaultToolCallLimit = 50
 
+type TokenUsage struct {
+	Input  int `json:"input"`
+	Output int `json:"output"`
+	Total  int `json:"total"`
+}
+
 type Session struct {
 	ID                        string                `json:"id"`
 	Title                     string                `json:"title"`
@@ -72,6 +78,7 @@ type Session struct {
 	ToolCallLimit             int                   `json:"tool_call_limit"`
 	ToolCallCount             int                   `json:"tool_call_count"`
 	LastLoopTerminationReason LoopTerminationReason `json:"last_loop_termination_reason,omitempty"`
+	TokenUsage                TokenUsage            `json:"token_usage"`
 }
 
 var (
@@ -97,7 +104,33 @@ type SessionStore interface {
 	GetEvents(sessionID string, sinceID int64) ([]Event, error)
 	IncrementSSEConnections(sessionID string) error
 	DecrementSSEConnections(sessionID string) error
+	AddUsageStep(sessionID string, stepSeq int, inputTokens, outputTokens int, source string) error
+	GetUsageSteps(sessionID string) ([]UsageStepRecord, error)
+	UpdateSessionUsage(sessionID string, inputTokens, outputTokens int) error
+	GetUsageStats(groupBy, dateRange, project string) (*UsageStatsResult, error)
 	Close() error
+}
+
+type UsageStepRecord struct {
+	SessionID    string    `json:"session_id"`
+	StepSeq      int       `json:"step_seq"`
+	InputTokens  int       `json:"input_tokens"`
+	OutputTokens int       `json:"output_tokens"`
+	Source       string    `json:"source"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type UsageStatsResult struct {
+	Groups  []UsageGroup `json:"groups"`
+	Summary TokenUsage   `json:"summary"`
+}
+
+type UsageGroup struct {
+	Key           string `json:"key"`
+	InputTokens   int    `json:"input_tokens"`
+	OutputTokens  int    `json:"output_tokens"`
+	TotalTokens   int    `json:"total_tokens"`
+	EstimatedCost string `json:"estimated_cost"`
 }
 
 var rng = rand.New(rand.NewSource(time.Now().UnixNano()))

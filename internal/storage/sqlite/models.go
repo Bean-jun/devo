@@ -23,6 +23,9 @@ type SessionModel struct {
 	ToolCallLimit             int    `gorm:"default:50"`
 	ToolCallCount             int    `gorm:"default:0"`
 	LastLoopTerminationReason string `gorm:"size:32"`
+	TokenUsageInput           int    `gorm:"default:0"`
+	TokenUsageOutput          int    `gorm:"default:0"`
+	TokenUsageTotal           int    `gorm:"default:0"`
 }
 
 type MessageModel struct {
@@ -60,6 +63,11 @@ func (m *SessionModel) ToDomain() *session.Session {
 		ToolCallLimit:             m.ToolCallLimit,
 		ToolCallCount:             m.ToolCallCount,
 		LastLoopTerminationReason: session.LoopTerminationReason(m.LastLoopTerminationReason),
+		TokenUsage: session.TokenUsage{
+			Input:  m.TokenUsageInput,
+			Output: m.TokenUsageOutput,
+			Total:  m.TokenUsageTotal,
+		},
 	}
 
 	if m.ApprovalPolicyJSON != "" {
@@ -86,6 +94,9 @@ func fromDomain(s *session.Session) *SessionModel {
 		ToolCallLimit:             s.ToolCallLimit,
 		ToolCallCount:             s.ToolCallCount,
 		LastLoopTerminationReason: string(s.LastLoopTerminationReason),
+		TokenUsageInput:           s.TokenUsage.Input,
+		TokenUsageOutput:          s.TokenUsage.Output,
+		TokenUsageTotal:           s.TokenUsage.Total,
 	}
 
 	if s.ApprovalPolicy != nil && len(s.ApprovalPolicy) > 0 {
@@ -168,7 +179,17 @@ func fromEvent(sessionID string, e session.Event) (*EventModel, error) {
 }
 
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&SessionModel{}, &MessageModel{}, &EventModel{}, &UserConfigModel{})
+	return db.AutoMigrate(&SessionModel{}, &MessageModel{}, &EventModel{}, &UserConfigModel{}, &TokenUsageStepModel{})
+}
+
+type TokenUsageStepModel struct {
+	ID           uint      `gorm:"primaryKey;autoIncrement"`
+	SessionID    string    `gorm:"size:64;index:idx_usage_step_session;not null"`
+	StepSeq      int       `gorm:"index:idx_usage_step_seq"`
+	InputTokens  int       `gorm:"default:0"`
+	OutputTokens int       `gorm:"default:0"`
+	Source       string    `gorm:"size:16"`
+	CreatedAt    time.Time `gorm:"autoCreateTime"`
 }
 
 type UserConfigModel struct {
