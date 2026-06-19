@@ -13,9 +13,9 @@ type InputArea struct {
 
 func NewInputArea() InputArea {
 	ta := textarea.New()
-	ta.Placeholder = "Type your message... (Enter to send, Shift+Enter for newline)"
-	ta.SetHeight(2)
-	ta.MaxHeight = 2
+	ta.Placeholder = "输入消息... (Enter 发送, Shift+Enter 换行, / 命令面板)"
+	ta.SetHeight(1)
+	ta.MaxHeight = 1
 	ta.ShowLineNumbers = false
 	ta.CharLimit = 0
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()

@@ -27,10 +27,11 @@ var StateColors = map[string]lipgloss.Color{
 
 var (
 	StatusBarStyle = lipgloss.NewStyle().
-			Background(ColorBg).
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(ColorBorder).
+			Background(ColorSurface).
 			Foreground(ColorWhite).
-			Padding(0, 1).
-			Height(1)
+			Padding(0, 1)
 
 	HelpBarStyle = lipgloss.NewStyle().
 			Background(ColorBg).
@@ -87,15 +88,15 @@ var (
 			Border(lipgloss.NormalBorder(), false, true, false, false).
 			BorderForeground(ColorBorder).
 			Padding(0, 1).
-			Width(22)
+			Width(30)
 
 	SidebarItemStyle = lipgloss.NewStyle().
 				Padding(0, 1).
-				Width(19)
+				Width(27)
 
 	SidebarActiveStyle = lipgloss.NewStyle().
 				Padding(0, 1).
-				Width(19).
+				Width(27).
 				Foreground(ColorWhite).
 				Background(ColorPrimary)
 

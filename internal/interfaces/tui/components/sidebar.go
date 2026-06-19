@@ -75,7 +75,7 @@ func (s *SessionSidebar) View() string {
 		title := sess.Title
 		tokStr := ""
 		if sess.TokenUsage.Total > 0 {
-			tokStr = fmt.Sprintf(" %d tok", sess.TokenUsage.Total)
+			tokStr = fmt.Sprintf(" %.3fM", float64(sess.TokenUsage.Total)/1000000.0)
 		}
 		maxTitleLen := s.Width - 12 - len(tokStr)
 		if maxTitleLen < 5 {
@@ -94,7 +94,5 @@ func (s *SessionSidebar) View() string {
 		}
 	}
 
-	content += "\n" + SidebarItemStyle.Copy().Foreground(ColorInfo).Render("[+ New]")
-
-	return SidebarStyle.Copy().Height(s.Height).Render(content)
+	return SidebarStyle.Copy().Width(s.Width).Height(s.Height).Render(content)
 }

@@ -37,11 +37,11 @@ func (c *APIClient) CreateSession(workingDir, title string) (*types.SessionInfo,
 }
 
 func (c *APIClient) ListSessions() ([]types.SessionInfo, error) {
-	var sessions []types.SessionInfo
-	if err := c.doJSON("GET", "/api/v1/sessions", nil, &sessions); err != nil {
+	var resp types.ListSessionsResponse
+	if err := c.doJSON("GET", "/api/v1/sessions", nil, &resp); err != nil {
 		return nil, err
 	}
-	return sessions, nil
+	return resp.Sessions, nil
 }
 
 func (c *APIClient) GetSession(id string) (*types.SessionInfo, error) {
@@ -59,11 +59,11 @@ func (c *APIClient) SendMessage(sessionID, content string) error {
 
 func (c *APIClient) GetMessages(sessionID string, limit, offset int) ([]types.Message, error) {
 	url := fmt.Sprintf("/api/v1/sessions/%s/messages?limit=%d&offset=%d", sessionID, limit, offset)
-	var messages []types.Message
-	if err := c.doJSON("GET", url, nil, &messages); err != nil {
+	var resp types.GetMessagesResponse
+	if err := c.doJSON("GET", url, nil, &resp); err != nil {
 		return nil, err
 	}
-	return messages, nil
+	return resp.Messages, nil
 }
 
 func (c *APIClient) GetFiles(sessionID string) ([]types.FileInfo, error) {

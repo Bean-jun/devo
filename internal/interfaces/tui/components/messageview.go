@@ -103,6 +103,8 @@ func (m *MessageViewport) SetSize(width, height int) {
 	if err == nil {
 		m.mdRenderer = r
 	}
+
+	m.renderContent()
 }
 
 func (m *MessageViewport) Update(msg tea.Msg) (MessageViewport, tea.Cmd) {
@@ -112,7 +114,7 @@ func (m *MessageViewport) Update(msg tea.Msg) (MessageViewport, tea.Cmd) {
 }
 
 func (m *MessageViewport) View() string {
-	return m.viewport.View()
+	return lipgloss.NewStyle().Height(m.Height).Render(m.viewport.View())
 }
 
 func (m *MessageViewport) renderContent() {

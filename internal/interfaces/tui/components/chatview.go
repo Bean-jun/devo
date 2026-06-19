@@ -6,11 +6,12 @@ import (
 )
 
 type ChatView struct {
-	MessageView MessageViewport
-	InputArea   InputArea
-	Width       int
-	Height      int
-	Processing  bool
+	MessageView        MessageViewport
+	InputArea          InputArea
+	Width              int
+	Height             int
+	Processing         bool
+	CommandPaletteView string
 }
 
 func NewChatView() ChatView {
@@ -24,7 +25,7 @@ func (c *ChatView) SetSize(width, height int) {
 	c.Width = width
 	c.Height = height
 
-	inputHeight := 4
+	inputHeight := 3
 	msgHeight := height - inputHeight
 	if msgHeight < 5 {
 		msgHeight = 5
@@ -69,6 +70,17 @@ func (c *ChatView) View() string {
 			Foreground(ColorInfo).
 			Italic(true).
 			Render("  Processing...")
+	}
+
+	paletteView := c.CommandPaletteView
+
+	if paletteView != "" {
+		return lipgloss.JoinVertical(lipgloss.Left,
+			msgView,
+			spacer,
+			paletteView,
+			inputView,
+		)
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left,

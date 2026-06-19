@@ -2,8 +2,9 @@ package tui
 
 import (
 	"fmt"
+	"net/url"
 	"os"
-	"strings"
+	"strconv"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -31,20 +32,21 @@ type App struct {
 	activeSession *types.SessionInfo
 	msgs          []types.Message
 
-	statusBar     components.StatusBar
-	sidebar       components.SessionSidebar
-	chatView      components.ChatView
-	helpBar       components.HelpBar
-	approvalModal components.ApprovalModal
-	toast         components.Toast
+	statusBar      components.StatusBar
+	sidebar        components.SessionSidebar
+	chatView       components.ChatView
+	approvalModal  components.ApprovalModal
+	commandPalette components.CommandPalette
+	toast          components.Toast
 
-	state       AppState
-	showSidebar bool
-	width       int
-	height      int
-	workingDir  string
-	ready       bool
-	apiBaseURL  string
+	state              AppState
+	showSidebar        bool
+	showCommandPalette bool
+	width              int
+	height             int
+	workingDir         string
+	ready              bool
+	apiBaseURL         string
 
 	initStatus string
 	initErr    error
@@ -57,18 +59,28 @@ func NewAppWithURL(baseURL string) (*App, error) {
 		return nil, fmt.Errorf("get working directory: %w", err)
 	}
 
+	statusBar := components.NewStatusBar()
+
+	if u, err := url.Parse(baseURL); err == nil {
+		if port, err := strconv.Atoi(u.Port()); err == nil {
+			statusBar.ServerPort = port
+		}
+	}
+
 	return &App{
-		apiBaseURL:    baseURL,
-		showSidebar:   true,
-		workingDir:    wd,
-		state:         StateReady,
-		initStatus:    "Connecting to server...",
-		statusBar:     components.NewStatusBar(),
-		sidebar:       components.NewSessionSidebar(),
-		chatView:      components.NewChatView(),
-		helpBar:       components.NewHelpBar(),
-		approvalModal: components.NewApprovalModal(),
-		toast:         components.NewToast(),
+		apiBaseURL:     baseURL,
+		showSidebar:    true,
+		workingDir:     wd,
+		width:          80,
+		height:         24,
+		state:          StateReady,
+		initStatus:     "Connecting to server...",
+		statusBar:      statusBar,
+		sidebar:        components.NewSessionSidebar(),
+		chatView:       components.NewChatView(),
+		approvalModal:  components.NewApprovalModal(),
+		commandPalette: components.NewCommandPalette(),
+		toast:          components.NewToast(),
 	}, nil
 }
 
@@ -136,6 +148,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Batch(cmds...)
 		}
 
+		if a.showCommandPalette {
+			return a, tea.Batch(cmds...)
+		}
+
 		a.chatView, cmd = a.chatView.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -191,10 +207,10 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.statusBar.SessionState = sess.State
 			a.ready = true
 			a.tickCount = 0
-			a.chatView.Focus()
-			a.helpBar.FocusMode = "✎ Input"
+			a.layout()
+			a.focusInput()
 			Log("[TUI] Session created: id=%s, title=%s", sess.ID, sess.Title)
-			return a, a.connectSSECmd()
+			return a, tea.Batch(a.connectSSECmd(), a.refreshSessionCmd())
 		}
 		return a, nil
 
@@ -249,11 +265,21 @@ func (a *App) View() string {
 	}
 
 	statusBarView := a.statusBar.View()
-	helpBarView := a.helpBar.View()
 
 	sidebarView := ""
 	if a.showSidebar {
 		sidebarView = a.sidebar.View()
+	}
+
+	if a.showCommandPalette {
+		chatPaletteWidth := a.width
+		if a.showSidebar {
+			chatPaletteWidth = a.width - 30 - 1
+		}
+		a.commandPalette.Width = chatPaletteWidth
+		a.chatView.CommandPaletteView = a.commandPalette.View()
+	} else {
+		a.chatView.CommandPaletteView = ""
 	}
 
 	chatView := a.chatView.View()
@@ -272,36 +298,46 @@ func (a *App) View() string {
 
 	toastView := a.toast.View()
 
-	view := lipgloss.JoinVertical(lipgloss.Left,
-		statusBarView,
-		mainContent,
-		toastView,
-		helpBarView,
-	)
+	var view string
+	if toastView != "" {
+		view = lipgloss.JoinVertical(lipgloss.Left,
+			statusBarView,
+			mainContent,
+			toastView,
+		)
+	} else {
+		view = lipgloss.JoinVertical(lipgloss.Left,
+			statusBarView,
+			mainContent,
+		)
+	}
 
 	if a.approvalModal.Visible {
 		modalView := a.approvalModal.View()
 		view = lipgloss.JoinVertical(lipgloss.Left,
 			statusBarView,
 			modalView,
-			helpBarView,
 		)
 	}
 
-	Log("[VIEW] main screen: w=%d h=%d ready=%v chatW=%d chatH=%d msgs=%d",
-		a.width, a.height, a.ready,
-		a.chatView.Width, a.chatView.Height,
-		len(a.chatView.MessageView.Messages))
+	// Log("[VIEW] main screen: w=%d h=%d ready=%v chatW=%d chatH=%d msgs=%d",
+	// 	a.width, a.height, a.ready,
+	// 	a.chatView.Width, a.chatView.Height,
+	// 	len(a.chatView.MessageView.Messages))
 
 	return view
 }
 
+func (a *App) focusInput() {
+	a.chatView.Focus()
+	a.statusBar.Mode = ""
+}
+
 func (a *App) layout() {
 	a.statusBar.Width = a.width
-	a.helpBar.Width = a.width
 	a.toast.Width = a.width
 
-	sidebarWidth := 22
+	sidebarWidth := 30
 	chatWidth := a.width
 	if a.showSidebar {
 		chatWidth = a.width - sidebarWidth - 1
@@ -310,9 +346,8 @@ func (a *App) layout() {
 		chatWidth = 20
 	}
 
-	topHeight := 1
-	bottomHeight := 1
-	chatHeight := a.height - topHeight - bottomHeight - 2
+	topHeight := 3
+	chatHeight := a.height - topHeight
 	if chatHeight < 10 {
 		chatHeight = 10
 	}
@@ -320,473 +355,4 @@ func (a *App) layout() {
 	a.sidebar.Width = sidebarWidth
 	a.sidebar.Height = chatHeight
 	a.chatView.SetSize(chatWidth, chatHeight)
-}
-
-func (a *App) initSessionCmd() tea.Cmd {
-	return func() tea.Msg {
-		dirName := a.workingDir
-		if idx := strings.LastIndex(dirName, "/"); idx >= 0 {
-			dirName = dirName[idx+1:]
-		}
-		if idx := strings.LastIndex(dirName, "\\"); idx >= 0 {
-			dirName = dirName[idx+1:]
-		}
-
-		Log("[API] POST /api/v1/sessions working_directory=%s title=%s", a.workingDir, dirName)
-		sess, err := a.apiClient.CreateSession(a.workingDir, dirName)
-		if err != nil {
-			Log("[API] CreateSession failed: %v", err)
-			return messages.APIResponse{Kind: "init_session", Err: err}
-		}
-
-		Log("[API] CreateSession OK: id=%s", sess.ID)
-		return messages.APIResponse{Kind: "init_session", Data: sess}
-	}
-}
-
-func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
-	if msg.Err != nil {
-		Log("[API] Response error (kind=%s): %v", msg.Kind, msg.Err)
-		a.toast.Show(msg.Err.Error(), true)
-		return nil
-	}
-
-	Log("[API] Response OK: kind=%s", msg.Kind)
-
-	switch msg.Kind {
-	case "init_session":
-		sess := msg.Data.(*types.SessionInfo)
-		a.activeSession = sess
-
-		found := false
-		for i, s := range a.sessions {
-			if s.ID == sess.ID {
-				a.sessions[i] = *sess
-				found = true
-				break
-			}
-		}
-		if !found {
-			a.sessions = append(a.sessions, *sess)
-		}
-
-		a.sidebar.SetSessions(a.sessions)
-		a.sidebar.ActiveID = sess.ID
-		for i, s := range a.sessions {
-			if s.ID == sess.ID {
-				a.sidebar.Cursor = i
-				break
-			}
-		}
-		a.statusBar.SessionTitle = sess.Title
-		a.statusBar.SessionState = sess.State
-		a.ready = true
-		a.chatView.Focus()
-		a.helpBar.FocusMode = "✎ Input"
-		return a.connectSSECmd()
-
-	case "message_sent":
-		// State already set in sendMessageCmd, just clear input on success
-		return nil
-
-	case "sessions_listed":
-		sessions := msg.Data.([]types.SessionInfo)
-		a.sessions = sessions
-		a.sidebar.SetSessions(sessions)
-		return nil
-
-	case "session_loaded":
-		sess := msg.Data.(*types.SessionInfo)
-		a.activeSession = sess
-		a.sidebar.ActiveID = sess.ID
-		a.statusBar.SessionTitle = sess.Title
-		a.statusBar.SessionState = sess.State
-		a.chatView.Focus()
-		a.helpBar.FocusMode = "✎ Input"
-		return a.connectSSECmd()
-
-	case "messages_loaded":
-		msgs := msg.Data.([]types.Message)
-		a.msgs = msgs
-		a.chatView.MessageView.SetMessages(msgs)
-		return nil
-
-	case "approval_done":
-		a.state = StateProcessing
-		a.statusBar.SessionState = "Processing"
-		a.chatView.Processing = true
-		return nil
-
-	case "pause_done", "resume_done", "cancel_done":
-		return a.refreshSessionCmd()
-
-	case "trust_set", "policy_set":
-		a.toast.Show("设置已更新", false)
-		return nil
-	}
-
-	return nil
-}
-
-func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
-	Log("[SSE] Event: %s", msg.Type)
-
-	switch msg.Type {
-	case "thinking":
-		if text, ok := msg.Data["message"].(string); ok {
-			a.chatView.MessageView.AddThinking(text)
-		}
-
-	case "tool_call_request":
-		toolName, _ := msg.Data["tool_name"].(string)
-		params, _ := msg.Data["params"]
-		paramsStr := ""
-		if params != nil {
-			paramsStr = fmt.Sprintf("%v", params)
-		}
-
-		card := components.ToolCardData{
-			ToolName: toolName,
-			Params:   paramsStr,
-		}
-		a.chatView.MessageView.AddToolCard(card)
-
-	case "tool_result":
-		toolName, _ := msg.Data["tool_name"].(string)
-		success, _ := msg.Data["success"].(bool)
-		summary, _ := msg.Data["summary"].(string)
-		a.chatView.MessageView.UpdateToolCard(toolName, success, summary, "")
-
-	case "message_complete":
-		content, _ := msg.Data["full_text"].(string)
-		if content != "" {
-			assistantMsg := types.Message{
-				Role:    "assistant",
-				Content: content,
-			}
-			a.chatView.MessageView.AddMessage(assistantMsg)
-		}
-		if totalStepTokens, ok := msg.Data["total_step_tokens"].(float64); ok && totalStepTokens > 0 {
-			a.chatView.MessageView.AddSystemNotice(fmt.Sprintf("本轮消耗 %d tokens", int(totalStepTokens)))
-		}
-
-	case "approval_required":
-		approvalID, _ := msg.Data["approval_id"].(string)
-		opType, _ := msg.Data["operation_type"].(string)
-		riskLevel, _ := msg.Data["risk_level"].(string)
-		summary, _ := msg.Data["summary"].(string)
-		diff, _ := msg.Data["diff"].(string)
-		commandPreview, _ := msg.Data["command_preview"].(string)
-
-		req := &types.ApprovalRequest{
-			ApprovalID:     approvalID,
-			OperationType:  opType,
-			RiskLevel:      riskLevel,
-			Summary:        summary,
-			Diff:           diff,
-			CommandPreview: commandPreview,
-		}
-		a.approvalModal.Show(req, a.width, a.height)
-		a.state = StateAwaitingApproval
-		a.statusBar.SessionState = "AwaitingApproval"
-		a.helpBar.SetApprovalMode()
-
-	case "approval_auto":
-		summary, _ := msg.Data["summary"].(string)
-		policyLevel, _ := msg.Data["policy_level"].(string)
-		notice := fmt.Sprintf("已根据信任策略（%s）自动批准：%s", policyLevel, summary)
-		a.chatView.MessageView.AddSystemNotice(notice)
-
-	case "token_usage":
-		inputTokens, _ := msg.Data["input_tokens"].(float64)
-		outputTokens, _ := msg.Data["output_tokens"].(float64)
-		sessionTotal, _ := msg.Data["session_total_tokens"].(float64)
-		a.statusBar.TokenUsage = fmt.Sprintf("%.0f tok (in:%.0f out:%.0f)", sessionTotal, inputTokens, outputTokens)
-
-	case "session_state_change":
-		oldState, _ := msg.Data["old_state"].(string)
-		newState, _ := msg.Data["new_state"].(string)
-		reason, _ := msg.Data["reason"].(string)
-		a.statusBar.SessionState = newState
-
-		switch reason {
-		case "completed":
-			a.state = StateReady
-			a.chatView.Processing = false
-			a.chatView.MessageView.AddSystemNotice("任务完成")
-		case "cancelled":
-			a.state = StateReady
-			a.chatView.Processing = false
-			a.chatView.MessageView.AddSystemNotice("操作已取消")
-		case "tool_limit_reached":
-			a.state = StateReady
-			a.chatView.Processing = false
-			a.chatView.MessageView.AddSystemNotice("已达到工具调用上限，输入新消息继续")
-		case "error":
-			a.state = StateReady
-			a.chatView.Processing = false
-			a.chatView.MessageView.AddSystemNotice("发生错误，请重试")
-		}
-
-		_ = oldState
-		_ = newState
-
-	case "error":
-		errMsg, _ := msg.Data["message"].(string)
-		a.toast.Show(errMsg, true)
-	}
-
-	return a.readSSEEvent()
-}
-
-func (a *App) handleApprovalDecision(msg messages.ApprovalDecision) tea.Cmd {
-	pending := a.approvalModal.Request
-	a.approvalModal.Hide()
-	a.helpBar.SetDefaultMode()
-
-	if msg.Approved {
-		a.toast.Show("已批准，正在执行...", false)
-		if pending != nil {
-			return a.sendApprovalCmd(pending.ApprovalID, true)
-		}
-	} else {
-		a.toast.Show("已拒绝", false)
-		if pending != nil {
-			return a.sendApprovalCmd(pending.ApprovalID, false)
-		}
-	}
-	return nil
-}
-
-func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
-	key := msg.String()
-
-	if a.state == StateAwaitingApproval {
-		switch key {
-		case "y", "Y":
-			return func() tea.Msg { return messages.ApprovalDecision{Approved: true} }
-		case "n", "N", "esc":
-			return func() tea.Msg { return messages.ApprovalDecision{Approved: false} }
-		case "d", "D":
-			a.approvalModal.Update(msg)
-			return nil
-		}
-		return nil
-	}
-
-	switch key {
-	case "ctrl+c":
-		return a.cancelCmd()
-
-	case "ctrl+q":
-		a.state = StateQuitting
-		return tea.Quit
-
-	case "ctrl+s":
-		a.showSidebar = !a.showSidebar
-		return nil
-
-	case "ctrl+n":
-		return a.newSessionCmd()
-
-	case "ctrl+p":
-		if a.activeSession != nil {
-			if a.activeSession.State == "Processing" {
-				return a.pauseCmd()
-			} else if a.activeSession.State == "Paused" {
-				return a.resumeCmd()
-			}
-		}
-
-	case "ctrl+l":
-		return tea.ClearScreen
-
-	case "enter":
-		if a.chatView.InputArea.Focused() && a.state == StateReady {
-			content := strings.TrimSpace(a.chatView.InputArea.Value())
-			if content != "" {
-				return a.sendMessageCmd(content)
-			}
-		} else if a.showSidebar {
-			selected := a.sidebar.SelectedSession()
-			if selected != nil && selected.ID != a.sidebar.ActiveID {
-				return a.switchSessionCmd(selected.ID)
-			}
-		}
-
-	case "esc":
-		if a.chatView.InputArea.Focused() {
-			a.chatView.Blur()
-			a.helpBar.FocusMode = "☰ Navigate"
-		}
-
-	case "up":
-		if a.showSidebar && !a.chatView.InputArea.Focused() {
-			a.sidebar.CursorUp()
-		}
-
-	case "down":
-		if a.showSidebar && !a.chatView.InputArea.Focused() {
-			a.sidebar.CursorDown()
-		}
-	}
-
-	return nil
-}
-
-func (a *App) connectSSECmd() tea.Cmd {
-	return func() tea.Msg {
-		a.sseClient = NewSSEClient()
-		sseURL := a.apiClient.SSEEndpoint(a.activeSession.ID)
-		if err := a.sseClient.Connect(sseURL); err != nil {
-			return messages.APIResponse{Kind: "sse_error", Err: err}
-		}
-		return a.readSSEEvent()()
-	}
-}
-
-func (a *App) readSSEEvent() tea.Cmd {
-	return func() tea.Msg {
-		select {
-		case event, ok := <-a.sseClient.Events():
-			if !ok {
-				return nil
-			}
-			return messages.SSEEvent{
-				Type: event.Type,
-				Data: event.Data,
-			}
-		case err, ok := <-a.sseClient.Errors():
-			if ok {
-				return messages.APIResponse{Kind: "sse_error", Err: err}
-			}
-			return nil
-		}
-	}
-}
-
-func (a *App) sendMessageCmd(content string) tea.Cmd {
-	// Add user message to chat view immediately
-	a.chatView.MessageView.AddMessage(types.Message{
-		Role:    "user",
-		Content: content,
-	})
-	a.chatView.InputArea.Reset()
-	a.state = StateProcessing
-	a.statusBar.SessionState = "Processing"
-	a.chatView.Processing = true
-
-	return func() tea.Msg {
-		err := a.apiClient.SendMessage(a.activeSession.ID, content)
-		if err != nil {
-			return messages.APIResponse{Kind: "message_sent", Err: err}
-		}
-		return messages.APIResponse{Kind: "message_sent"}
-	}
-}
-
-func (a *App) sendApprovalCmd(approvalID string, approved bool) tea.Cmd {
-	return func() tea.Msg {
-		var err error
-		if approved {
-			err = a.apiClient.Approve(a.activeSession.ID, approvalID)
-		} else {
-			err = a.apiClient.Reject(a.activeSession.ID, approvalID)
-		}
-		if err != nil {
-			return messages.APIResponse{Kind: "approval_done", Err: err}
-		}
-		return messages.APIResponse{Kind: "approval_done"}
-	}
-}
-
-func (a *App) cancelCmd() tea.Cmd {
-	return func() tea.Msg {
-		err := a.apiClient.Cancel(a.activeSession.ID)
-		if err != nil {
-			return messages.APIResponse{Kind: "cancel_done", Err: err}
-		}
-		return messages.APIResponse{Kind: "cancel_done"}
-	}
-}
-
-func (a *App) pauseCmd() tea.Cmd {
-	return func() tea.Msg {
-		err := a.apiClient.Pause(a.activeSession.ID)
-		if err != nil {
-			return messages.APIResponse{Kind: "pause_done", Err: err}
-		}
-		return messages.APIResponse{Kind: "pause_done"}
-	}
-}
-
-func (a *App) resumeCmd() tea.Cmd {
-	return func() tea.Msg {
-		err := a.apiClient.Resume(a.activeSession.ID)
-		if err != nil {
-			return messages.APIResponse{Kind: "resume_done", Err: err}
-		}
-		return messages.APIResponse{Kind: "resume_done"}
-	}
-}
-
-func (a *App) switchSessionCmd(sessionID string) tea.Cmd {
-	return func() tea.Msg {
-		if a.sseClient != nil {
-			a.sseClient.Disconnect()
-		}
-
-		sess, err := a.apiClient.GetSession(sessionID)
-		if err != nil {
-			return messages.APIResponse{Kind: "session_loaded", Err: err}
-		}
-
-		return messages.APIResponse{Kind: "session_loaded", Data: sess}
-	}
-}
-
-func (a *App) newSessionCmd() tea.Cmd {
-	return func() tea.Msg {
-		dirName := a.workingDir
-		if idx := strings.LastIndex(dirName, "/"); idx >= 0 {
-			dirName = dirName[idx+1:]
-		}
-		if idx := strings.LastIndex(dirName, "\\"); idx >= 0 {
-			dirName = dirName[idx+1:]
-		}
-
-		sess, err := a.apiClient.CreateSession(a.workingDir, dirName)
-		if err != nil {
-			return messages.APIResponse{Kind: "init_session", Err: err}
-		}
-
-		return messages.APIResponse{Kind: "init_session", Data: sess}
-	}
-}
-
-func (a *App) refreshSessionCmd() tea.Cmd {
-	return func() tea.Msg {
-		sessions, err := a.apiClient.ListSessions()
-		if err != nil {
-			return messages.APIResponse{Kind: "sessions_listed", Err: err}
-		}
-
-		if a.activeSession != nil {
-			sess, err := a.apiClient.GetSession(a.activeSession.ID)
-			if err == nil {
-				a.activeSession = sess
-				a.statusBar.SessionState = sess.State
-			}
-		}
-
-		return messages.APIResponse{Kind: "sessions_listed", Data: sessions}
-	}
-}
-
-func getKeys(m map[string]interface{}) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }

@@ -76,3 +76,13 @@ type SetApprovalPolicyRequest struct {
 type UpdateConfigRequest struct {
 	ToolCallLimit int `json:"tool_call_limit,omitempty"`
 }
+
+type ListSessionsResponse struct {
+	Sessions []SessionInfo `json:"sessions"`
+	Total    int           `json:"total"`
+}
+
+type GetMessagesResponse struct {
+	Messages []Message `json:"messages"`
+	Total    int       `json:"total"`
+}
