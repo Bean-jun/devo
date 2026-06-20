@@ -90,6 +90,8 @@ func (l *Loop) Rollback(sessionID string, targetMessageID string) (*RollbackResu
 		return nil, fmt.Errorf("add rollback system message: %w", err)
 	}
 
+	l.archiveManager.AppendSystemMessage(sessionID, sysMsg.Content)
+
 	fileWarnings := l.checkFileConsistency(sessionID, actualRollbackMessageID, msgs)
 	if len(fileWarnings) > 0 {
 		eventBus, err := l.store.GetEventBus(sessionID)

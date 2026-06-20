@@ -38,6 +38,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/sessions/{id}/usage", h.GetSessionUsage)
 	mux.HandleFunc("GET /api/v1/usage/stats", h.GetUsageStats)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/rollback", h.Rollback)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/archive", h.GetArchive)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/sync-archive", h.SyncArchive)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

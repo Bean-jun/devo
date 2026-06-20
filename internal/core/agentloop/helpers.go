@@ -78,6 +78,7 @@ func (l *Loop) incrementToolCallCount(sessionID string, eventBus *session.EventB
 			CreatedAt: time.Now(),
 		}
 		l.store.AddMessage(sessionID, limitMsg)
+		l.archiveManager.AppendSystemMessage(sessionID, limitMsg.Content)
 
 		oldState := string(sess.State)
 		sess.State = session.StateIdle

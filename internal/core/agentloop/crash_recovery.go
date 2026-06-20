@@ -63,6 +63,8 @@ func (l *Loop) recoverSession(sess *session.Session) {
 		log.Printf("[crash-recovery] failed to add system message to session %s: %v", sess.ID, err)
 	}
 
+	l.archiveManager.AppendSystemMessage(sess.ID, crashRecoverySystemMessage)
+
 	eventBus, err := l.store.GetEventBus(sess.ID)
 	if err == nil {
 		eventBus.Publish("session_state_change", map[string]any{
@@ -72,11 +74,5 @@ func (l *Loop) recoverSession(sess *session.Session) {
 		})
 	}
 
-	triggerArchiveUpdate(sess.ID)
-
 	log.Printf("[crash-recovery] recovered session %s: %s -> Idle", sess.ID, oldState)
-}
-
-func triggerArchiveUpdate(sessionID string) {
-	log.Printf("[crash-recovery] archive update placeholder for session %s (task 16)", sessionID)
 }

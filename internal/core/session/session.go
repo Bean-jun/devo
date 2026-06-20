@@ -102,6 +102,7 @@ type Session struct {
 	MaxContextTokens          int                   `json:"max_context_tokens"`
 	MaxConcurrentToolCalls    int                   `json:"max_concurrent_tool_calls"`
 	MaxConcurrentSubprocesses int                   `json:"max_concurrent_subprocesses"`
+	ArchivePath               string                `json:"archive_path,omitempty"`
 }
 
 var (

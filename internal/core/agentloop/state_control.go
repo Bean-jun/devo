@@ -126,6 +126,8 @@ func (l *Loop) Complete(sessionID string) error {
 		return fmt.Errorf("update session to completed: %w", err)
 	}
 
+	l.archiveManager.AppendSystemMessage(sessionID, fmt.Sprintf("会话已于 %s 被标记为完成。", sess.LastActiveAt.Format(time.RFC3339)))
+
 	eventBus, err := l.store.GetEventBus(sessionID)
 	if err == nil {
 		eventBus.Publish("session_state_change", map[string]any{
@@ -180,6 +182,8 @@ func (l *Loop) checkControlFlags(sessionID string, eventBus *session.EventBus) (
 		sess.PauseRequested = false
 		sess.LastActiveAt = time.Now()
 		l.store.Update(sess)
+
+		l.archiveManager.AppendSystemMessage(sessionID, fmt.Sprintf("会话已于 %s 被用户取消。", sess.LastActiveAt.Format(time.RFC3339)))
 
 		eventBus.Publish("session_state_change", map[string]any{
 			"old_state": oldState,

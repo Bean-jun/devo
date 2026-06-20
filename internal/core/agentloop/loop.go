@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"devo/internal/core/approval"
+	"devo/internal/core/archive"
 	"devo/internal/core/compressor"
 	"devo/internal/core/concurrency"
 	"devo/internal/core/session"
@@ -39,10 +40,12 @@ type Loop struct {
 	tokenMeter       *tokenmeter.Meter
 	compressor       *compressor.Compressor
 	pathLockManager  *concurrency.PathLockManager
+	archiveManager   *archive.ArchiveManager
 	mu               sync.Mutex
 }
 
 func New(store session.SessionStore, llmClient llmclient.Client) *Loop {
+	pathLockManager := concurrency.NewPathLockManager()
 	return &Loop{
 		store:            store,
 		llmClient:        llmClient,
@@ -51,11 +54,13 @@ func New(store session.SessionStore, llmClient llmclient.Client) *Loop {
 		approvalChannels: make(map[string]chan ApprovalDecision),
 		tokenMeter:       tokenmeter.NewMeter(store),
 		compressor:       compressor.New(llmClient, store),
-		pathLockManager:  concurrency.NewPathLockManager(),
+		pathLockManager:  pathLockManager,
+		archiveManager:   archive.NewArchiveManager(store, pathLockManager),
 	}
 }
 
 func NewWithTools(store session.SessionStore, llmClient llmclient.Client, toolExecutor ToolExecutor) *Loop {
+	pathLockManager := concurrency.NewPathLockManager()
 	return &Loop{
 		store:            store,
 		llmClient:        llmClient,
@@ -65,7 +70,8 @@ func NewWithTools(store session.SessionStore, llmClient llmclient.Client, toolEx
 		approvalChannels: make(map[string]chan ApprovalDecision),
 		tokenMeter:       tokenmeter.NewMeter(store),
 		compressor:       compressor.New(llmClient, store),
-		pathLockManager:  concurrency.NewPathLockManager(),
+		pathLockManager:  pathLockManager,
+		archiveManager:   archive.NewArchiveManager(store, pathLockManager),
 	}
 }
 
@@ -111,6 +117,7 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 			l.store.Update(sess)
 			return fmt.Errorf("add continuation system message: %w", err)
 		}
+		l.archiveManager.AppendSystemMessage(sessionID, pauseMsg.Content)
 		sess.ToolCallCount = 0
 		sess.LastLoopTerminationReason = ""
 		l.store.Update(sess)
@@ -128,6 +135,8 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		return fmt.Errorf("add user message: %w", err)
 	}
 
+	l.archiveManager.AppendUserMessage(sessionID, content)
+
 	eventBus, err := l.store.GetEventBus(sessionID)
 	if err != nil {
 		sess.State = session.StateIdle
@@ -138,4 +147,12 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 	go l.runAgentLoop(context.Background(), sessionID, eventBus)
 
 	return nil
+}
+
+func (l *Loop) GetArchiveContent(sessionID string) ([]byte, error) {
+	return l.archiveManager.GetArchiveContent(sessionID)
+}
+
+func (l *Loop) SyncArchive(sessionID string) (string, error) {
+	return l.archiveManager.SyncArchive(sessionID)
 }

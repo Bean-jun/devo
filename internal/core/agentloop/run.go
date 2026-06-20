@@ -51,8 +51,10 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 			return
 		}
 
-		if _, err := l.compressor.Compress(ctx, sessionID, eventBus); err != nil {
+		if result, err := l.compressor.Compress(ctx, sessionID, eventBus); err != nil {
 			log.Printf("context compression warning for session %s: %v", sessionID, err)
+		} else if result != nil && result.CompressedCount > 0 {
+			l.archiveManager.AppendSystemMessage(sessionID, fmt.Sprintf("[上下文压缩摘要] %s", result.SummaryText))
 		}
 
 		msgs, _, err = l.store.GetMessages(sessionID, 0, 0)
@@ -101,6 +103,7 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 			}
 
 			for _, tc := range result.ToolCalls {
+				l.archiveManager.AppendToolCall(sessionID, tc.ToolName, tc.Params)
 				if l.toolExecutor == nil {
 					toolResult := &tools.ToolResult{
 						ToolCallID: tc.ID,
@@ -276,6 +279,8 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 					"summary":   summary,
 				})
 
+				l.archiveManager.AppendToolResult(sessionID, tc.ToolName, toolResult.Success, summary)
+
 				if l.incrementToolCallCount(sessionID, eventBus) {
 					return
 				}
@@ -298,6 +303,8 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 			l.handleLoopError(sessionID, fmt.Errorf("add assistant message: %w", err))
 			return
 		}
+
+		l.archiveManager.AppendAssistantMessage(sessionID, result.Text)
 
 		eventBus.Publish("message_complete", map[string]any{
 			"message_id":        assistantMsg.ID,
