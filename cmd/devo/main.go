@@ -7,7 +7,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"devo/internal/core/agentloop"
@@ -17,13 +19,15 @@ import (
 	"devo/internal/storage/sqlite"
 	"devo/internal/taskexec/llmclient/providers"
 	"devo/internal/taskexec/tools"
+	webembed "devo/web"
 
 	gormsqlite "github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
 func main() {
-	tuiMode := flag.Bool("tui", true, "Launch TUI mode")
+	tuiMode := flag.Bool("tui", false, "Launch TUI mode")
+	webMode := flag.Bool("web", false, "Launch Web mode")
 	flag.Parse()
 
 	port := os.Getenv("PORT")
@@ -108,6 +112,45 @@ func main() {
 		return
 	}
 
+	if *webMode {
+		webPort, err := findFreePort()
+		if err != nil {
+			log.Fatalf("find free port: %v", err)
+		}
+		addr := fmt.Sprintf("127.0.0.1:%d", webPort)
+		baseURL := fmt.Sprintf("http://%s", addr)
+
+		webFS, err := webembed.StaticFS()
+		if err != nil {
+			webFS = os.DirFS("web/dist")
+		}
+
+		fileServer := http.FileServer(http.FS(webFS))
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+			path := r.URL.Path
+			f, err := webFS.Open(path[1:])
+			if err == nil {
+				f.Close()
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+			r.URL.Path = "/"
+			fileServer.ServeHTTP(w, r)
+		})
+
+		log.Printf("[devo] Web mode: starting server on %s", addr)
+		go openBrowser(baseURL)
+
+		if err := http.ListenAndServe(addr, mux); err != nil {
+			log.Fatalf("server failed: %v", err)
+		}
+		return
+	}
+
 	log.Printf("Devo server starting on :%s", port)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatalf("server failed: %v", err)
@@ -141,4 +184,20 @@ func waitForReady(baseURL string, timeout time.Duration) {
 	}
 	fmt.Fprintf(os.Stderr, "[devo] Server did not become ready within %v\n", timeout)
 	log.Fatalf("server did not become ready within %v", timeout)
+}
+
+func openBrowser(url string) {
+	log.Printf("[devo] Opening browser: %s", url)
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	if err := cmd.Start(); err != nil {
+		log.Printf("[devo] Failed to open browser: %v", err)
+	}
 }

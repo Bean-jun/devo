@@ -52,9 +52,6 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	title := req.Title
-	if title == "" {
-		title = req.WorkingDirectory
-	}
 
 	now := time.Now()
 	timeoutSeconds := req.ApprovalTimeoutSeconds

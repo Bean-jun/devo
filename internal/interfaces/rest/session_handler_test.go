@@ -114,8 +114,8 @@ func TestCreateSession_DefaultTitle(t *testing.T) {
 	var result createSessionResponse
 	json.NewDecoder(resp.Body).Decode(&result)
 
-	if result.Title != tmpDir {
-		t.Errorf("expected default title %q, got %q", tmpDir, result.Title)
+	if result.Title != "" {
+		t.Errorf("expected empty title, got %q", result.Title)
 	}
 }
 

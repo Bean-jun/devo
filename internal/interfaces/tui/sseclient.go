@@ -126,7 +126,14 @@ func (s *SSEClient) parseEvent(eventType string, eventID int64, data string) mes
 	if data != "" {
 		var parsed map[string]interface{}
 		if err := json.Unmarshal([]byte(data), &parsed); err == nil {
-			event.Data = parsed
+			if t, ok := parsed["type"].(string); ok {
+				event.Type = t
+			}
+			if d, ok := parsed["data"].(map[string]interface{}); ok {
+				event.Data = d
+			} else {
+				event.Data = parsed
+			}
 		} else {
 			event.Data = map[string]interface{}{
 				"raw": data,

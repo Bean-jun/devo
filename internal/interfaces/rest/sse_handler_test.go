@@ -146,9 +146,14 @@ readLoop:
 			if line == "" {
 				continue
 			}
-			if strings.HasPrefix(line, "event: ") {
-				eventType := strings.TrimPrefix(line, "event: ")
-				events[eventType] = true
+			if strings.HasPrefix(line, "data: ") {
+				dataStr := strings.TrimPrefix(line, "data: ")
+				var wrapper struct {
+					Type string `json:"type"`
+				}
+				if json.Unmarshal([]byte(dataStr), &wrapper) == nil {
+					events[wrapper.Type] = true
+				}
 			}
 		}
 	}
@@ -202,12 +207,12 @@ func TestSSELastEventIDReplay(t *testing.T) {
 		if line == "" {
 			continue
 		}
-		if strings.HasPrefix(line, "id: ") || strings.HasPrefix(line, "event: ") || strings.HasPrefix(line, "data: ") {
+		if strings.HasPrefix(line, "id: ") || strings.HasPrefix(line, "data: ") {
 			receivedCount++
 		}
 	}
 
-	receivedEvents := receivedCount / 3
+	receivedEvents := receivedCount / 2
 	if receivedEvents != 2 {
 		t.Errorf("expected 2 events after ID 1, got %d events", receivedEvents)
 	}

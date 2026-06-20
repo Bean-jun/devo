@@ -84,8 +84,12 @@ func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
 
 func writeSSEEvent(w http.ResponseWriter, flusher http.Flusher, evt session.Event) {
 	dataJSON, _ := json.Marshal(evt.Data)
+	wrapJSON, _ := json.Marshal(map[string]any{
+		"type": evt.Type,
+		"data": evt.Data,
+	})
+	_ = dataJSON
 	fmt.Fprintf(w, "id: %d\n", evt.ID)
-	fmt.Fprintf(w, "event: %s\n", evt.Type)
-	fmt.Fprintf(w, "data: %s\n\n", string(dataJSON))
+	fmt.Fprintf(w, "data: %s\n\n", string(wrapJSON))
 	flusher.Flush()
 }

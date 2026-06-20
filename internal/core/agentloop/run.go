@@ -306,11 +306,16 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 
 		l.archiveManager.AppendAssistantMessage(sessionID, result.Text)
 
-		eventBus.Publish("message_complete", map[string]any{
+		msgCompleteData := map[string]any{
 			"message_id":        assistantMsg.ID,
 			"full_text":         result.Text,
 			"total_step_tokens": totalStepTokens,
-		})
+		}
+		if result.TokenUsage != nil {
+			msgCompleteData["input_tokens"] = result.TokenUsage.InputTokens
+			msgCompleteData["output_tokens"] = result.TokenUsage.OutputTokens
+		}
+		eventBus.Publish("message_complete", msgCompleteData)
 
 		freshSess, err := l.store.Get(sessionID)
 		if err != nil {

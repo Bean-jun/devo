@@ -5,6 +5,8 @@ set DEVO_LLM_MODEL=deepseek-v4-flash
 set DEVO_DB_PATH=./.env/devo.db
 set DEVO_LOG_PATH=./.env/devo.log
 
-go build -o devo.exe cmd\devo\main.go
 
-devo.exe --tui
+@REM cd web && npm install && npm run build && cd .. && go build -o devo.exe cmd\devo\main.go
+
+@REM devo.exe -tui
+.\build\devo.exe -web
