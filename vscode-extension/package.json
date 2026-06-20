@@ -16,6 +16,15 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "menus": {
+      "editor/title": [
+        {
+          "command": "devo.open",
+          "group": "navigation",
+          "when": "editorIsOpen"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "devo.open",

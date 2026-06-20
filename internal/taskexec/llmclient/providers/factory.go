@@ -1,57 +1,31 @@
 package providers
 
 import (
-	"encoding/json"
 	"log"
-	"os"
 
+	"devo/internal/config"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/llmclient/providers/openai"
 	"devo/internal/taskexec/tools"
 )
 
-func NewClientFromEnv(registry *tools.Registry) llmclient.Client {
-	apiKey := os.Getenv("DEVO_LLM_API_KEY")
-	if apiKey == "" {
-		log.Println("DEVO_LLM_API_KEY not set, using MockClient")
+func NewClient(cfg *config.Config, registry *tools.Registry) llmclient.Client {
+	if cfg.LLM.APIKey == "" {
+		log.Println("[devo] LLM API key not configured, using MockClient")
 		return llmclient.NewMockClient()
 	}
 
-	baseURL := os.Getenv("DEVO_LLM_BASE_URL")
-	if baseURL == "" {
-		baseURL = "https://api.openai.com/v1"
-	}
-
-	model := os.Getenv("DEVO_LLM_MODEL")
-	if model == "" {
-		model = "gpt-4o"
-	}
-
-	headers := parseExtraHeaders(os.Getenv("DEVO_LLM_EXTRA_HEADERS"))
-
 	client := openai.New(openai.Config{
-		BaseURL: baseURL,
-		APIKey:  apiKey,
-		Model:   model,
-		Headers: headers,
+		BaseURL: cfg.LLM.BaseURL,
+		APIKey:  cfg.LLM.APIKey,
+		Model:   cfg.LLM.Model,
+		Headers: cfg.LLM.ExtraHeaders,
 	})
 
 	client.SetTools(buildToolDefinitions(registry))
 
-	log.Printf("Using OpenAI-compatible LLM: base_url=%s, model=%s", baseURL, model)
+	log.Printf("[devo] Using LLM: base_url=%s, model=%s", cfg.LLM.BaseURL, cfg.LLM.Model)
 	return client
-}
-
-func parseExtraHeaders(raw string) map[string]string {
-	if raw == "" {
-		return nil
-	}
-	var headers map[string]string
-	if err := json.Unmarshal([]byte(raw), &headers); err != nil {
-		log.Printf("failed to parse DEVO_LLM_EXTRA_HEADERS: %v", err)
-		return nil
-	}
-	return headers
 }
 
 func buildToolDefinitions(registry *tools.Registry) []llmclient.ToolDefinition {

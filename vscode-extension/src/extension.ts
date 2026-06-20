@@ -8,8 +8,13 @@ let statusBarItem: vscode.StatusBarItem
 let devoProcess: cp.ChildProcess | null = null
 let devoPort: number | null = null
 let panel: vscode.WebviewPanel | null = null
+let outputChannel: vscode.OutputChannel
 
 export function activate(context: vscode.ExtensionContext) {
+  outputChannel = vscode.window.createOutputChannel('Devo')
+  context.subscriptions.push(outputChannel)
+  outputChannel.appendLine('Devo extension activated')
+
   statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     100
@@ -29,19 +34,23 @@ export function activate(context: vscode.ExtensionContext) {
 
 async function openDevoPanel(context: vscode.ExtensionContext) {
   if (panel) {
+    outputChannel.appendLine('[open] Panel already exists, revealing...')
     panel.reveal(vscode.ViewColumn.Beside)
     return
   }
 
   if (!devoProcess) {
     try {
+      outputChannel.appendLine('[open] Starting Devo process...')
       await startDevoProcess(context)
     } catch (err) {
+      outputChannel.appendLine(`[open] Failed to start Devo: ${err}`)
       vscode.window.showErrorMessage(`Failed to start Devo: ${err}`)
       return
     }
   }
 
+  outputChannel.appendLine(`[open] Creating webview panel on port ${devoPort}...`)
   panel = vscode.window.createWebviewPanel(
     'devoPanel',
     'Devo',
@@ -59,12 +68,14 @@ async function openDevoPanel(context: vscode.ExtensionContext) {
   )
 
   panel.onDidDispose(() => {
+    outputChannel.appendLine('[open] Panel disposed')
     panel = null
   })
 
   updateStatusBar()
 
   panel.webview.html = getWebviewContent(devoPort!)
+  outputChannel.appendLine('[open] Webview panel created successfully')
 }
 
 function getWebviewContent(port: number): string {
@@ -140,36 +151,46 @@ async function startDevoProcess(context: vscode.ExtensionContext): Promise<void>
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 
   devoPort = await findFreePort()
+  outputChannel.appendLine(`[process] Found free port: ${devoPort}`)
 
-  const args = ['--web', '--port', String(devoPort)]
+  const args = ['--port', String(devoPort)]
   if (workspaceRoot) {
     args.push('--workspace', workspaceRoot)
+    outputChannel.appendLine(`[process] Workspace: ${workspaceRoot}`)
   }
 
   const devoPath = getDevoPath(context)
+  outputChannel.appendLine(`[process] Binary path: ${devoPath}`)
+  outputChannel.appendLine(`[process] Spawning: ${devoPath} ${args.join(' ')}`)
 
   return new Promise((resolve, reject) => {
     devoProcess = cp.spawn(devoPath, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
     })
+    outputChannel.appendLine(`[process] PID: ${devoProcess.pid}`)
 
     const timeout = setTimeout(() => {
+      outputChannel.appendLine('[process] Startup timed out after 30 seconds')
       reject(new Error('Devo startup timed out after 30 seconds'))
     }, 30000)
 
     devoProcess.stdout?.on('data', (data: Buffer) => {
       const text = data.toString()
-      if (text.includes('Web mode: starting server') || text.includes('Starting server')) {
+      outputChannel.appendLine(`[stdout] ${text.trim()}`)
+      if (text.includes('Server ready')) {
         clearTimeout(timeout)
+        outputChannel.appendLine('[process] Server started successfully')
         resolve()
       }
     })
 
     devoProcess.stderr?.on('data', (data: Buffer) => {
       const text = data.toString()
-      if (text.includes('Web mode: starting server') || text.includes('Starting server')) {
+      outputChannel.appendLine(`[stderr] ${text.trim()}`)
+      if (text.includes('Server ready')) {
         clearTimeout(timeout)
+        outputChannel.appendLine('[process] Server started successfully (via stderr)')
         resolve()
       }
     })
@@ -178,11 +199,13 @@ async function startDevoProcess(context: vscode.ExtensionContext): Promise<void>
       clearTimeout(timeout)
       devoProcess = null
       devoPort = null
+      outputChannel.appendLine(`[process] Error: ${err.message}`)
       reject(new Error(`Cannot start devo: ${err.message}.`))
     })
 
     devoProcess.on('close', (code) => {
       clearTimeout(timeout)
+      outputChannel.appendLine(`[process] Process exited with code ${code}`)
       if (devoPort === null) {
         reject(new Error(`Devo exited with code ${code} before port was assigned`))
       } else {
@@ -195,6 +218,8 @@ async function startDevoProcess(context: vscode.ExtensionContext): Promise<void>
 function handleProcessCrash(code: number | null) {
   devoProcess = null
   devoPort = null
+
+  outputChannel.appendLine(`[crash] Devo process crashed with code ${code}`)
 
   updateStatusBar()
 
@@ -259,11 +284,14 @@ function updateStatusBar() {
 }
 
 export function deactivate() {
+  outputChannel.appendLine('[deactivate] Devo extension deactivating...')
   if (devoProcess) {
     devoProcess.kill()
     devoProcess = null
+    outputChannel.appendLine('[deactivate] Process killed')
   }
   if (panel) {
     panel.dispose()
+    outputChannel.appendLine('[deactivate] Panel disposed')
   }
 }

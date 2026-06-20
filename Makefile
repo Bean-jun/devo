@@ -26,6 +26,7 @@ build-go: build-web
 vsix: build-go
 	@echo [VSIX] Copying binary to extension...
 	@if not exist $(VSIX_DIR)\bin mkdir $(VSIX_DIR)\bin
+	upx -9 $(BUILD_DIR)\$(APP_NAME).exe
 	copy $(BUILD_DIR)\$(APP_NAME).exe $(VSIX_DIR)\bin\$(APP_NAME).exe
 	@echo [VSIX] Packaging extension...
 	cd $(VSIX_DIR) && npm run vsix
