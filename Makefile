@@ -1,25 +1,36 @@
-.PHONY: all build build-web build-go dev dev-web run-web run-tui test test-web test-e2e clean lint
+.PHONY: all build build-web build-go dev dev-web run-web run-tui test test-web test-e2e clean lint vsix
 
 APP_NAME := devo
 GO_ENTRY := cmd/devo/main.go
 WEB_DIR  := web
 BUILD_DIR := build
+VSIX_DIR := vscode-extension
 DB_PATH  := .env/devo.db
 
 # ========== Build ==========
 all: build
 
-build: build-web build-go
+build: vsix
 	@echo [OK] Build complete: $(BUILD_DIR)/$(APP_NAME).exe
 
 build-web:
 	@echo [BUILD] Frontend...
 	cd $(WEB_DIR) && npm install && npm run build
 
-build-go:
+build-go: build-web
 	@echo [BUILD] Backend...
 	@if not exist $(BUILD_DIR) mkdir $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(APP_NAME).exe $(GO_ENTRY)
+	go build -ldflags="-s -w" -o $(BUILD_DIR)/$(APP_NAME).exe $(GO_ENTRY)
+
+# ========== VS Code Extension ==========
+vsix: build-go
+	@echo [VSIX] Copying binary to extension...
+	@if not exist $(VSIX_DIR)\bin mkdir $(VSIX_DIR)\bin
+	copy $(BUILD_DIR)\$(APP_NAME).exe $(VSIX_DIR)\bin\$(APP_NAME).exe
+	@echo [VSIX] Packaging extension...
+	cd $(VSIX_DIR) && npm run vsix
+	cmd /c "move $(VSIX_DIR)\$(APP_NAME)-*.vsix $(BUILD_DIR)\"
+	@echo [OK] VSIX package: $(BUILD_DIR)\$(APP_NAME)-*.vsix
 
 # ========== Development ==========
 dev:
@@ -67,6 +78,9 @@ clean:
 	@echo [CLEAN] Removing build artifacts...
 	rm -rf $(BUILD_DIR)
 	rm -rf $(WEB_DIR)/dist
+	rm -rf $(VSIX_DIR)\bin
+	rm -f $(VSIX_DIR)\*.vsix
+	rm -f $(BUILD_DIR)\*.vsix
 	rm -f $(DB_PATH)
 	@echo [OK] Clean complete
 
@@ -94,9 +108,12 @@ help:
 	@echo "  make test-e2e      Run E2E tests"
 	@echo "  make test-go       Run backend tests"
 	@echo ""
+	@echo "VS Code Extension:"
+	@echo "  make vsix          Build VS Code extension .vsix package"
+	@echo ""
 	@echo "Other:"
 	@echo "  make lint          Code linting"
-	@echo "  make clean         Remove build artifacts"
+	@echo "  make clean         Remove all build artifacts"
 	@echo ""
 	@echo "Environment Variables:"
 	@echo "  DEVO_LLM_BASE_URL   LLM API base URL"

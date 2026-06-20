@@ -28,7 +28,16 @@ import (
 func main() {
 	tuiMode := flag.Bool("tui", false, "Launch TUI mode")
 	webMode := flag.Bool("web", false, "Launch Web mode")
+	webPortFlag := flag.Int("port", 0, "Port for web server (0 = auto-assign)")
+	workspaceFlag := flag.String("workspace", "", "Default working directory (uses current directory if not set)")
 	flag.Parse()
+
+	if *workspaceFlag != "" {
+		if err := os.Chdir(*workspaceFlag); err != nil {
+			log.Fatalf("failed to change working directory to %s: %v", *workspaceFlag, err)
+		}
+		log.Printf("[devo] Working directory set to: %s", *workspaceFlag)
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -113,9 +122,13 @@ func main() {
 	}
 
 	if *webMode {
-		webPort, err := findFreePort()
-		if err != nil {
-			log.Fatalf("find free port: %v", err)
+		webPort := *webPortFlag
+		if webPort == 0 {
+			var err error
+			webPort, err = findFreePort()
+			if err != nil {
+				log.Fatalf("find free port: %v", err)
+			}
 		}
 		addr := fmt.Sprintf("127.0.0.1:%d", webPort)
 		baseURL := fmt.Sprintf("http://%s", addr)

@@ -1,0 +1,40 @@
+{
+  "name": "devo",
+  "displayName": "Devo - AI Coding Agent",
+  "description": "AI coding agent that runs in VS Code",
+  "version": "1.0.0",
+  "publisher": "devo",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Machine Learning"
+  ],
+  "activationEvents": [
+    "onCommand:devo.open"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "devo.open",
+        "title": "Open Devo",
+        "icon": "$(hubot)"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node esbuild.js --production",
+    "dev": "node esbuild.js --watch",
+    "lint": "eslint src --ext ts",
+    "vsix": "npm run compile && vsce package --allow-star-activation --skip-license --allow-missing-repository --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0"
+  }
+}
