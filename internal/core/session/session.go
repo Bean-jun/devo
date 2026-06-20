@@ -99,6 +99,7 @@ type Session struct {
 	CompressionCount          int                   `json:"compression_count"`
 	CompressThreshold         int                   `json:"compress_threshold"`
 	KeepRecent                int                   `json:"keep_recent"`
+	MaxContextTokens          int                   `json:"max_context_tokens"`
 }
 
 var (

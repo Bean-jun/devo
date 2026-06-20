@@ -28,6 +28,7 @@ type createSessionResponse struct {
 	ApprovalPolicy         map[string]string  `json:"approval_policy,omitempty"`
 	ApprovalTimeoutSeconds int                `json:"approval_timeout_seconds"`
 	TokenUsage             session.TokenUsage `json:"token_usage"`
+	MaxContextTokens       int                `json:"max_context_tokens"`
 }
 
 func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +87,7 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 		ApprovalPolicy:         sess.ApprovalPolicy,
 		ApprovalTimeoutSeconds: sess.ApprovalTimeoutSeconds,
 		TokenUsage:             sess.TokenUsage,
+		MaxContextTokens:       sess.MaxContextTokens,
 	})
 }
 
@@ -102,6 +104,7 @@ type getSessionResponse struct {
 	ToolCallLimit          int                `json:"tool_call_limit"`
 	ToolCallCount          int                `json:"tool_call_count"`
 	TokenUsage             session.TokenUsage `json:"token_usage"`
+	MaxContextTokens       int                `json:"max_context_tokens"`
 }
 
 func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
@@ -134,6 +137,7 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 		ToolCallLimit:          sess.ToolCallLimit,
 		ToolCallCount:          sess.ToolCallCount,
 		TokenUsage:             sess.TokenUsage,
+		MaxContextTokens:       sess.MaxContextTokens,
 	})
 }
 

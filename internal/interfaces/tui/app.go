@@ -229,10 +229,8 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.sidebar.ActiveID = sess.ID
 			a.statusBar.SessionTitle = sess.Title
 			a.statusBar.SessionState = sess.State
-			if sess.TokenUsage.Total > 0 {
-				a.statusBar.TokenUsage = fmt.Sprintf("%d tok (↑%d ↓%d)",
-					sess.TokenUsage.Total, sess.TokenUsage.Input, sess.TokenUsage.Output)
-			}
+			a.statusBar.TokenUsage = fmt.Sprintf("%d token (↑%d ↓%d)",
+				sess.TokenUsage.Total, sess.TokenUsage.Input, sess.TokenUsage.Output)
 			a.ready = true
 			a.tickCount = 0
 			a.layout()
@@ -254,6 +252,8 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.sidebar.ActiveID = sess.ID
 			a.statusBar.SessionTitle = sess.Title
 			a.statusBar.SessionState = sess.State
+			a.statusBar.TokenUsage = fmt.Sprintf("%d token (↑%d ↓%d)",
+				sess.TokenUsage.Total, sess.TokenUsage.Input, sess.TokenUsage.Output)
 			a.ready = true
 			a.tickCount = 0
 			a.layout()

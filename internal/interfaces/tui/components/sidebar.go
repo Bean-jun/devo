@@ -75,7 +75,7 @@ func (s *SessionSidebar) View() string {
 		title := sess.Title
 		tokStr := ""
 		if sess.TokenUsage.Total > 0 {
-			tokStr = fmt.Sprintf(" %.3fM", float64(sess.TokenUsage.Total)/1000000.0)
+			tokStr = fmt.Sprintf(" %.3fK", float64(sess.TokenUsage.Total)/1000.0)
 		}
 		maxTitleLen := s.Width - 12 - len(tokStr)
 		if maxTitleLen < 5 {

@@ -33,12 +33,6 @@ var (
 			Foreground(ColorWhite).
 			Padding(0, 1)
 
-	HelpBarStyle = lipgloss.NewStyle().
-			Background(ColorBg).
-			Foreground(ColorMuted).
-			Padding(0, 1).
-			Height(1)
-
 	UserBubbleStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(ColorPrimary).

@@ -46,7 +46,11 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 				Role:    "assistant",
 				Content: content,
 			}
+			a.msgs = append(a.msgs, assistantMsg)
 			a.chatView.MessageView.AddMessage(assistantMsg)
+			if a.activeSession != nil {
+				a.updateContextUsage(a.activeSession)
+			}
 		}
 		if totalStepTokens, ok := msg.Data["total_step_tokens"].(float64); ok && totalStepTokens > 0 {
 			a.chatView.MessageView.AddSystemNotice(fmt.Sprintf("本轮消耗 %d tokens", int(totalStepTokens)))
@@ -83,6 +87,19 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 		outputTokens, _ := msg.Data["output_tokens"].(float64)
 		sessionTotal, _ := msg.Data["session_total_tokens"].(float64)
 		a.statusBar.TokenUsage = fmt.Sprintf("%.0f tok (↑%.0f ↓%.0f)", sessionTotal, inputTokens, outputTokens)
+		if a.activeSession != nil {
+			a.updateContextUsage(a.activeSession)
+		}
+
+	case "context_compressed":
+		compressedCount, _ := msg.Data["compressed_count"].(float64)
+		tokensRemoved, _ := msg.Data["tokens_removed"].(float64)
+		a.chatView.MessageView.AddSystemNotice(fmt.Sprintf("上下文已压缩：%d 条消息，释放约 %d tokens",
+			int(compressedCount), int(tokensRemoved)))
+		if a.activeSession != nil {
+			a.updateContextUsage(a.activeSession)
+		}
+		return a.loadMessagesCmd(a.activeSession.ID)
 
 	case "session_state_change":
 		oldState, _ := msg.Data["old_state"].(string)

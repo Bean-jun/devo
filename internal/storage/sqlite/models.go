@@ -30,6 +30,7 @@ type SessionModel struct {
 	CompressionCount          int    `gorm:"default:0"`
 	CompressThreshold         int    `gorm:"default:0"`
 	KeepRecent                int    `gorm:"default:0"`
+	MaxContextTokens          int    `gorm:"default:0"`
 }
 
 type MessageModel struct {
@@ -75,6 +76,7 @@ func (m *SessionModel) ToDomain() *session.Session {
 		CompressionCount:  m.CompressionCount,
 		CompressThreshold: m.CompressThreshold,
 		KeepRecent:        m.KeepRecent,
+		MaxContextTokens:  m.MaxContextTokens,
 	}
 
 	if m.ApprovalPolicyJSON != "" {
@@ -114,6 +116,7 @@ func fromDomain(s *session.Session) *SessionModel {
 		CompressionCount:          s.CompressionCount,
 		CompressThreshold:         s.CompressThreshold,
 		KeepRecent:                s.KeepRecent,
+		MaxContextTokens:          s.MaxContextTokens,
 	}
 
 	if s.ApprovalPolicy != nil && len(s.ApprovalPolicy) > 0 {

@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	DefaultCompressThreshold = 60
-	DefaultKeepRecent        = 20
+	DefaultCompressThreshold = 60     // 默认压缩对话轮数，已废弃
+	DefaultKeepRecent        = 20     // 压缩时保留的最近消息数
+	DefaultMaxContextTokens  = 128000 // 默认最大上下文长度（单位：token），超过则触发压缩
+	ContextCompressRatio     = 0.8    // 当估算的上下文长度超过 maxContextTokens * ContextCompressRatio 时触发压缩
 )
 
 type Compressor struct {
@@ -43,18 +45,21 @@ func (c *Compressor) Compress(ctx context.Context, sessionID string, eventBus *s
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
-	threshold := sess.CompressThreshold
-	if threshold <= 0 {
-		threshold = DefaultCompressThreshold
+	maxContext := sess.MaxContextTokens
+	if maxContext <= 0 {
+		maxContext = DefaultMaxContextTokens
+	}
+
+	estimatedTokens := EstimateContextTokens(msgs, sess.CompressionState)
+	compressThreshold := int(float64(maxContext) * ContextCompressRatio)
+
+	if estimatedTokens <= compressThreshold {
+		return nil, nil
 	}
 
 	keepRecent := sess.KeepRecent
 	if keepRecent <= 0 {
 		keepRecent = DefaultKeepRecent
-	}
-
-	if len(msgs) <= threshold {
-		return nil, nil
 	}
 
 	compressible, toCompress := selectMessagesToCompress(msgs, keepRecent)
@@ -174,6 +179,11 @@ func estimateTokens(msgs []session.Message) int {
 		total += len(msg.ID) / 4
 	}
 	return total
+}
+
+func EstimateContextTokens(msgs []session.Message, compressionState *session.CompressionState) int {
+	activeMsgs := FilterActiveMessages(msgs, compressionState)
+	return estimateTokens(activeMsgs)
 }
 
 func FilterActiveMessages(msgs []session.Message, compressionState *session.CompressionState) []session.Message {

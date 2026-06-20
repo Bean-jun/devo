@@ -10,6 +10,7 @@ type SessionInfo struct {
 	TrustLevel       string            `json:"trust_level"`
 	ApprovalPolicy   map[string]string `json:"approval_policy,omitempty"`
 	TokenUsage       TokenUsage        `json:"token_usage"`
+	MaxContextTokens int               `json:"max_context_tokens"`
 }
 
 type TokenUsage struct {

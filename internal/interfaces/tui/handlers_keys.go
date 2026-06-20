@@ -188,9 +188,10 @@ func (a *App) executeCommand(action string) tea.Cmd {
 		return nil
 	case "pause":
 		if a.activeSession != nil {
-			if a.activeSession.State == "Processing" {
+			switch a.activeSession.State {
+			case "Processing":
 				return a.pauseCmd()
-			} else if a.activeSession.State == "Paused" {
+			case "Paused":
 				return a.resumeCmd()
 			}
 		}
