@@ -128,6 +128,12 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 	case "trust_set", "policy_set":
 		a.toast.Show("设置已更新", false)
 		return nil
+
+	case "archive_done":
+		result := msg.Data.(*types.SyncArchiveResult)
+		toastMsg := fmt.Sprintf("会话存档已导出: %s", result.ArchivePath)
+		a.toast.Show(toastMsg, false)
+		return nil
 	}
 
 	return nil

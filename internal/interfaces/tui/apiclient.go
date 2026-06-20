@@ -132,6 +132,14 @@ func (c *APIClient) Rollback(sessionID string, targetMessageID string) (*types.R
 	return &result, nil
 }
 
+func (c *APIClient) SyncArchive(sessionID string) (*types.SyncArchiveResult, error) {
+	var result types.SyncArchiveResult
+	if err := c.doJSON("POST", "/api/v1/sessions/"+sessionID+"/sync-archive", nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *APIClient) SSEEndpoint(sessionID string) string {
 	return fmt.Sprintf("%s/api/v1/sessions/%s/events", c.baseURL, sessionID)
 }

@@ -182,3 +182,13 @@ func (a *App) rollbackCmd(targetMessageID string) tea.Cmd {
 		return messages.APIResponse{Kind: "rollback_done", Data: result}
 	}
 }
+
+func (a *App) exportArchiveCmd() tea.Cmd {
+	return func() tea.Msg {
+		result, err := a.apiClient.SyncArchive(a.activeSession.ID)
+		if err != nil {
+			return messages.APIResponse{Kind: "archive_done", Err: err}
+		}
+		return messages.APIResponse{Kind: "archive_done", Data: result}
+	}
+}

@@ -89,6 +89,11 @@ type RollbackResult struct {
 	DeletedCount            int    `json:"deleted_count"`
 }
 
+type SyncArchiveResult struct {
+	ArchivePath   string `json:"archive_path"`
+	LastMessageID string `json:"last_message_id"`
+}
+
 type ListSessionsResponse struct {
 	Sessions []SessionInfo `json:"sessions"`
 	Total    int           `json:"total"`

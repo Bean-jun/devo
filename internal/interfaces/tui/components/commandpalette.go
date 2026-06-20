@@ -26,6 +26,7 @@ func NewCommandPalette() CommandPalette {
 			{Label: "/cancel", Description: "取消当前操作", Action: "cancel"},
 			{Label: "/usage", Description: "查看 Token 用量", Action: "usage"},
 			{Label: "/pause", Description: "暂停/恢复", Action: "pause"},
+			{Label: "/export", Description: "导出会话存档 (Markdown)", Action: "export"},
 			{Label: "/clear", Description: "清屏", Action: "clear"},
 			{Label: "/quit", Description: "退出", Action: "quit"},
 		},

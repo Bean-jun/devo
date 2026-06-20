@@ -201,6 +201,11 @@ func (a *App) executeCommand(action string) tea.Cmd {
 	case "quit":
 		a.state = StateQuitting
 		return tea.Quit
+	case "export":
+		if a.activeSession != nil {
+			return a.exportArchiveCmd()
+		}
+		return nil
 	}
 	return nil
 }
