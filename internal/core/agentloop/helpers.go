@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -158,4 +159,18 @@ func findLastIndex(s, substr string) int {
 		}
 	}
 	return -1
+}
+
+func (l *Loop) getLockPath(workingDir, toolName string, params map[string]interface{}) string {
+	switch toolName {
+	case "write_file", "edit_file":
+		if path, ok := params["path"].(string); ok && path != "" {
+			return filepath.Join(workingDir, path)
+		}
+		return workingDir
+	case "execute_command":
+		return workingDir
+	default:
+		return ""
+	}
 }

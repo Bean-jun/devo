@@ -71,6 +71,11 @@ func main() {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
+	log.Printf("[devo] Running crash recovery check...")
+	if err := loop.RecoverCrashedSessions(); err != nil {
+		log.Printf("[devo] Crash recovery scan failed (non-fatal): %v", err)
+	}
+
 	if *tuiMode {
 		fmt.Fprintf(os.Stderr, "[devo] TUI mode: initializing server components...\n")
 

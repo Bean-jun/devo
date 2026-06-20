@@ -100,6 +100,8 @@ type Session struct {
 	CompressThreshold         int                   `json:"compress_threshold"`
 	KeepRecent                int                   `json:"keep_recent"`
 	MaxContextTokens          int                   `json:"max_context_tokens"`
+	MaxConcurrentToolCalls    int                   `json:"max_concurrent_tool_calls"`
+	MaxConcurrentSubprocesses int                   `json:"max_concurrent_subprocesses"`
 }
 
 var (

@@ -482,3 +482,151 @@ func TestUpdateConfig_NotFound(t *testing.T) {
 		t.Errorf("expected 404, got %d", resp.StatusCode)
 	}
 }
+
+func TestUpdateConfig_MaxConcurrentToolCalls(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+		ToolCallLimit:    50,
+	}
+	store.Create(sess)
+
+	body := map[string]int{"max_concurrent_tool_calls": 5}
+	jsonBody, _ := json.Marshal(body)
+
+	resp := doPut(t, server.URL+"/api/v1/sessions/sess-test-1/config", jsonBody)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result updateConfigResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.MaxConcurrentToolCalls != 5 {
+		t.Errorf("expected max_concurrent_tool_calls 5, got %d", result.MaxConcurrentToolCalls)
+	}
+
+	sessGot, _ := store.Get("sess-test-1")
+	if sessGot.MaxConcurrentToolCalls != 5 {
+		t.Errorf("expected max_concurrent_tool_calls 5 in store, got %d", sessGot.MaxConcurrentToolCalls)
+	}
+}
+
+func TestUpdateConfig_MaxConcurrentSubprocesses(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+		ToolCallLimit:    50,
+	}
+	store.Create(sess)
+
+	body := map[string]int{"max_concurrent_subprocesses": 3}
+	jsonBody, _ := json.Marshal(body)
+
+	resp := doPut(t, server.URL+"/api/v1/sessions/sess-test-1/config", jsonBody)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result updateConfigResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.MaxConcurrentSubprocesses != 3 {
+		t.Errorf("expected max_concurrent_subprocesses 3, got %d", result.MaxConcurrentSubprocesses)
+	}
+
+	sessGot, _ := store.Get("sess-test-1")
+	if sessGot.MaxConcurrentSubprocesses != 3 {
+		t.Errorf("expected max_concurrent_subprocesses 3 in store, got %d", sessGot.MaxConcurrentSubprocesses)
+	}
+}
+
+func TestUpdateConfig_AllFields(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+		ToolCallLimit:    50,
+	}
+	store.Create(sess)
+
+	body := map[string]int{
+		"tool_call_limit":             100,
+		"max_concurrent_tool_calls":   5,
+		"max_concurrent_subprocesses": 3,
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	resp := doPut(t, server.URL+"/api/v1/sessions/sess-test-1/config", jsonBody)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result updateConfigResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.ToolCallLimit != 100 {
+		t.Errorf("expected tool_call_limit 100, got %d", result.ToolCallLimit)
+	}
+	if result.MaxConcurrentToolCalls != 5 {
+		t.Errorf("expected max_concurrent_tool_calls 5, got %d", result.MaxConcurrentToolCalls)
+	}
+	if result.MaxConcurrentSubprocesses != 3 {
+		t.Errorf("expected max_concurrent_subprocesses 3, got %d", result.MaxConcurrentSubprocesses)
+	}
+}
+
+func TestGetSession_IncludesConcurrencyFields(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:                        "sess-test-1",
+		Title:                     "Test",
+		WorkingDirectory:          tmpDir,
+		State:                     session.StateIdle,
+		MaxConcurrentToolCalls:    5,
+		MaxConcurrentSubprocesses: 3,
+	}
+	store.Create(sess)
+
+	resp, err := http.Get(server.URL + "/api/v1/sessions/sess-test-1")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result getSessionResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.MaxConcurrentToolCalls != 5 {
+		t.Errorf("expected max_concurrent_tool_calls 5, got %d", result.MaxConcurrentToolCalls)
+	}
+	if result.MaxConcurrentSubprocesses != 3 {
+		t.Errorf("expected max_concurrent_subprocesses 3, got %d", result.MaxConcurrentSubprocesses)
+	}
+}

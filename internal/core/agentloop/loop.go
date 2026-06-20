@@ -8,6 +8,7 @@ import (
 
 	"devo/internal/core/approval"
 	"devo/internal/core/compressor"
+	"devo/internal/core/concurrency"
 	"devo/internal/core/session"
 	"devo/internal/core/tokenmeter"
 	"devo/internal/taskexec/llmclient"
@@ -37,6 +38,7 @@ type Loop struct {
 	approvalChannels map[string]chan ApprovalDecision
 	tokenMeter       *tokenmeter.Meter
 	compressor       *compressor.Compressor
+	pathLockManager  *concurrency.PathLockManager
 	mu               sync.Mutex
 }
 
@@ -49,6 +51,7 @@ func New(store session.SessionStore, llmClient llmclient.Client) *Loop {
 		approvalChannels: make(map[string]chan ApprovalDecision),
 		tokenMeter:       tokenmeter.NewMeter(store),
 		compressor:       compressor.New(llmClient, store),
+		pathLockManager:  concurrency.NewPathLockManager(),
 	}
 }
 
@@ -62,6 +65,7 @@ func NewWithTools(store session.SessionStore, llmClient llmclient.Client, toolEx
 		approvalChannels: make(map[string]chan ApprovalDecision),
 		tokenMeter:       tokenmeter.NewMeter(store),
 		compressor:       compressor.New(llmClient, store),
+		pathLockManager:  concurrency.NewPathLockManager(),
 	}
 }
 

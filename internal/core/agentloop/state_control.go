@@ -226,3 +226,31 @@ func (l *Loop) UpdateConfig(sessionID string, toolCallLimit int) error {
 
 	return nil
 }
+
+func (l *Loop) UpdateConcurrencyConfig(sessionID string, maxConcurrentToolCalls, maxConcurrentSubprocesses *int) error {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+
+	if maxConcurrentToolCalls != nil {
+		if *maxConcurrentToolCalls < 0 {
+			return fmt.Errorf("max_concurrent_tool_calls must be >= 0")
+		}
+		sess.MaxConcurrentToolCalls = *maxConcurrentToolCalls
+	}
+
+	if maxConcurrentSubprocesses != nil {
+		if *maxConcurrentSubprocesses < 0 {
+			return fmt.Errorf("max_concurrent_subprocesses must be >= 0")
+		}
+		sess.MaxConcurrentSubprocesses = *maxConcurrentSubprocesses
+	}
+
+	sess.LastActiveAt = time.Now()
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update session concurrency config: %w", err)
+	}
+
+	return nil
+}

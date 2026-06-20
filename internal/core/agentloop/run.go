@@ -221,7 +221,17 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 					}
 				}
 
+				lockPath := l.getLockPath(sess.WorkingDirectory, tc.ToolName, tc.Params)
+				if lockPath != "" {
+					l.pathLockManager.Lock(lockPath)
+				}
+
 				toolResult, err := l.toolExecutor.Execute(sess.WorkingDirectory, tc.ToolName, tc.Params)
+
+				if lockPath != "" {
+					l.pathLockManager.Unlock(lockPath)
+				}
+
 				if err != nil {
 					eventBus.Publish("tool_result", map[string]any{
 						"tool_name": tc.ToolName,

@@ -2,6 +2,8 @@ package agentloop
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -275,5 +277,188 @@ func TestStateCompletedAndArchivedDefined(t *testing.T) {
 	}
 	if session.StateArchived != "Archived" {
 		t.Errorf("expected StateArchived to be 'Archived', got %q", session.StateArchived)
+	}
+}
+
+func TestEventChannelIsolation(t *testing.T) {
+	store := session.NewInMemoryStore()
+
+	createTestSession(store, "sess-a")
+	createTestSession(store, "sess-b")
+
+	ebA, _ := store.GetEventBus("sess-a")
+	ebB, _ := store.GetEventBus("sess-b")
+
+	chA, unsubA := ebA.Subscribe()
+	defer unsubA()
+	chB, unsubB := ebB.Subscribe()
+	defer unsubB()
+
+	ebA.Publish("test_a", map[string]string{"session": "a"})
+	ebB.Publish("test_b", map[string]string{"session": "b"})
+
+	evtA, ok := waitForEvent(chA, "test_a", 500*time.Millisecond)
+	if !ok {
+		t.Fatal("session A should receive its own event")
+	}
+	if evtA.Data.(map[string]string)["session"] != "a" {
+		t.Error("session A received wrong event data")
+	}
+
+	evtB, ok := waitForEvent(chB, "test_b", 500*time.Millisecond)
+	if !ok {
+		t.Fatal("session B should receive its own event")
+	}
+	if evtB.Data.(map[string]string)["session"] != "b" {
+		t.Error("session B received wrong event data")
+	}
+
+	select {
+	case evt := <-chA:
+		if evt.Type == "test_b" {
+			t.Error("session A should NOT receive session B's events")
+		}
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	select {
+	case evt := <-chB:
+		if evt.Type == "test_a" {
+			t.Error("session B should NOT receive session A's events")
+		}
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestConcurrentSessionProcessing(t *testing.T) {
+	store := session.NewInMemoryStore()
+
+	for i := 0; i < 5; i++ {
+		sess := &session.Session{
+			ID:               fmt.Sprintf("sess-concurrent-%d", i),
+			Title:            fmt.Sprintf("Concurrent Test %d", i),
+			WorkingDirectory: fmt.Sprintf("/tmp/test-%d", i),
+			State:            session.StateIdle,
+			CreatedAt:        time.Now(),
+			LastActiveAt:     time.Now(),
+		}
+		store.Create(sess)
+	}
+
+	loop := New(store, llmclient.NewMockClient())
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 5)
+
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			sessionID := fmt.Sprintf("sess-concurrent-%d", idx)
+			err := loop.ProcessMessage(context.Background(), sessionID, fmt.Sprintf("Message %d", idx))
+			if err != nil {
+				errs <- fmt.Errorf("session %d: %w", idx, err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Error(err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	for i := 0; i < 5; i++ {
+		sessionID := fmt.Sprintf("sess-concurrent-%d", i)
+		msgs, total, err := store.GetMessages(sessionID, 0, 0)
+		if err != nil {
+			t.Errorf("session %d: get messages failed: %v", i, err)
+			continue
+		}
+		if total < 2 {
+			t.Errorf("session %d: expected at least 2 messages, got %d", i, total)
+			continue
+		}
+		if msgs[0].Role != session.RoleUser {
+			t.Errorf("session %d: first message should be user, got %q", i, msgs[0].Role)
+		}
+	}
+}
+
+func TestConcurrentSessionStateIsolation(t *testing.T) {
+	store := session.NewInMemoryStore()
+
+	createTestSession(store, "sess-a")
+	createTestSession(store, "sess-b")
+
+	slowClient := &slowLLMClient{}
+	loop := New(store, slowClient)
+
+	if err := loop.ProcessMessage(context.Background(), "sess-a", "Message A"); err != nil {
+		t.Fatalf("session A: %v", err)
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	sessA, _ := store.Get("sess-a")
+	if sessA.State != session.StateProcessing {
+		t.Errorf("session A should be Processing, got %q", sessA.State)
+	}
+
+	sessB, _ := store.Get("sess-b")
+	if sessB.State != session.StateIdle {
+		t.Errorf("session B should remain Idle, got %q", sessB.State)
+	}
+
+	if err := loop.ProcessMessage(context.Background(), "sess-b", "Message B"); err != nil {
+		t.Fatalf("session B: %v", err)
+	}
+}
+
+func TestUpdateConcurrencyConfig(t *testing.T) {
+	store := session.NewInMemoryStore()
+	createTestSession(store, "sess-1")
+
+	loop := New(store, llmclient.NewMockClient())
+
+	maxToolCalls := 5
+	maxSubprocesses := 3
+	err := loop.UpdateConcurrencyConfig("sess-1", &maxToolCalls, &maxSubprocesses)
+	if err != nil {
+		t.Fatalf("UpdateConcurrencyConfig failed: %v", err)
+	}
+
+	sess, _ := store.Get("sess-1")
+	if sess.MaxConcurrentToolCalls != 5 {
+		t.Errorf("expected MaxConcurrentToolCalls 5, got %d", sess.MaxConcurrentToolCalls)
+	}
+	if sess.MaxConcurrentSubprocesses != 3 {
+		t.Errorf("expected MaxConcurrentSubprocesses 3, got %d", sess.MaxConcurrentSubprocesses)
+	}
+}
+
+func TestUpdateConcurrencyConfigNotFound(t *testing.T) {
+	store := session.NewInMemoryStore()
+	loop := New(store, llmclient.NewMockClient())
+
+	maxToolCalls := 5
+	err := loop.UpdateConcurrencyConfig("nonexistent", &maxToolCalls, nil)
+	if err == nil {
+		t.Fatal("expected error for nonexistent session")
+	}
+}
+
+func TestUpdateConcurrencyConfigNegativeValue(t *testing.T) {
+	store := session.NewInMemoryStore()
+	createTestSession(store, "sess-1")
+
+	loop := New(store, llmclient.NewMockClient())
+
+	badValue := -1
+	err := loop.UpdateConcurrencyConfig("sess-1", nil, &badValue)
+	if err == nil {
+		t.Fatal("expected error for negative max_concurrent_subprocesses")
 	}
 }
