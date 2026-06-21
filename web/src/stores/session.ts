@@ -71,10 +71,14 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
-  async function fetchSessions(): Promise<void> {
+  async function fetchSessions(project?: string): Promise<void> {
     isLoading.value = true
     try {
-      const res = await fetch(`${API_BASE}/sessions`)
+      const params = new URLSearchParams()
+      if (project) params.set('project', project)
+
+      const url = `${API_BASE}/sessions${params.toString() ? '?' + params.toString() : ''}`
+      const res = await fetch(url)
       if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.status}`)
       const data = await res.json()
       sessions.value = (Array.isArray(data) ? data : (data.sessions || data.data || [])).map(mapSession)

@@ -12,16 +12,38 @@ export interface Toast {
   duration: number
 }
 
-export type ModalType = 'approval' | 'session-picker' | 'rollback-picker' | 'help' | null
+export type ModalType = 'approval' | 'session-picker' | 'rollback-picker' | 'help' | 'input-prompt' | null
+
+export interface InputPromptConfig {
+  title: string
+  placeholder?: string
+  defaultValue?: string
+  confirmLabel?: string
+  onConfirm: (value: string) => void
+  onCancel?: () => void
+}
 
 export const useUiStore = defineStore('ui', () => {
   const toasts = ref<Toast[]>([])
   const activeModal = ref<ModalType>(null)
   const connectionStatus = ref<'connected' | 'disconnected' | 'connecting'>('disconnected')
   const focusInputCounter = ref(0)
+  const inputPrompt = ref<InputPromptConfig>({
+    title: '',
+    placeholder: '',
+    defaultValue: '',
+    confirmLabel: '确定',
+    onConfirm: () => {},
+    onCancel: () => {},
+  })
 
   function requestFocusInput(): void {
     focusInputCounter.value++
+  }
+
+  function openInputPrompt(config: InputPromptConfig): void {
+    inputPrompt.value = { ...config }
+    activeModal.value = 'input-prompt'
   }
 
   function showToast(type: ToastType, message: string, duration: number = TOAST_DURATION): void {
@@ -65,10 +87,12 @@ export const useUiStore = defineStore('ui', () => {
     activeModal,
     connectionStatus,
     focusInputCounter,
+    inputPrompt,
     showToast,
     removeToast,
     setConnectionStatus,
     setActiveModal,
+    openInputPrompt,
     requestFocusInput,
   }
 })

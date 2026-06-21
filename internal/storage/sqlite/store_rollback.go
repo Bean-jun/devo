@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"devo/internal/core/session"
+
+	"gorm.io/gorm"
 )
 
 func (s *GormStore) GetMessageByID(sessionID string, messageID string) (*session.Message, error) {
@@ -33,7 +35,13 @@ func (s *GormStore) DeleteMessagesAfter(sessionID string, messageID string) (int
 		return 0, result.Error
 	}
 
-	return int(result.RowsAffected), nil
+	deleted := int(result.RowsAffected)
+	if deleted > 0 {
+		s.db.Model(&SessionModel{}).Where("id = ?", sessionID).
+			Update("message_count", gorm.Expr("message_count - ?", deleted))
+	}
+
+	return deleted, nil
 }
 
 func (s *GormStore) RecordFileModification(record session.FileModificationRecord) error {

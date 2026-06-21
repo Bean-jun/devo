@@ -5,7 +5,7 @@ export interface Command {
   id: string
   name: string
   description: string
-  action: (args?: string) => void
+  action: (args?: string) => void | Promise<void>
   placeholder?: string
 }
 

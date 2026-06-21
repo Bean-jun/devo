@@ -30,13 +30,13 @@ describe('useCommand', () => {
     expect(newCmd?.name).toBe('/new')
   })
 
-  it('should include /sessions command', () => {
+  it('should include /switch command', () => {
     const { openPalette } = useCommand()
     const commandStore = useCommandStore()
 
     openPalette()
 
-    const cmd = commandStore.commands.find(c => c.id === 'sessions')
+    const cmd = commandStore.commands.find(c => c.id === 'switch')
     expect(cmd).toBeTruthy()
   })
 
@@ -50,13 +50,13 @@ describe('useCommand', () => {
     expect(cmd).toBeTruthy()
   })
 
-  it('should include /clear command', () => {
+  it('should include /export command', () => {
     const { openPalette } = useCommand()
     const commandStore = useCommandStore()
 
     openPalette()
 
-    const cmd = commandStore.commands.find(c => c.id === 'clear')
+    const cmd = commandStore.commands.find(c => c.id === 'export')
     expect(cmd).toBeTruthy()
   })
 })

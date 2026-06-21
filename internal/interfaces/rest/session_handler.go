@@ -153,6 +153,7 @@ type listSessionsItem struct {
 	State        string             `json:"state"`
 	CreatedAt    string             `json:"created_at"`
 	LastActiveAt string             `json:"last_active_at"`
+	MessageCount int                `json:"message_count"`
 	TokenUsage   session.TokenUsage `json:"token_usage"`
 }
 
@@ -202,6 +203,7 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 			State:        string(s.State),
 			CreatedAt:    s.CreatedAt.Format(time.RFC3339),
 			LastActiveAt: s.LastActiveAt.Format(time.RFC3339),
+			MessageCount: s.MessageCount,
 			TokenUsage:   s.TokenUsage,
 		}
 	}

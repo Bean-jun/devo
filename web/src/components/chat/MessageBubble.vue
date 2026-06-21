@@ -53,12 +53,6 @@ const displayTime = computed(() => formatTime(props.message.timestamp))
       <div v-else class="bubble-content">
         {{ message.content }}
       </div>
-
-      <div v-if="message.tokenUsage" class="bubble-footer">
-        <span class="token-info">
-          {{ message.tokenUsage.input }} → {{ message.tokenUsage.output }} tokens
-        </span>
-      </div>
     </div>
   </div>
 </template>
@@ -138,18 +132,6 @@ const displayTime = computed(() => formatTime(props.message.timestamp))
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
   text-align: center;
-}
-
-.bubble-footer {
-  margin-top: var(--space-xs);
-  padding-top: var(--space-xs);
-  border-top: 1px solid var(--color-border-light);
-}
-
-.token-info {
-  font-size: 10px;
-  opacity: 0.5;
-  font-family: var(--font-mono);
 }
 
 /* Markdown 内容样式 */

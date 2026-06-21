@@ -22,6 +22,7 @@ type SessionModel struct {
 	ApprovalTimeoutSeconds    int    `gorm:"default:300"`
 	ToolCallLimit             int    `gorm:"default:50"`
 	ToolCallCount             int    `gorm:"default:0"`
+	MessageCount              int    `gorm:"default:0"`
 	LastLoopTerminationReason string `gorm:"size:32"`
 	TokenUsageInput           int    `gorm:"default:0"`
 	TokenUsageOutput          int    `gorm:"default:0"`
@@ -67,6 +68,7 @@ func (m *SessionModel) ToDomain() *session.Session {
 		ApprovalTimeoutSeconds:    m.ApprovalTimeoutSeconds,
 		ToolCallLimit:             m.ToolCallLimit,
 		ToolCallCount:             m.ToolCallCount,
+		MessageCount:              m.MessageCount,
 		LastLoopTerminationReason: session.LoopTerminationReason(m.LastLoopTerminationReason),
 		TokenUsage: session.TokenUsage{
 			Input:  m.TokenUsageInput,

@@ -5,10 +5,9 @@ import type { Command } from '@/stores/command'
 
 const mockCommands: Command[] = [
   { id: 'new', name: '/new', description: '创建新会话', action: () => {} },
-  { id: 'sessions', name: '/sessions', description: '查看会话列表', action: () => {} },
   { id: 'switch', name: '/switch', description: '切换会话', action: () => {} },
+  { id: 'export', name: '/export', description: '下载当前会话记录', action: () => {} },
   { id: 'help', name: '/help', description: '显示帮助', action: () => {} },
-  { id: 'clear', name: '/clear', description: '清屏', action: () => {} },
 ]
 
 describe('CommandStore', () => {
@@ -23,7 +22,7 @@ describe('CommandStore', () => {
       store.open(mockCommands)
 
       expect(store.isOpen).toBe(true)
-      expect(store.commands).toHaveLength(5)
+      expect(store.commands).toHaveLength(4)
       expect(store.query).toBe('')
       expect(store.selectedIndex).toBe(0)
     })
@@ -69,7 +68,7 @@ describe('CommandStore', () => {
 
       store.open(mockCommands)
 
-      expect(store.filteredCommands).toHaveLength(5)
+      expect(store.filteredCommands).toHaveLength(4)
     })
 
     it('should filter commands by name', () => {
@@ -135,10 +134,10 @@ describe('CommandStore', () => {
       const store = useCommandStore()
 
       store.open(mockCommands)
-      store.selectedIndex = 4
+      store.selectedIndex = 3
       store.moveDown()
 
-      expect(store.selectedIndex).toBe(4)
+      expect(store.selectedIndex).toBe(3)
     })
   })
 
@@ -182,7 +181,7 @@ describe('CommandStore', () => {
       const store = useCommandStore()
 
       store.open(mockCommands)
-      store.selectedIndex = 2
+      store.selectedIndex = 1
 
       expect(store.selectedCommand?.id).toBe('switch')
     })

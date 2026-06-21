@@ -1,13 +1,12 @@
 import { useCommandStore } from '@/stores/command'
 import { useSessionStore } from '@/stores/session'
-import { useChatStore } from '@/stores/chat'
 import { useUiStore } from '@/stores/ui'
+import { API_BASE } from '@/utils/constants'
 import type { Command } from '@/stores/command'
 
 export function useCommand() {
   const commandStore = useCommandStore()
   const sessionStore = useSessionStore()
-  const chatStore = useChatStore()
   const uiStore = useUiStore()
 
   const builtinCommands: Command[] = [
@@ -15,52 +14,58 @@ export function useCommand() {
       id: 'new',
       name: '/new',
       description: '创建新会话',
-      placeholder: '会话名称（可选）',
-      action: (args?: string) => {
-        uiStore.setActiveModal(null)
-        sessionStore.createSession({ title: args || undefined, workingDirectory: sessionStore.workingDirectory })
-      },
-    },
-    {
-      id: 'sessions',
-      name: '/sessions',
-      description: '查看会话列表',
       action: () => {
-        uiStore.setActiveModal('session-picker')
+        uiStore.openInputPrompt({
+          title: '创建新会话',
+          placeholder: '会话名称（可选，留空则自动生成）',
+          confirmLabel: '创建',
+          onConfirm: (value) => {
+            sessionStore.createSession({ title: value || undefined, workingDirectory: sessionStore.workingDirectory })
+          },
+        })
       },
     },
     {
       id: 'switch',
       name: '/switch',
       description: '切换会话',
-      placeholder: '会话ID',
-      action: async (args?: string) => {
-        if (args) {
-          await sessionStore.switchSessionById(args)
-        }
+      action: () => {
+        uiStore.setActiveModal('session-picker')
       },
     },
     {
       id: 'rename',
       name: '/rename',
       description: '重命名当前会话',
-      placeholder: '新名称',
-      action: async (args?: string) => {
-        if (args && sessionStore.currentSession) {
-          await sessionStore.renameSession(sessionStore.currentSession.id, args)
-        }
+      action: () => {
+        if (!sessionStore.currentSession) return
+        uiStore.openInputPrompt({
+          title: '重命名当前会话',
+          placeholder: '输入新名称',
+          defaultValue: sessionStore.currentSession.title || '',
+          confirmLabel: '重命名',
+          onConfirm: (value) => {
+            sessionStore.renameSession(sessionStore.currentSession!.id, value)
+          },
+        })
       },
     },
     {
-      id: 'archive',
-      name: '/archive',
-      description: '归档当前会话',
-      action: () => {
-        if (sessionStore.currentSession) {
-          if (confirm('确定要归档当前会话吗？')) {
-            sessionStore.archiveSession(sessionStore.currentSession.id)
-          }
-        }
+      id: 'export',
+      name: '/export',
+      description: '导出当前会话记录',
+      action: async () => {
+        if (!sessionStore.currentSession) return
+        const sid = sessionStore.currentSession.id
+        await fetch(`${API_BASE}/sessions/${sid}/sync-archive`, { method: 'POST' })
+        const url = `${API_BASE}/sessions/${sid}/archive`
+        const filename = `${sid}.md`
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
       },
     },
     {
@@ -95,14 +100,6 @@ export function useCommand() {
       description: '显示帮助',
       action: () => {
         uiStore.setActiveModal('help')
-      },
-    },
-    {
-      id: 'clear',
-      name: '/clear',
-      description: '清屏',
-      action: () => {
-        chatStore.clearMessages()
       },
     },
   ]

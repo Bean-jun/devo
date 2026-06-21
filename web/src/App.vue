@@ -17,6 +17,7 @@ import ApprovalModal from '@/components/modal/ApprovalModal.vue'
 import SessionPicker from '@/components/modal/SessionPicker.vue'
 import RollbackPicker from '@/components/modal/RollbackPicker.vue'
 import HelpPanel from '@/components/modal/HelpPanel.vue'
+import InputModal from '@/components/modal/InputModal.vue'
 
 const sessionStore = useSessionStore()
 const chatStore = useChatStore()
@@ -32,8 +33,13 @@ onStatusChange((connected) => {
 
 onMounted(async () => {
   await sessionStore.fetchWorkspace()
-  await sessionStore.fetchSessions()
-  if (sessionStore.sessions.length > 0) {
+  await sessionStore.fetchSessions(sessionStore.workingDirectory)
+
+  const params = new URLSearchParams(window.location.search)
+  const sessionIdFromUrl = params.get('session')
+  if (sessionIdFromUrl && sessionStore.sessions.some(s => s.id === sessionIdFromUrl)) {
+    await sessionStore.switchSessionById(sessionIdFromUrl)
+  } else if (sessionStore.sessions.length > 0) {
     const latest = sessionStore.sessions[0]
     await sessionStore.switchSessionById(latest.id)
   } else {
@@ -44,6 +50,11 @@ onMounted(async () => {
 watch(
   () => sessionStore.currentSession?.id,
   (newId, oldId) => {
+    if (newId) {
+      const url = new URL(window.location.href)
+      url.searchParams.set('session', newId)
+      history.replaceState(null, '', url.toString())
+    }
     if (newId && newId !== oldId) {
       disconnect()
       chatStore.clearMessages()
@@ -82,9 +93,6 @@ function connectSSE(sessionId: string) {
         input: data.input_tokens ?? 0,
         output: data.output_tokens ?? 0,
       })
-    }
-    if (data.total_step_tokens) {
-      chatStore.appendSystemMessage(`本轮消耗 ${data.total_step_tokens} tokens`)
     }
     if (sessionStore.currentSession) {
       sessionStore.updateSessionState(sessionStore.currentSession.id, 'idle')
@@ -218,6 +226,7 @@ useKeyboard([
       <SessionPicker />
       <RollbackPicker />
       <HelpPanel />
+      <InputModal />
     </Teleport>
   </div>
 </template>

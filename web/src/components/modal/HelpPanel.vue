@@ -20,16 +20,14 @@ const shortcuts = [
 
 const commands = [
   { name: '/new', desc: '创建新会话', args: '[名称]' },
-  { name: '/sessions', desc: '查看会话列表', args: '[搜索]' },
-  { name: '/switch', desc: '切换会话', args: '<ID或名称>' },
+  { name: '/switch', desc: '切换会话', args: '' },
   { name: '/rename', desc: '重命名当前会话', args: '<新名称>' },
-  { name: '/archive', desc: '归档当前会话', args: '' },
+  { name: '/export', desc: '导出当前会话记录', args: '' },
   { name: '/rollback', desc: '回滚消息', args: '' },
   { name: '/pause', desc: '暂停当前会话', args: '' },
   { name: '/resume', desc: '恢复当前会话', args: '' },
   { name: '/cancel', desc: '取消当前操作', args: '' },
   { name: '/help', desc: '显示帮助', args: '' },
-  { name: '/clear', desc: '清屏', args: '' },
 ]
 
 function handleKeydown(e: KeyboardEvent) {

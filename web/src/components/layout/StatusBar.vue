@@ -25,10 +25,7 @@ const tokenUsage = computed(() => {
 const contextUsage = computed(() => {
   const usage = sessionStore.currentSession?.tokenUsage
   const input = usage?.input ?? 0
-  const maxContext = sessionStore.currentSession?.maxContextTokens ?? 128000
-  const used = formatTokenCount(input)
-  const total = formatTokenCount(maxContext)
-  return `${used} / ${total}`
+  return formatTokenCount(input)
 })
 
 const connectionStatusText = computed(() => {
@@ -65,7 +62,7 @@ const connectionDot = computed(() => {
       </span>
     </div>
     <div class="statusbar-right">
-      <span class="context-usage" title="上下文窗口">上下文: {{ contextUsage }}</span>
+      <span class="context-usage" title="context">context: {{ contextUsage }}</span>
       <span class="token-usage" title="输入/输出 Token">Tokens: {{ tokenUsage }}</span>
       <span class="connection-status" :title="connectionStatusText">
         {{ connectionDot }} {{ connectionStatusText }}

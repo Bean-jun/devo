@@ -76,6 +76,7 @@ func (s *InMemoryStore) AddMessage(sessionID string, msg Message) error {
 	}
 
 	sess.Messages = append(sess.Messages, msg)
+	sess.MessageCount = len(sess.Messages)
 	return nil
 }
 
@@ -338,6 +339,7 @@ func (s *InMemoryStore) DeleteMessagesAfter(sessionID string, messageID string) 
 	deletedCount := len(sess.Messages) - cutoffIdx - 1
 	if deletedCount > 0 {
 		sess.Messages = sess.Messages[:cutoffIdx+1]
+		sess.MessageCount = len(sess.Messages)
 	}
 
 	return deletedCount, nil

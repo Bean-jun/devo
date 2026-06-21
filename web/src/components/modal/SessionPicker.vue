@@ -3,8 +3,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { useSession } from '@/composables/useSession'
-import { formatRelativeTime } from '@/utils/formatters'
+import { formatDateTime } from '@/utils/formatters'
 import { STATUS_LABELS } from '@/utils/constants'
+import type { TokenUsage } from '@/types/session'
 
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
@@ -13,6 +14,13 @@ const { createAndSwitch, switchTo } = useSession()
 const searchQuery = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
 const selectedIndex = ref(0)
+
+function formatTokenUsage(usage?: TokenUsage): string {
+  if (!usage || (usage.input === 0 && usage.output === 0)) return '0 token'
+  const total = usage.input + usage.output
+  if (total >= 1000) return `${(total / 1000).toFixed(1)}k token`
+  return `${total} token`
+}
 
 const isOpen = computed(() => uiStore.activeModal === 'session-picker')
 const filteredSessions = computed(() => {
@@ -24,7 +32,7 @@ const filteredSessions = computed(() => {
 })
 
 onMounted(async () => {
-  await sessionStore.fetchSessions()
+  await sessionStore.fetchSessions(sessionStore.workingDirectory)
 })
 
 watch(searchQuery, () => {
@@ -103,7 +111,7 @@ function handleKeydown(e: KeyboardEvent) {
           <div class="item-left">
             <span class="item-name">{{ session.title }}</span>
             <span class="item-meta">
-              {{ session.messageCount }} 条消息 · {{ formatRelativeTime(session.lastActiveAt) }}
+              {{ session.messageCount }} 条消息 · {{ formatTokenUsage(session.tokenUsage) }} · {{ formatDateTime(session.createdAt) }}
             </span>
           </div>
           <div class="item-right">

@@ -26,12 +26,13 @@ func (h *Handler) GetArchive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filename := filepath.Base(sess.ArchivePath)
-	if filename == "" {
+	if filename == "" || filename == "." {
 		filename = sessionID + ".md"
 	}
 
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition")
 	w.WriteHeader(http.StatusOK)
 	w.Write(content)
 }

@@ -93,6 +93,7 @@ type Session struct {
 	PauseRequested            bool                  `json:"pause_requested"`
 	ToolCallLimit             int                   `json:"tool_call_limit"`
 	ToolCallCount             int                   `json:"tool_call_count"`
+	MessageCount              int                   `json:"message_count"`
 	LastLoopTerminationReason LoopTerminationReason `json:"last_loop_termination_reason,omitempty"`
 	TokenUsage                TokenUsage            `json:"token_usage"`
 	CompressionState          *CompressionState     `json:"compression_state,omitempty"`

@@ -34,6 +34,12 @@ export function formatRelativeTime(dateStr: string): string {
   return date.toLocaleDateString('zh-CN')
 }
 
+export function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 export function formatTime(dateStr: string): string {
   const date = new Date(dateStr)
   return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })

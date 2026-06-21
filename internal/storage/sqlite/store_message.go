@@ -24,6 +24,11 @@ func (s *GormStore) AddMessage(sessionID string, msg session.Message) error {
 		return err
 	}
 
+	if err := s.db.Model(&SessionModel{}).Where("id = ?", sessionID).
+		Update("message_count", maxSeq+1).Error; err != nil {
+		return err
+	}
+
 	return nil
 }
 
