@@ -10,15 +10,17 @@ import (
 )
 
 type Handler struct {
-	store session.SessionStore
-	loop  *agentloop.Loop
+	store   session.SessionStore
+	loop    *agentloop.Loop
+	version string
 }
 
-func NewHandler(store session.SessionStore, loop *agentloop.Loop) *Handler {
-	return &Handler{store: store, loop: loop}
+func NewHandler(store session.SessionStore, loop *agentloop.Loop, version string) *Handler {
+	return &Handler{store: store, loop: loop, version: version}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/version", h.GetVersion)
 	mux.HandleFunc("GET /api/v1/workspace", h.GetWorkspace)
 	mux.HandleFunc("POST /api/v1/sessions", h.CreateSession)
 	mux.HandleFunc("GET /api/v1/sessions", h.ListSessions)
@@ -41,6 +43,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sessions/{id}/rollback", h.Rollback)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/archive", h.GetArchive)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/sync-archive", h.SyncArchive)
+}
+
+func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{
+		"version": h.version,
+	})
 }
 
 func (h *Handler) GetWorkspace(w http.ResponseWriter, r *http.Request) {

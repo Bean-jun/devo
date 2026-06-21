@@ -7,6 +7,17 @@ BUILD_DIR := build
 VSIX_DIR := vscode-extension
 DB_PATH  := .env/devo.db
 
+# ========== Version ==========
+VERSION := $(shell type VERSION)
+GIT_HASH := $(shell git rev-parse --short HEAD)
+GIT_DIRTY := $(shell git status --porcelain)
+ifneq ($(GIT_DIRTY),)
+  DIRTY_SUFFIX := -dirty
+else
+  DIRTY_SUFFIX :=
+endif
+FULL_VERSION := $(VERSION)-$(GIT_HASH)$(DIRTY_SUFFIX)
+
 # ========== Build ==========
 all: build
 
@@ -14,16 +25,18 @@ build: vsix
 	@echo [OK] Build complete: $(BUILD_DIR)/$(APP_NAME).exe
 
 build-web:
-	@echo [BUILD] Frontend...
-	cd $(WEB_DIR) && npm install && npm run build
+	@echo [BUILD] Frontend (version: $(FULL_VERSION))...
+	cd $(WEB_DIR) && npm install && set VITE_APP_VERSION=$(FULL_VERSION) && npm run build
 
 build-go: build-web
-	@echo [BUILD] Backend...
+	@echo [BUILD] Backend (version: $(FULL_VERSION))...
 	@if not exist $(BUILD_DIR) mkdir $(BUILD_DIR)
-	go build -ldflags="-s -w" -o $(BUILD_DIR)/$(APP_NAME).exe $(GO_ENTRY)
+	go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME).exe $(GO_ENTRY)
 
 # ========== VS Code Extension ==========
 vsix: build-go
+	@echo [VSIX] Syncing version $(FULL_VERSION) to extension...
+	cd $(VSIX_DIR) && node -e "var p=require('./package.json');p.version='$(FULL_VERSION)';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 	@echo [VSIX] Copying binary to extension...
 	@if not exist $(VSIX_DIR)\bin mkdir $(VSIX_DIR)\bin
 	upx -9 $(BUILD_DIR)\$(APP_NAME).exe

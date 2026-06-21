@@ -26,6 +26,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var Version = "dev"
+
 func main() {
 	tuiMode := flag.Bool("tui", false, "Launch TUI mode")
 	webMode := flag.Bool("web", false, "Auto-open browser on startup")
@@ -84,7 +86,7 @@ func main() {
 
 	llm := providers.NewClient(cfg, toolRegistry)
 	loop := agentloop.NewWithTools(store, llm, toolRegistry)
-	handler := rest.NewHandler(store, loop)
+	handler := rest.NewHandler(store, loop, Version)
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)

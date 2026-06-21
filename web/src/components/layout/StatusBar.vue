@@ -45,6 +45,8 @@ const connectionDot = computed(() => {
 })
 
 const serverPort = computed(() => window.location.port)
+
+const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
 </script>
 
 <template>
@@ -70,6 +72,7 @@ const serverPort = computed(() => window.location.port)
         {{ connectionDot }} {{ connectionStatusText }}
       </span>
       <span class="port-info" title="后端端口">:{{ serverPort }}</span>
+      <span class="version-info" title="版本号">v{{ appVersion }}</span>
     </div>
   </header>
 </template>
@@ -164,5 +167,14 @@ const serverPort = computed(() => window.location.port)
   font-family: var(--font-mono);
   white-space: nowrap;
   line-height: 1;
+}
+
+.version-info {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  line-height: 1;
+  opacity: 0.7;
 }
 </style>

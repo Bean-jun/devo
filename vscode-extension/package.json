@@ -2,7 +2,7 @@
   "name": "devo",
   "displayName": "Devo - AI Coding Agent",
   "description": "AI coding agent that runs in VS Code",
-  "version": "1.0.0",
+  "version": "0.0.1-bd9055f-dirty",
   "publisher": "devo",
   "engines": {
     "vscode": "^1.85.0"
