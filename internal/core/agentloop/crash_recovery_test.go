@@ -378,6 +378,39 @@ func TestRecoverCrashedSessions_NoChildPID(t *testing.T) {
 	}
 }
 
+func TestRecoverCrashedSessions_WithBackgroundPIDs(t *testing.T) {
+	store := session.NewInMemoryStore()
+	loop := New(store, llmclient.NewMockClient())
+
+	pid := 99999
+	sess := &session.Session{
+		ID:               "sess-bg-crash",
+		Title:            "Background PID Crash",
+		WorkingDirectory: "/tmp/test-bg-crash",
+		State:            session.StateProcessing,
+		ChildPID:         &pid,
+		BackgroundPIDs:   []int{100001, 100002},
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	}
+	store.Create(sess)
+
+	if err := loop.RecoverCrashedSessions(); err != nil {
+		t.Fatalf("RecoverCrashedSessions failed: %v", err)
+	}
+
+	sess, _ = store.Get("sess-bg-crash")
+	if sess.State != session.StateIdle {
+		t.Errorf("expected Idle, got %q", sess.State)
+	}
+	if sess.ChildPID != nil {
+		t.Error("expected ChildPID to be nil after recovery")
+	}
+	if len(sess.BackgroundPIDs) != 0 {
+		t.Errorf("expected BackgroundPIDs to be empty, got %v", sess.BackgroundPIDs)
+	}
+}
+
 func TestRecoverCrashedSessions_InvalidChildPID(t *testing.T) {
 	store := session.NewInMemoryStore()
 	loop := New(store, llmclient.NewMockClient())

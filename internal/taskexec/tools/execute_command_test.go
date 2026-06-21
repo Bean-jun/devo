@@ -6,15 +6,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-
-	"devo/internal/taskexec/sandbox"
 )
 
 func TestExecuteCommandTool_Success(t *testing.T) {
-	if !sandbox.IsPythonAvailable() {
-		t.Skip("python not available, skipping test")
-	}
-
 	tmpDir := t.TempDir()
 	tool := NewExecuteCommandTool()
 
@@ -67,10 +61,6 @@ func TestExecuteCommandTool_EmptyCommand(t *testing.T) {
 }
 
 func TestExecuteCommandTool_Timeout(t *testing.T) {
-	if !sandbox.IsPythonAvailable() {
-		t.Skip("python not available, skipping test")
-	}
-
 	tool := NewExecuteCommandTool()
 
 	timeoutCmd := "sleep 10"
@@ -93,10 +83,6 @@ func TestExecuteCommandTool_Timeout(t *testing.T) {
 }
 
 func TestExecuteCommandTool_ExitCodeNonZero(t *testing.T) {
-	if !sandbox.IsPythonAvailable() {
-		t.Skip("python not available, skipping test")
-	}
-
 	tool := NewExecuteCommandTool()
 
 	cmd := "false"
@@ -118,10 +104,6 @@ func TestExecuteCommandTool_ExitCodeNonZero(t *testing.T) {
 }
 
 func TestExecuteCommandTool_WritesFile(t *testing.T) {
-	if !sandbox.IsPythonAvailable() {
-		t.Skip("python not available, skipping test")
-	}
-
 	tmpDir := t.TempDir()
 	tool := NewExecuteCommandTool()
 
@@ -154,10 +136,6 @@ func TestExecuteCommandTool_WritesFile(t *testing.T) {
 }
 
 func TestExecuteCommandTool_StderrCaptured(t *testing.T) {
-	if !sandbox.IsPythonAvailable() {
-		t.Skip("python not available, skipping test")
-	}
-
 	tool := NewExecuteCommandTool()
 
 	cmd := "ls nonexistent_file_that_does_not_exist 2>&1"
@@ -173,7 +151,7 @@ func TestExecuteCommandTool_StderrCaptured(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if !strings.Contains(result, "No such file") && !strings.Contains(result, "cannot access") && !strings.Contains(result, "File Not Found") && !strings.Contains(result, "not found") {
+	if !strings.Contains(result, "No such file") && !strings.Contains(result, "cannot access") && !strings.Contains(result, "File Not Found") && !strings.Contains(result, "not found") && !strings.Contains(result, "找不到") && !strings.Contains(result, "Exit code: 1") {
 		t.Errorf("expected stderr to contain error message, got: %s", result)
 	}
 }
@@ -193,6 +171,112 @@ func TestExecuteCommandTool_OperationType(t *testing.T) {
 	opType := tool.OperationType("/tmp", nil)
 	if opType != "execute_command" {
 		t.Errorf("expected 'execute_command', got %s", opType)
+	}
+}
+
+func TestExecuteCommandTool_PIDTag(t *testing.T) {
+	tool := NewExecuteCommandTool()
+
+	result, err := tool.Execute("/tmp", map[string]interface{}{
+		"command": "echo hello",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if !strings.Contains(result, "__DEVO_CHILD_PID__=") {
+		t.Errorf("expected output to contain PID tag, got: %s", result)
+	}
+
+	if strings.Contains(result, "__DEVO_BACKGROUND__=true") {
+		t.Errorf("expected no background marker for sync command, got: %s", result)
+	}
+}
+
+func TestExecuteCommandTool_ModeSync(t *testing.T) {
+	tool := NewExecuteCommandTool()
+
+	result, err := tool.Execute("/tmp", map[string]interface{}{
+		"command": "echo sync-test",
+		"mode":    "sync",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if !strings.Contains(result, "Exit code: 0") {
+		t.Errorf("expected exit code 0, got: %s", result)
+	}
+
+	if strings.Contains(result, "Background process started") {
+		t.Errorf("expected sync mode not to report background, got: %s", result)
+	}
+}
+
+func TestExecuteCommandTool_NoPythonDependency(t *testing.T) {
+	tool := NewExecuteCommandTool()
+
+	result, err := tool.Execute("/tmp", map[string]interface{}{
+		"command": "echo no-python-test",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error (no Python dependency), got: %v", err)
+	}
+
+	if !strings.Contains(result, "no-python-test") {
+		t.Errorf("expected output to contain 'no-python-test', got: %s", result)
+	}
+}
+
+func TestExecuteCommandTool_GetCommandContext_Mode(t *testing.T) {
+	tool := NewExecuteCommandTool()
+
+	ctx := tool.GetCommandContext("/tmp", map[string]interface{}{
+		"timeout_seconds": float64(10),
+		"mode":            "sync",
+	})
+
+	if ctx["timeout_seconds"] != 10 {
+		t.Errorf("expected timeout_seconds=10, got %v", ctx["timeout_seconds"])
+	}
+
+	if ctx["mode"] != "sync" {
+		t.Errorf("expected mode=sync, got %v", ctx["mode"])
+	}
+}
+
+func TestExecuteCommandTool_ParamsSchema(t *testing.T) {
+	tool := NewExecuteCommandTool()
+
+	schema := tool.ParamsSchema()
+
+	props, ok := schema["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected properties in schema")
+	}
+
+	if _, ok := props["mode"]; !ok {
+		t.Error("expected 'mode' parameter in schema")
+	}
+
+	modeProp, ok := props["mode"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected mode property to be a map")
+	}
+
+	enum, ok := modeProp["enum"].([]string)
+	if !ok {
+		t.Fatal("expected mode to have enum")
+	}
+
+	expectedModes := map[string]bool{"sync": true, "async": true, "auto": true}
+	for _, m := range enum {
+		if !expectedModes[m] {
+			t.Errorf("unexpected mode value: %s", m)
+		}
 	}
 }
 

@@ -65,6 +65,7 @@ func (l *Loop) Cancel(sessionID string) error {
 	}
 
 	childPID := sess.ChildPID
+	bgPIDs := sess.BackgroundPIDs
 
 	sess.CancelRequested = true
 	sess.PauseRequested = false
@@ -74,11 +75,16 @@ func (l *Loop) Cancel(sessionID string) error {
 
 	if childPID != nil {
 		killChildProcess(*childPID)
-		sess, err := l.store.Get(sessionID)
-		if err == nil {
-			sess.ChildPID = nil
-			l.store.Update(sess)
-		}
+	}
+	if len(bgPIDs) > 0 {
+		killAllBackgroundPIDs(bgPIDs)
+	}
+
+	sess, err = l.store.Get(sessionID)
+	if err == nil {
+		sess.ChildPID = nil
+		sess.BackgroundPIDs = nil
+		l.store.Update(sess)
 	}
 
 	return nil
@@ -96,6 +102,7 @@ func (l *Loop) Complete(sessionID string) error {
 
 	if sess.State == session.StateProcessing || sess.State == session.StateAwaitingApproval {
 		childPID := sess.ChildPID
+		bgPIDs := sess.BackgroundPIDs
 		sess.CancelRequested = true
 		sess.PauseRequested = false
 		if err := l.store.Update(sess); err != nil {
@@ -104,11 +111,16 @@ func (l *Loop) Complete(sessionID string) error {
 
 		if childPID != nil {
 			killChildProcess(*childPID)
-			sess, err := l.store.Get(sessionID)
-			if err == nil {
-				sess.ChildPID = nil
-				l.store.Update(sess)
-			}
+		}
+		if len(bgPIDs) > 0 {
+			killAllBackgroundPIDs(bgPIDs)
+		}
+
+		sess, err := l.store.Get(sessionID)
+		if err == nil {
+			sess.ChildPID = nil
+			sess.BackgroundPIDs = nil
+			l.store.Update(sess)
 		}
 	}
 

@@ -29,6 +29,12 @@ func killChildProcess(pid int) {
 	}
 }
 
+func killAllBackgroundPIDs(pids []int) {
+	for _, pid := range pids {
+		killChildProcess(pid)
+	}
+}
+
 func (l *Loop) rejectionMessage(tc session.ToolCall) session.Message {
 	return session.Message{
 		ID:         session.GenerateID("msg"),
@@ -106,7 +112,16 @@ func (l *Loop) handleLoopError(sessionID string, err error) {
 		return
 	}
 
+	if sess.ChildPID != nil {
+		killChildProcess(*sess.ChildPID)
+	}
+	if len(sess.BackgroundPIDs) > 0 {
+		killAllBackgroundPIDs(sess.BackgroundPIDs)
+	}
+
 	sess.State = session.StateIdle
+	sess.ChildPID = nil
+	sess.BackgroundPIDs = nil
 	l.store.Update(sess)
 }
 
@@ -125,8 +140,20 @@ func (l *Loop) recordChildPID(sessionID, toolName string, tr *tools.ToolResult) 
 		return
 	}
 
-	sess.ChildPID = &pid
+	isBackground := extractBoolFromContent(tr.Content, "__DEVO_BACKGROUND__=true")
+
+	if isBackground {
+		sess.BackgroundPIDs = append(sess.BackgroundPIDs, pid)
+	} else {
+		sess.ChildPID = &pid
+	}
+
 	l.store.Update(sess)
+}
+
+func extractBoolFromContent(content, marker string) bool {
+	idx := findLastIndex(content, marker)
+	return idx >= 0
 }
 
 func extractPIDFromContent(content string) int {

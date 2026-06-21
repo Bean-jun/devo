@@ -42,9 +42,13 @@ func (l *Loop) recoverSession(sess *session.Session) {
 	if sess.ChildPID != nil {
 		killChildProcess(*sess.ChildPID)
 	}
+	if len(sess.BackgroundPIDs) > 0 {
+		killAllBackgroundPIDs(sess.BackgroundPIDs)
+	}
 
 	sess.State = session.StateIdle
 	sess.ChildPID = nil
+	sess.BackgroundPIDs = nil
 	sess.CancelRequested = false
 	sess.PauseRequested = false
 

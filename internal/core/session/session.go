@@ -85,6 +85,7 @@ type Session struct {
 	Messages                  []Message             `json:"messages,omitempty"`
 	ActiveSSEConnections      int                   `json:"active_sse_connections"`
 	ChildPID                  *int                  `json:"child_pid,omitempty"`
+	BackgroundPIDs            []int                 `json:"background_pids,omitempty"`
 	EventBus                  *EventBus             `json:"-"`
 	TrustLevel                string                `json:"trust_level"`
 	ApprovalPolicy            map[string]string     `json:"approval_policy,omitempty"`

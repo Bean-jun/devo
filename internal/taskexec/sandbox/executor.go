@@ -1,168 +1,247 @@
 package sandbox
 
 import (
-	"encoding/json"
+	"bytes"
+	"context"
 	"fmt"
-	"os"
+	"io"
 	"os/exec"
 	"runtime"
-	"syscall"
+	"strings"
+	"sync"
+	"time"
+	"unicode/utf8"
+
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 
-const pythonScript = `
-import os, sys, json, subprocess, signal, platform
+type ExecMode string
 
-command = os.environ.get("DEVO_COMMAND", "")
-workdir = os.environ.get("DEVO_WORKDIR", "")
-timeout_str = os.environ.get("DEVO_TIMEOUT", "30")
-
-if not command:
-    print(json.dumps({"exit_code": -1, "stdout": "", "stderr": "DEVO_COMMAND environment variable not set", "timed_out": False}))
-    sys.exit(0)
-
-try:
-    timeout = int(timeout_str)
-except ValueError:
-    timeout = 30
-
-try:
-    if workdir:
-        os.chdir(workdir)
-except Exception as e:
-    print(json.dumps({"exit_code": -1, "stdout": "", "stderr": "Failed to chdir to " + workdir + ": " + str(e), "timed_out": False}))
-    sys.exit(0)
-
-def set_resource_limits():
-    if platform.system() == "Windows":
-        return
-    try:
-        import resource
-        resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 1024 * 1024 * 1024))
-        resource.setrlimit(resource.RLIMIT_CPU, (timeout + 5, timeout + 10))
-        resource.setrlimit(resource.RLIMIT_NPROC, (50, 100))
-    except Exception:
-        pass
-
-set_resource_limits()
-
-try:
-    proc = subprocess.Popen(
-        command,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        preexec_fn=None if platform.system() == "Windows" else os.setsid,
-    )
-    
-    try:
-        stdout, stderr = proc.communicate(timeout=timeout)
-        exit_code = proc.returncode
-        timed_out = False
-    except subprocess.TimeoutExpired:
-        if platform.system() != "Windows":
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except Exception:
-                proc.kill()
-        else:
-            proc.kill()
-        stdout, stderr = proc.communicate()
-        exit_code = -1
-        timed_out = True
-    
-    result = {
-        "exit_code": exit_code,
-        "stdout": stdout.decode("utf-8", errors="replace") if stdout else "",
-        "stderr": stderr.decode("utf-8", errors="replace") if stderr else "",
-        "timed_out": timed_out,
-    }
-    print(json.dumps(result))
-    
-except Exception as e:
-    print(json.dumps({"exit_code": -1, "stdout": "", "stderr": str(e), "timed_out": False}))
-
-sys.exit(0)
-`
+const (
+	ExecModeSync  ExecMode = "sync"
+	ExecModeAsync ExecMode = "async"
+	ExecModeAuto  ExecMode = "auto"
+)
 
 type ExecResult struct {
-	ExitCode int    `json:"exit_code"`
-	Stdout   string `json:"stdout"`
-	Stderr   string `json:"stderr"`
-	TimedOut bool   `json:"timed_out"`
+	ExitCode   int    `json:"exit_code"`
+	Stdout     string `json:"stdout"`
+	Stderr     string `json:"stderr"`
+	TimedOut   bool   `json:"timed_out"`
+	Background bool   `json:"background"`
+	PID        int    `json:"pid"`
 }
 
-type Executor struct{}
-
-func NewExecutor() *Executor {
-	return &Executor{}
+type NativeExecutor struct {
+	mu sync.Mutex
 }
 
-func (e *Executor) Execute(workingDir, command string, timeoutSeconds int) (*ExecResult, int, error) {
+func NewExecutor() *NativeExecutor {
+	return &NativeExecutor{}
+}
+
+func (e *NativeExecutor) Execute(workingDir, command string, timeoutSeconds int, mode ExecMode) (*ExecResult, error) {
 	if timeoutSeconds <= 0 {
 		timeoutSeconds = 30
 	}
 
-	cmd := exec.Command("python", "-c", pythonScript)
-	cmd.Env = append(os.Environ(),
-		"DEVO_COMMAND="+command,
-		"DEVO_WORKDIR="+workingDir,
-		fmt.Sprintf("DEVO_TIMEOUT=%d", timeoutSeconds),
-	)
+	actualMode := e.resolveMode(mode, command)
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
+	switch actualMode {
+	case ExecModeAsync:
+		return e.executeAsync(workingDir, command, timeoutSeconds)
+	default:
+		return e.executeSync(workingDir, command, timeoutSeconds)
+	}
+}
 
-	stdout, err := cmd.Output()
+func (e *NativeExecutor) resolveMode(mode ExecMode, command string) ExecMode {
+	if mode == ExecModeSync || mode == ExecModeAsync {
+		return mode
+	}
+	if isBackgroundCommand(command) {
+		return ExecModeAsync
+	}
+	return ExecModeSync
+}
+
+func (e *NativeExecutor) executeSync(workingDir, command string, timeoutSeconds int) (*ExecResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
+
+	shell, shellArgs := getShellCommand(command)
+
+	cmd := exec.CommandContext(ctx, shell, shellArgs...)
+	cmd.Dir = workingDir
+
+	e.setPlatformAttrs(cmd)
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	err := cmd.Run()
+
+	pid := cmd.Process.Pid
+	timedOut := false
+	exitCode := 0
+
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			timedOut = true
+			exitCode = -1
+		} else if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			return nil, fmt.Errorf("command execution failed: %w", err)
+		}
+	}
+
+	return &ExecResult{
+		ExitCode:   exitCode,
+		Stdout:     decodeOutput(stdoutBuf.Bytes()),
+		Stderr:     decodeOutput(stderrBuf.Bytes()),
+		TimedOut:   timedOut,
+		Background: false,
+		PID:        pid,
+	}, nil
+}
+
+func (e *NativeExecutor) executeAsync(workingDir, command string, timeoutSeconds int) (*ExecResult, error) {
+	shell, shellArgs := getShellCommand(command)
+
+	cmd := exec.Command(shell, shellArgs...)
+	cmd.Dir = workingDir
+
+	e.setPlatformAttrs(cmd)
+
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("create stdout pipe: %w", err)
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("create stderr pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("start command: %w", err)
+	}
 
 	pid := cmd.Process.Pid
 
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			stderrOutput := string(exitErr.Stderr)
-			if len(stdout) > 0 {
-				var result ExecResult
-				if jsonErr := json.Unmarshal(stdout, &result); jsonErr == nil {
-					return &result, pid, nil
-				}
-			}
-			return &ExecResult{
-				ExitCode: -1,
-				Stdout:   "",
-				Stderr:   stderrOutput,
-				TimedOut: false,
-			}, pid, nil
+	var stdoutBuf, stderrBuf bytes.Buffer
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		io.Copy(&stdoutBuf, stdoutPipe)
+	}()
+	go func() {
+		defer wg.Done()
+		io.Copy(&stderrBuf, stderrPipe)
+	}()
+
+	collectionTimeout := time.Duration(min(timeoutSeconds, 5)) * time.Second
+	startTime := time.Now()
+	lastOutputLen := 0
+
+	for {
+		elapsed := time.Since(startTime)
+		currentLen := stdoutBuf.Len() + stderrBuf.Len()
+
+		if currentLen > lastOutputLen {
+			lastOutputLen = currentLen
 		}
-		return &ExecResult{
-			ExitCode: -1,
-			Stdout:   "",
-			Stderr:   err.Error(),
-			TimedOut: false,
-		}, 0, err
+
+		if currentLen > 0 && elapsed > 2*time.Second {
+			stableDuration := time.Since(startTime)
+			_ = stableDuration
+			break
+		}
+
+		if elapsed >= collectionTimeout {
+			break
+		}
+
+		if e.isProcessDone(cmd) {
+			break
+		}
+
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	var result ExecResult
-	if err := json.Unmarshal(stdout, &result); err != nil {
-		return &ExecResult{
-			ExitCode: -1,
-			Stdout:   string(stdout),
-			Stderr:   "",
-			TimedOut: false,
-		}, pid, nil
+	_ = lastOutputLen
+
+	exitCode := 0
+	if e.isProcessDone(cmd) {
+		if err := cmd.Wait(); err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				exitCode = exitErr.ExitCode()
+			}
+		}
 	}
 
-	return &result, pid, nil
+	return &ExecResult{
+		ExitCode:   exitCode,
+		Stdout:     decodeOutput(stdoutBuf.Bytes()),
+		Stderr:     decodeOutput(stderrBuf.Bytes()),
+		TimedOut:   false,
+		Background: true,
+		PID:        pid,
+	}, nil
 }
 
-func IsPythonAvailable() bool {
-	_, err := exec.LookPath("python")
-	if err != nil {
-		_, err = exec.LookPath("python3")
+func (e *NativeExecutor) isProcessDone(cmd *exec.Cmd) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if cmd.ProcessState != nil {
+		return true
 	}
-	return err == nil
+	return false
+}
+
+func decodeOutput(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+
+	if utf8.Valid(data) {
+		return string(data)
+	}
+
+	if runtime.GOOS == "windows" {
+		reader := transform.NewReader(bytes.NewReader(data), simplifiedchinese.GBK.NewDecoder())
+		decoded, err := io.ReadAll(reader)
+		if err == nil {
+			result := string(decoded)
+			if utf8.ValidString(result) {
+				return result
+			}
+		}
+	}
+
+	return strings.ToValidUTF8(string(data), "\uFFFD")
+}
+
+func isBackgroundCommand(cmd string) bool {
+	trimmed := strings.TrimSpace(cmd)
+	if runtime.GOOS == "windows" {
+		lower := strings.ToLower(trimmed)
+		return strings.HasPrefix(lower, "start ")
+	}
+	return strings.HasSuffix(trimmed, "&") || strings.Contains(trimmed, "nohup ")
+}
+
+func getShellCommand(command string) (string, []string) {
+	if runtime.GOOS == "windows" {
+		return "cmd", []string{"/c", command}
+	}
+	return "sh", []string{"-c", command}
 }
 
 func PlatformResourceLimitsNote() string {
-	if runtime.GOOS == "windows" {
-		return "resource limits (setrlimit) not supported on Windows"
-	}
-	return "resource limits active on " + runtime.GOOS
+	return ""
 }

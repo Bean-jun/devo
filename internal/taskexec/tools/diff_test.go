@@ -375,29 +375,21 @@ func TestExecuteCommandTool_GetCommandContext(t *testing.T) {
 		t.Errorf("expected working_directory /tmp/test, got %v", ctx["working_directory"])
 	}
 
-	if ctx["invocation"] != "python -c <内置脚本> (DEVO_COMMAND env)" {
-		t.Errorf("expected invocation description, got %v", ctx["invocation"])
+	invocation, ok := ctx["invocation"].(string)
+	if !ok {
+		t.Fatal("expected invocation to be a string")
+	}
+	if !strings.Contains(invocation, "Go native executor") {
+		t.Errorf("expected invocation to mention Go native executor, got %v", invocation)
 	}
 
 	if ctx["timeout_seconds"] != 60 {
 		t.Errorf("expected timeout_seconds 60, got %v", ctx["timeout_seconds"])
 	}
 
-	resourceLimits, ok := ctx["resource_limits"].(map[string]any)
-	if !ok {
-		t.Fatal("expected resource_limits to be a map")
-	}
-
 	if runtime.GOOS == "windows" {
-		if resourceLimits["max_memory_mb"] != nil {
-			t.Error("expected max_memory_mb to be nil on Windows")
-		}
-		if resourceLimits["note"] == nil {
-			t.Error("expected note about Windows resource limits")
-		}
-	} else {
-		if resourceLimits["max_memory_mb"] != 512 {
-			t.Errorf("expected max_memory_mb 512, got %v", resourceLimits["max_memory_mb"])
+		if ctx["encoding"] == nil {
+			t.Error("expected encoding info on Windows")
 		}
 	}
 }

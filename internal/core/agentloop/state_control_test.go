@@ -592,3 +592,106 @@ func TestCompleteCancelsRunningProcess(t *testing.T) {
 		t.Error("expected ChildPID to be nil after complete")
 	}
 }
+
+func TestCancelClearsBackgroundPIDs(t *testing.T) {
+	loop, store := setupTestLoop()
+
+	pid := 99999
+	bgPIDs := []int{100001, 100002}
+	sess := createTestSession(store, "sess-bg")
+	sess.State = session.StateProcessing
+	sess.ChildPID = &pid
+	sess.BackgroundPIDs = bgPIDs
+	store.Update(sess)
+
+	err := loop.Cancel("sess-bg")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	sess, _ = store.Get("sess-bg")
+	if sess.ChildPID != nil {
+		t.Error("expected ChildPID to be nil after cancel")
+	}
+	if len(sess.BackgroundPIDs) != 0 {
+		t.Errorf("expected BackgroundPIDs to be empty, got %v", sess.BackgroundPIDs)
+	}
+}
+
+func TestCompleteClearsBackgroundPIDs(t *testing.T) {
+	loop, store := setupTestLoop()
+
+	pid := 99999
+	bgPIDs := []int{100001}
+	sess := createTestSession(store, "sess-bg-complete")
+	sess.State = session.StateProcessing
+	sess.ChildPID = &pid
+	sess.BackgroundPIDs = bgPIDs
+	store.Update(sess)
+
+	err := loop.Complete("sess-bg-complete")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	sess, _ = store.Get("sess-bg-complete")
+	if sess.State != session.StateCompleted {
+		t.Errorf("expected state Completed, got %q", sess.State)
+	}
+	if sess.ChildPID != nil {
+		t.Error("expected ChildPID to be nil after complete")
+	}
+	if len(sess.BackgroundPIDs) != 0 {
+		t.Errorf("expected BackgroundPIDs to be empty, got %v", sess.BackgroundPIDs)
+	}
+}
+
+func TestCancelOnlyBackgroundPIDs(t *testing.T) {
+	loop, store := setupTestLoop()
+
+	bgPIDs := []int{100001, 100002, 100003}
+	sess := createTestSession(store, "sess-bg-only")
+	sess.State = session.StateProcessing
+	sess.BackgroundPIDs = bgPIDs
+	store.Update(sess)
+
+	err := loop.Cancel("sess-bg-only")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	sess, _ = store.Get("sess-bg-only")
+	if sess.ChildPID != nil {
+		t.Error("expected ChildPID to remain nil")
+	}
+	if len(sess.BackgroundPIDs) != 0 {
+		t.Errorf("expected BackgroundPIDs to be empty, got %v", sess.BackgroundPIDs)
+	}
+}
+
+func TestCancelNoPIDs(t *testing.T) {
+	loop, store := setupTestLoop()
+
+	sess := createTestSession(store, "sess-nopid")
+	sess.State = session.StateProcessing
+	store.Update(sess)
+
+	err := loop.Cancel("sess-nopid")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	sess, _ = store.Get("sess-nopid")
+	if sess.ChildPID != nil {
+		t.Error("expected ChildPID to remain nil")
+	}
+	if len(sess.BackgroundPIDs) != 0 {
+		t.Errorf("expected BackgroundPIDs to be empty, got %v", sess.BackgroundPIDs)
+	}
+}
+
+func TestKillAllBackgroundPIDs(t *testing.T) {
+	killAllBackgroundPIDs(nil)
+	killAllBackgroundPIDs([]int{})
+	killAllBackgroundPIDs([]int{-1, 0, 99999999})
+}

@@ -1121,12 +1121,8 @@ func TestApprovalRequest_ExecuteCommandContext(t *testing.T) {
 		t.Errorf("expected timeout_seconds 60, got %v", cmdCtx["timeout_seconds"])
 	}
 
-	resourceLimits, ok := cmdCtx["resource_limits"].(map[string]any)
-	if !ok {
-		t.Fatal("expected resource_limits in command_context")
-	}
-	if resourceLimits["max_memory_mb"] == nil && resourceLimits["note"] == nil {
-		t.Error("expected either max_memory_mb or note in resource_limits")
+	if mode, ok := cmdCtx["mode"].(string); !ok || (mode != "sync" && mode != "async" && mode != "auto") {
+		t.Errorf("expected valid mode, got %v", cmdCtx["mode"])
 	}
 
 	t.Logf("command_context: %+v", cmdCtx)
