@@ -222,11 +222,19 @@ func (t *EditFileTool) executeReplace(safePath string, params map[string]interfa
 	}
 
 	newContent := strings.Replace(content, oldStr, newStr, 1)
+
+	// 生成 diff（在写入前）
+	diff := generateUnifiedDiff(content, newContent)
+
 	if err := os.WriteFile(safePath, []byte(newContent), 0644); err != nil {
 		return "", fmt.Errorf("failed to write file: %v", err)
 	}
 
-	return fmt.Sprintf("File successfully edited: replaced 1 occurrence"), nil
+	result := fmt.Sprintf("File successfully edited: replaced 1 occurrence")
+	if diff != "" {
+		result += "\n__DEVO_DIFF__\n" + diff
+	}
+	return result, nil
 }
 
 func (t *EditFileTool) executePatch(safePath string, params map[string]interface{}) (string, error) {
@@ -245,11 +253,17 @@ func (t *EditFileTool) executePatch(safePath string, params map[string]interface
 		return "", fmt.Errorf("patch application failed: %v", err)
 	}
 
+	diff := generateUnifiedDiff(string(data), patchedContent)
+
 	if err := os.WriteFile(safePath, []byte(patchedContent), 0644); err != nil {
 		return "", fmt.Errorf("failed to write file: %v", err)
 	}
 
-	return "File successfully patched with unified diff", nil
+	result := "File successfully patched with unified diff"
+	if diff != "" {
+		result += "\n__DEVO_DIFF__\n" + diff
+	}
+	return result, nil
 }
 
 func applyUnifiedDiff(original, diffText string) (string, error) {

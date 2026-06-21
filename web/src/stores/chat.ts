@@ -132,13 +132,57 @@ export const useChatStore = defineStore('chat', () => {
       if (!res.ok) return
       const data = await res.json()
       const list = (data.messages || []) as any[]
-      messages.value = list.map((m: any) => ({
-        id: m.id || generateId(),
-        sessionId,
-        role: m.role || 'user',
-        content: m.content || '',
-        timestamp: m.created_at || new Date().toISOString(),
-      }))
+
+      const toolCallMap = new Map<string, ToolCall>()
+
+      // 第一遍：从 assistant 消息中收集 tool_calls
+      for (const m of list) {
+        if (m.role === 'assistant' && Array.isArray(m.tool_calls)) {
+          for (const tc of m.tool_calls) {
+            toolCallMap.set(tc.id, {
+              id: tc.id,
+              name: tc.tool_name || 'unknown',
+              parameters: tc.params || {},
+              status: 'pending',
+            })
+          }
+        }
+      }
+
+      // 第二遍：处理 tool 消息，更新 tool call 状态
+      for (const m of list) {
+        if (m.role === 'tool' && m.tool_call_id && toolCallMap.has(m.tool_call_id)) {
+          const tc = toolCallMap.get(m.tool_call_id)!
+          const content = m.content || ''
+          const isError = content.startsWith('错误:') || content.includes('failed')
+          tc.status = isError ? 'failed' : 'success'
+          tc.result = {
+            success: !isError,
+            stdout: content,
+            error: isError ? content : undefined,
+          }
+        }
+      }
+
+      // 构建最终消息列表
+      messages.value = list.map((m: any) => {
+        const baseMsg = {
+          id: m.id || generateId(),
+          sessionId,
+          role: m.role || 'user',
+          content: m.content || '',
+          timestamp: m.created_at || new Date().toISOString(),
+        }
+
+        if (m.role === 'tool' && m.tool_call_id && toolCallMap.has(m.tool_call_id)) {
+          return {
+            ...baseMsg,
+            toolCall: toolCallMap.get(m.tool_call_id)!,
+          }
+        }
+
+        return baseMsg
+      })
     } catch {
       // Ignore fetch errors
     }

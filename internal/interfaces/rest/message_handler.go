@@ -49,10 +49,12 @@ func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 type messageItem struct {
-	ID        string `json:"id"`
-	Role      string `json:"role"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at"`
+	ID         string             `json:"id"`
+	Role       string             `json:"role"`
+	Content    string             `json:"content"`
+	CreatedAt  string             `json:"created_at"`
+	ToolCalls  []session.ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string             `json:"tool_call_id,omitempty"`
 }
 
 type getMessagesResponse struct {
@@ -99,10 +101,12 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	items := make([]messageItem, len(msgs))
 	for i, m := range msgs {
 		items[i] = messageItem{
-			ID:        m.ID,
-			Role:      string(m.Role),
-			Content:   m.Content,
-			CreatedAt: m.CreatedAt.Format(time.RFC3339),
+			ID:         m.ID,
+			Role:       string(m.Role),
+			Content:    m.Content,
+			CreatedAt:  m.CreatedAt.Format(time.RFC3339),
+			ToolCalls:  m.ToolCalls,
+			ToolCallID: m.ToolCallID,
 		}
 	}
 

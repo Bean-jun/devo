@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, watch, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import type { Message } from '@/types/message'
 import MessageBubble from './MessageBubble.vue'
 import ToolCallCard from './ToolCallCard.vue'
+import ToolCallGroup from './ToolCallGroup.vue'
 import ThinkingIndicator from './ThinkingIndicator.vue'
 
 const props = defineProps<{
@@ -19,6 +21,42 @@ const visibleMessages = computed(() =>
     return true
   })
 )
+
+/**
+ * 将连续的 tool 消息分组，非 tool 消息保持独立
+ * 返回 (Message | Message[])[] 数组
+ */
+const groupedMessages = computed(() => {
+  const result: (Message | Message[])[] = []
+  let toolGroup: Message[] = []
+
+  for (const msg of visibleMessages.value) {
+    if (msg.role === 'tool' && msg.toolCall) {
+      toolGroup.push(msg)
+    } else {
+      if (toolGroup.length > 0) {
+        if (toolGroup.length === 1) {
+          result.push(toolGroup[0])
+        } else {
+          result.push([...toolGroup])
+        }
+        toolGroup = []
+      }
+      result.push(msg)
+    }
+  }
+
+  // 处理末尾的 tool 组
+  if (toolGroup.length > 0) {
+    if (toolGroup.length === 1) {
+      result.push(toolGroup[0])
+    } else {
+      result.push([...toolGroup])
+    }
+  }
+
+  return result
+})
 
 watch(
   () => [chatStore.messages.length, chatStore.streamingContent],
@@ -41,9 +79,10 @@ watch(
       </div>
     </div>
 
-    <template v-for="msg in visibleMessages" :key="msg.id">
-      <MessageBubble v-if="msg.role !== 'tool'" :message="msg" />
-      <ToolCallCard v-else-if="msg.toolCall" :tool-call="msg.toolCall" />
+    <template v-for="item in groupedMessages" :key="Array.isArray(item) ? item[0].id : item.id">
+      <ToolCallGroup v-if="Array.isArray(item)" :messages="item" />
+      <MessageBubble v-else-if="item.role !== 'tool'" :message="item" />
+      <ToolCallCard v-else-if="item.toolCall" :tool-call="item.toolCall" />
     </template>
 
     <ThinkingIndicator v-if="chatStore.isStreaming" />

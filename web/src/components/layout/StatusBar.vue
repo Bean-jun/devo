@@ -43,6 +43,8 @@ const connectionDot = computed(() => {
     case 'disconnected': return '🔴'
   }
 })
+
+const serverPort = computed(() => window.location.port)
 </script>
 
 <template>
@@ -67,6 +69,7 @@ const connectionDot = computed(() => {
       <span class="connection-status" :title="connectionStatusText">
         {{ connectionDot }} {{ connectionStatusText }}
       </span>
+      <span class="port-info" title="后端端口">:{{ serverPort }}</span>
     </div>
   </header>
 </template>
@@ -149,5 +152,17 @@ const connectionDot = computed(() => {
   color: var(--color-text-secondary);
   cursor: pointer;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+
+.port-info {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  line-height: 1;
 }
 </style>

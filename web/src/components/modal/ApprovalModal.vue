@@ -20,6 +20,53 @@ const riskLabel = computed(() => {
   return RISK_LABELS[approval.value.riskLevel] ?? '未知'
 })
 
+const MAX_DIFF_LINES = 300
+
+const highlightedDiff = computed(() => {
+  const diff = approval.value?.diff
+  if (!diff) return ''
+
+  const lines = diff.split('\n')
+  const truncated = lines.length > MAX_DIFF_LINES
+  const displayLines = lines.slice(0, MAX_DIFF_LINES)
+
+  const highlighted = displayLines
+    .map((line) => {
+      const escaped = escapeHtml(line)
+      if (line.startsWith('+')) {
+        return `<span class="diff-add">${escaped}</span>`
+      }
+      if (line.startsWith('-')) {
+        return `<span class="diff-remove">${escaped}</span>`
+      }
+      if (line.startsWith('@@')) {
+        return `<span class="diff-hunk">${escaped}</span>`
+      }
+      return escaped
+    })
+    .join('\n')
+
+  if (truncated) {
+    return highlighted + `\n<span class="diff-truncated">... (共 ${lines.length} 行，仅显示前 ${MAX_DIFF_LINES} 行)</span>`
+  }
+  return highlighted
+})
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function getDiffSummary(diff: string): string {
+  const lines = diff.split('\n')
+  const additions = lines.filter(l => l.startsWith('+') && !l.startsWith('+++')).length
+  const deletions = lines.filter(l => l.startsWith('-') && !l.startsWith('---')).length
+  return `+${additions} −${deletions} 行`
+}
+
 function handleApprove() {
   approvalStore.approve()
   uiStore.setActiveModal(null)
@@ -79,8 +126,11 @@ function handleKeydown(e: KeyboardEvent) {
         </div>
 
         <div v-if="approval?.diff" class="diff-section">
-          <div class="info-label">变更内容</div>
-          <pre class="diff-preview"><code>{{ approval.diff }}</code></pre>
+          <div class="info-label">
+            变更内容
+            <span class="diff-summary">{{ getDiffSummary(approval.diff) }}</span>
+          </div>
+          <pre class="diff-preview"><code v-html="highlightedDiff"></code></pre>
         </div>
 
         <div v-if="approval?.parameters && !approval?.diff && !approval?.command" class="params-section">
@@ -217,13 +267,53 @@ function handleKeydown(e: KeyboardEvent) {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   background: var(--color-bg-secondary);
-  padding: var(--space-sm) var(--space-md);
+  padding: 0;
   border-radius: var(--radius-md);
   overflow-x: auto;
-  max-height: 300px;
+  max-height: 400px;
   overflow-y: auto;
-  white-space: pre-wrap;
   line-height: 1.5;
+  white-space: pre;
+}
+
+.diff-preview code {
+  display: block;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.diff-summary {
+  font-weight: 400;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: none;
+  margin-left: var(--space-sm);
+}
+
+.diff-preview :deep(.diff-add) {
+  background: rgba(0, 200, 0, 0.1);
+  color: #2ecc71;
+  display: block;
+}
+
+.diff-preview :deep(.diff-remove) {
+  background: rgba(255, 0, 0, 0.1);
+  color: #e74c3c;
+  display: block;
+}
+
+.diff-preview :deep(.diff-hunk) {
+  color: var(--color-accent);
+  font-weight: 600;
+  display: block;
+}
+
+.diff-preview :deep(.diff-truncated) {
+  display: block;
+  padding: var(--space-sm) var(--space-md);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  text-align: center;
+  border-top: 1px solid var(--color-border-light);
 }
 
 .params-preview {

@@ -78,6 +78,8 @@ func main() {
 	toolRegistry.Register(&tools.ListFilesTool{})
 	toolRegistry.Register(&tools.SearchCodebaseTool{})
 	toolRegistry.Register(&tools.WriteFileTool{})
+	toolRegistry.Register(&tools.EditFileTool{})
+	toolRegistry.Register(&tools.ExecPythonTool{})
 	toolRegistry.Register(tools.NewExecuteCommandTool())
 
 	llm := providers.NewClient(cfg, toolRegistry)

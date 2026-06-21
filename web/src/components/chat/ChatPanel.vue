@@ -70,7 +70,7 @@ function handleOpenCommand() {
       ref="containerRef"
       class="message-area"
       @scroll="onScroll"
-      @click="uiStore.requestFocusInput()"
+      @click.self="uiStore.requestFocusInput()"
     >
       <MessageList :scroll-to-bottom="scrollToBottom" />
 

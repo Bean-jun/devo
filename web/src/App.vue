@@ -113,6 +113,7 @@ function connectSSE(sessionId: string) {
     const toolName = data.tool_name || ''
     const success = data.success === true
     const summary = data.summary || ''
+    const diff = data.diff || ''
     const msgs = chatStore.messages
     for (let i = msgs.length - 1; i >= 0; i--) {
       const msg = msgs[i]
@@ -121,6 +122,7 @@ function connectSSE(sessionId: string) {
           stdout: summary,
           error: success ? undefined : summary,
           success,
+          diff,
         })
         break
       }
@@ -128,6 +130,7 @@ function connectSSE(sessionId: string) {
   })
 
   onEvent('approval_required', (data: any) => {
+    const details = data.details || {}
     approvalStore.setApproval({
       id: data.approval_id || `appr-${Date.now()}`,
       sessionId: sessionStore.currentSession?.id || '',
@@ -135,9 +138,9 @@ function connectSSE(sessionId: string) {
       toolName: data.operation_type || 'unknown',
       riskLevel: data.risk_level || 'medium',
       parameters: {},
-      command: data.command_preview || '',
-      diff: data.diff || '',
-      filePath: '',
+      command: details.command || '',
+      diff: details.diff || '',
+      filePath: details.path || '',
       timeout: 30,
       createdAt: new Date().toISOString(),
     })

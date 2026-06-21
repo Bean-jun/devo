@@ -26,6 +26,45 @@ const statusClass: Record<string, string> = {
   failed: 'status-failed',
   rejected: 'status-rejected',
 }
+
+/**
+ * 渲染 diff 文本，高亮 +/- 行，长内容截断
+ */
+function renderDiff(diff: string): string {
+  const MAX_LINES = 200
+  const lines = diff.split('\n')
+  const truncated = lines.length > MAX_LINES
+  const displayLines = lines.slice(0, MAX_LINES)
+
+  const highlighted = displayLines
+    .map((line) => {
+      const escaped = escapeHtml(line)
+      if (line.startsWith('+')) {
+        return `<span class="diff-add">${escaped}</span>`
+      }
+      if (line.startsWith('-')) {
+        return `<span class="diff-remove">${escaped}</span>`
+      }
+      if (line.startsWith('@@')) {
+        return `<span class="diff-hunk">${escaped}</span>`
+      }
+      return escaped
+    })
+    .join('\n')
+
+  if (truncated) {
+    return highlighted + `\n<span class="diff-truncated">... (共 ${lines.length} 行，仅显示前 ${MAX_LINES} 行)</span>`
+  }
+  return highlighted
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 </script>
 
 <template>
@@ -58,6 +97,13 @@ const statusClass: Record<string, string> = {
           {{ toolCall.result.success ? '✅ 成功' : '❌ 失败' }}
         </div>
         <div v-if="toolCall.result.error" class="result-error">{{ toolCall.result.error }}</div>
+
+        <!-- Diff 对比展示（edit_file / write_file） -->
+        <div v-if="toolCall.result.diff" class="diff-section">
+          <div class="diff-header">变更对比</div>
+          <pre class="diff-content"><code v-html="renderDiff(toolCall.result.diff as string)"></code></pre>
+        </div>
+
         <pre v-if="toolCall.result.stdout" class="tool-json">{{ toolCall.result.stdout }}</pre>
         <pre v-if="toolCall.result.stderr" class="tool-json stderr">{{ toolCall.result.stderr }}</pre>
       </div>
@@ -194,5 +240,62 @@ const statusClass: Record<string, string> = {
   font-size: var(--font-size-sm);
   color: var(--color-error);
   margin-bottom: var(--space-xs);
+}
+
+/* Diff 展示样式 */
+.diff-section {
+  margin-top: var(--space-sm);
+}
+
+.diff-header {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.diff-content {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--color-bg-secondary);
+  padding: 0;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.diff-content code {
+  display: block;
+  padding: var(--space-sm) var(--space-md);
+}
+
+:deep(.diff-add) {
+  background: rgba(0, 200, 0, 0.1);
+  color: #2ecc71;
+  display: block;
+}
+
+:deep(.diff-remove) {
+  background: rgba(255, 0, 0, 0.1);
+  color: #e74c3c;
+  display: block;
+}
+
+:deep(.diff-hunk) {
+  color: var(--color-accent);
+  font-weight: 600;
+  display: block;
+}
+
+:deep(.diff-truncated) {
+  display: block;
+  padding: var(--space-sm) var(--space-md);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  text-align: center;
+  border-top: 1px solid var(--color-border-light);
 }
 </style>

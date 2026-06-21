@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"devo/internal/core/approval"
@@ -270,14 +271,25 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 				}
 
 				summary := toolResult.Content
+				// 提取 diff（如果存在）
+				var diff string
+				const diffMarker = "\n__DEVO_DIFF__\n"
+				if idx := strings.Index(summary, diffMarker); idx != -1 {
+					diff = summary[idx+len(diffMarker):]
+					summary = summary[:idx]
+				}
 				if len(summary) > 200 {
 					summary = summary[:200] + "..."
 				}
-				eventBus.Publish("tool_result", map[string]any{
+				toolResultData := map[string]any{
 					"tool_name": tc.ToolName,
 					"success":   toolResult.Success,
 					"summary":   summary,
-				})
+				}
+				if diff != "" {
+					toolResultData["diff"] = diff
+				}
+				eventBus.Publish("tool_result", toolResultData)
 
 				l.archiveManager.AppendToolResult(sessionID, tc.ToolName, toolResult.Success, summary)
 

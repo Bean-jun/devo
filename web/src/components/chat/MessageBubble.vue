@@ -1,34 +1,47 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Message } from '@/types/message'
 import { formatTime } from '@/utils/formatters'
-import { marked } from 'marked'
-import { markedHighlight } from 'marked-highlight'
-import hljs from 'highlight.js'
-import 'highlight.js/styles/github-dark.css'
+import { renderMarkdown } from '@/utils/markdown'
 
 const props = defineProps<{
   message: Message
 }>()
 
-marked.use(markedHighlight({
-  langPrefix: 'hljs language-',
-  highlight(code: string, lang: string) {
-    if (lang && hljs.getLanguage(lang)) {
-      return hljs.highlight(code, { language: lang }).value
-    }
-    return hljs.highlightAuto(code).value
-  },
-}))
+const copied = ref(false)
 
 const renderedContent = computed(() => {
   if (props.message.role === 'assistant') {
-    return marked.parse(props.message.content, { breaks: true }) as string
+    return renderMarkdown(props.message.content)
   }
   return props.message.content
 })
 
 const displayTime = computed(() => formatTime(props.message.timestamp))
+
+async function copyContent() {
+  try {
+    await navigator.clipboard.writeText(props.message.content)
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  } catch {
+    // Fallback for older browsers
+    const textarea = document.createElement('textarea')
+    textarea.value = props.message.content
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  }
+}
 </script>
 
 <template>
@@ -42,7 +55,18 @@ const displayTime = computed(() => formatTime(props.message.timestamp))
         <span class="bubble-role">
           {{ message.role === 'user' ? '你' : message.role === 'system' ? '系统' : 'Devo' }}
         </span>
-        <span class="bubble-time">{{ displayTime }}</span>
+        <div class="bubble-header-right">
+          <button
+            v-if="message.role === 'assistant'"
+            class="copy-btn"
+            :class="{ copied }"
+            :title="copied ? '已复制' : '复制内容'"
+            @click.stop="copyContent"
+          >
+            {{ copied ? '✓ 已复制' : '📋 复制' }}
+          </button>
+          <span class="bubble-time">{{ displayTime }}</span>
+        </div>
       </div>
 
       <div
@@ -106,6 +130,34 @@ const displayTime = computed(() => formatTime(props.message.timestamp))
   margin-bottom: var(--space-xs);
 }
 
+.bubble-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.copy-btn {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+  background: transparent;
+  transition: all var(--transition-fast) ease;
+  white-space: nowrap;
+}
+
+.copy-btn:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-bg-hover);
+}
+
+.copy-btn.copied {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
 .bubble-role {
   font-size: var(--font-size-xs);
   font-weight: 600;
@@ -148,7 +200,7 @@ const displayTime = computed(() => formatTime(props.message.timestamp))
   margin: var(--space-sm) 0;
   background: var(--color-code-bg) !important;
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .markdown-body :deep(code) {
@@ -159,8 +211,23 @@ const displayTime = computed(() => formatTime(props.message.timestamp))
 .markdown-body :deep(pre code) {
   display: block;
   padding: var(--space-md);
-  overflow-x: auto;
   background: none !important;
+  color: #e0e0e0;
+}
+
+/* 代码块头部：语言标签 */
+.markdown-body :deep(pre)::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  border-radius: 0 var(--radius-md) 0 var(--radius-sm);
+  z-index: 1;
 }
 
 .markdown-body :deep(blockquote) {
