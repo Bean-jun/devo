@@ -36,8 +36,11 @@ func (c *APIClient) CreateSession(workingDir, title string) (*types.SessionInfo,
 	return &sess, nil
 }
 
-func (c *APIClient) ListSessions(limit, offset int) ([]types.SessionInfo, error) {
+func (c *APIClient) ListSessions(limit, offset int, project string) ([]types.SessionInfo, error) {
 	url := fmt.Sprintf("/api/v1/sessions?limit=%d&offset=%d", limit, offset)
+	if project != "" {
+		url += "&project=" + project
+	}
 	var resp types.ListSessionsResponse
 	if err := c.doJSON("GET", url, nil, &resp); err != nil {
 		return nil, err
@@ -95,6 +98,10 @@ func (c *APIClient) Resume(sessionID string) error {
 
 func (c *APIClient) Cancel(sessionID string) error {
 	return c.doJSON("POST", "/api/v1/sessions/"+sessionID+"/cancel", nil, nil)
+}
+
+func (c *APIClient) RenameSession(sessionID, title string) error {
+	return c.doJSON("PUT", "/api/v1/sessions/"+sessionID, map[string]string{"title": title}, nil)
 }
 
 func (c *APIClient) Complete(sessionID string) error {

@@ -26,8 +26,8 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 		a.activeSession = sess
 		a.msgs = nil
 		a.chatView.MessageView.SetMessages(nil)
-		a.statusBar.TokenUsage = "0 token"
-		a.statusBar.ContextUsage = ""
+		a.chatView.InputArea.TokenUsage = "0 token"
+		a.chatView.InputArea.ContextUsage = ""
 
 		found := false
 		for i, s := range a.sessions {
@@ -41,14 +41,6 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 			a.sessions = append(a.sessions, *sess)
 		}
 
-		a.sidebar.SetSessions(a.sessions)
-		a.sidebar.ActiveID = sess.ID
-		for i, s := range a.sessions {
-			if s.ID == sess.ID {
-				a.sidebar.Cursor = i
-				break
-			}
-		}
 		a.statusBar.SessionTitle = sess.Title
 		a.statusBar.SessionState = sess.State
 		a.updateContextUsage(sess)
@@ -62,15 +54,8 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 	case "sessions_listed":
 		sessions := msg.Data.([]types.SessionInfo)
 		a.sessions = sessions
-		a.sidebar.SetSessions(sessions)
-		if a.activeSession != nil {
-			a.sidebar.ActiveID = a.activeSession.ID
-			for i, s := range sessions {
-				if s.ID == a.activeSession.ID {
-					a.sidebar.Cursor = i
-					break
-				}
-			}
+		if a.showSessionPicker {
+			a.sessionPicker.Sessions = sessions
 		}
 		return nil
 
@@ -78,14 +63,13 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 		sess := msg.Data.(*types.SessionInfo)
 		a.activeSession = sess
 		a.msgs = nil
-		a.sidebar.ActiveID = sess.ID
 		a.statusBar.SessionTitle = sess.Title
 		a.statusBar.SessionState = sess.State
-		a.statusBar.TokenUsage = ""
-		a.statusBar.ContextUsage = ""
+		a.chatView.InputArea.TokenUsage = ""
+		a.chatView.InputArea.ContextUsage = ""
 		if sess.TokenUsage.Total > 0 {
-			a.statusBar.TokenUsage = fmt.Sprintf("%d token (↑%d ↓%d)",
-				sess.TokenUsage.Total, sess.TokenUsage.Input, sess.TokenUsage.Output)
+			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)",
+				formatTokens(sess.TokenUsage.Total), formatTokens(sess.TokenUsage.Input), formatTokens(sess.TokenUsage.Output))
 		}
 		a.updateContextUsage(sess)
 		a.focusInput()
@@ -115,6 +99,14 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 
 	case "pause_done", "resume_done", "cancel_done":
 		return a.refreshSessionCmd()
+
+	case "rename_done":
+		if msg.Err != nil {
+			a.toast.Show(fmt.Sprintf("重命名失败: %v", msg.Err), true)
+		} else {
+			a.toast.Show("重命名成功", false)
+		}
+		return nil
 
 	case "rollback_done":
 		result := msg.Data.(*types.RollbackResult)
@@ -158,17 +150,13 @@ func (a *App) handleApprovalDecision(msg messages.ApprovalDecision) tea.Cmd {
 }
 
 func (a *App) updateContextUsage(sess *types.SessionInfo) {
-	maxTokens := sess.MaxContextTokens
-	if maxTokens <= 0 {
-		maxTokens = 128000
-	}
+	_ = sess
 	used := a.estimateContextTokens()
 	if used == 0 && len(a.msgs) > 0 {
 		used = len(a.msgs) * 50
 	}
-	pct := float64(used) / float64(maxTokens) * 100
-	a.statusBar.ContextUsage = fmt.Sprintf("上下文 %s/%s (%.1f%%)",
-		formatTokens(used), formatTokens(maxTokens), pct)
+	a.chatView.InputArea.ContextUsage = fmt.Sprintf("context %s",
+		formatTokens(used))
 }
 
 func (a *App) estimateContextTokens() int {
@@ -177,7 +165,18 @@ func (a *App) estimateContextTokens() int {
 		if msg.Content == "" {
 			continue
 		}
-		tokens := (len(msg.Content) + 3) / 4
+		cjk := 0
+		other := 0
+		for _, ch := range msg.Content {
+			if (ch >= 0x4e00 && ch <= 0x9fff) ||
+				(ch >= 0x3400 && ch <= 0x4dbf) ||
+				(ch >= 0xf900 && ch <= 0xfaff) {
+				cjk++
+			} else {
+				other++
+			}
+		}
+		tokens := cjk*2/3 + other/4
 		if tokens < 1 {
 			tokens = 1
 		}
@@ -187,5 +186,12 @@ func (a *App) estimateContextTokens() int {
 }
 
 func formatTokens(n int) string {
-	return fmt.Sprintf("%.1fK", float64(n)/1000)
+	if n < 1000 {
+		return fmt.Sprintf("%d", n)
+	}
+	v := float64(n) / 1000
+	if v >= 10 {
+		return fmt.Sprintf("%.0fK", v)
+	}
+	return fmt.Sprintf("%.1fK", v)
 }

@@ -7,8 +7,11 @@ import (
 )
 
 type InputArea struct {
-	textarea textarea.Model
-	Width    int
+	textarea     textarea.Model
+	Width        int
+	ContextUsage string
+	TokenUsage   string
+	Version      string
 }
 
 func NewInputArea() InputArea {
@@ -68,5 +71,42 @@ func (i *InputArea) View() string {
 	style := InputAreaStyle.Copy().
 		Width(i.Width - 2).
 		BorderForeground(borderColor)
-	return style.Render(i.textarea.View())
+
+	var parts []string
+	parts = append(parts, style.Render(i.textarea.View()))
+
+	footer := i.buildFooter()
+	if footer != "" {
+		footerStyle := lipgloss.NewStyle().
+			Foreground(ColorMuted).
+			Padding(0, 1).
+			Width(i.Width - 2)
+		parts = append(parts, footerStyle.Render(footer))
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+}
+
+func (i *InputArea) buildFooter() string {
+	var parts []string
+	if i.ContextUsage != "" {
+		parts = append(parts, i.ContextUsage)
+	}
+	if i.TokenUsage != "" {
+		parts = append(parts, i.TokenUsage)
+	}
+	if i.Version != "" {
+		parts = append(parts, i.Version)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	result := ""
+	for idx, p := range parts {
+		if idx > 0 {
+			result += "  ·  "
+		}
+		result += p
+	}
+	return result
 }

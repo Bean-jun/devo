@@ -21,13 +21,15 @@ type CommandPalette struct {
 func NewCommandPalette() CommandPalette {
 	return CommandPalette{
 		Items: []CommandItem{
-			{Label: "/new", Description: "新建会话", Action: "new"},
-			{Label: "/rollback", Description: "回滚对话到指定消息", Action: "rollback"},
+			{Label: "/new", Description: "创建新会话", Action: "new"},
+			{Label: "/switch", Description: "切换会话", Action: "switch"},
+			{Label: "/rename", Description: "重命名当前会话", Action: "rename"},
+			{Label: "/export", Description: "导出当前会话记录", Action: "export"},
+			{Label: "/rollback", Description: "回滚消息", Action: "rollback"},
+			{Label: "/pause", Description: "暂停当前会话", Action: "pause"},
+			{Label: "/resume", Description: "恢复当前会话", Action: "resume"},
 			{Label: "/cancel", Description: "取消当前操作", Action: "cancel"},
-			{Label: "/usage", Description: "查看 Token 用量", Action: "usage"},
-			{Label: "/pause", Description: "暂停/恢复", Action: "pause"},
-			{Label: "/export", Description: "导出会话存档 (Markdown)", Action: "export"},
-			{Label: "/clear", Description: "清屏", Action: "clear"},
+			{Label: "/help", Description: "显示帮助", Action: "help"},
 			{Label: "/quit", Description: "退出", Action: "quit"},
 		},
 	}
@@ -86,6 +88,8 @@ func (c *CommandPalette) View() string {
 				Render(line)
 		} else {
 			line = lipgloss.NewStyle().
+				Foreground(ColorMuted).
+				Background(ColorSurface).
 				Padding(0, 1).
 				Width(c.Width - 4).
 				Render(line)

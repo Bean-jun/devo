@@ -119,7 +119,7 @@ func main() {
 
 	if *tuiMode {
 		log.Printf("[devo] Launching TUI...")
-		tui.Launch(baseURL)
+		tui.Launch(baseURL, Version)
 		log.Printf("[devo] TUI exited, shutting down server...")
 		server.Close()
 		return

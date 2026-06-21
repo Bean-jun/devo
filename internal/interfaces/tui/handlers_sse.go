@@ -85,8 +85,10 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 	case "token_usage":
 		inputTokens, _ := msg.Data["input_tokens"].(float64)
 		outputTokens, _ := msg.Data["output_tokens"].(float64)
-		sessionTotal, _ := msg.Data["session_total_tokens"].(float64)
-		a.statusBar.TokenUsage = fmt.Sprintf("%.0f tok (↑%.0f ↓%.0f)", sessionTotal, inputTokens, outputTokens)
+		in := int(inputTokens)
+		out := int(outputTokens)
+		total := in + out
+		a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)", formatTokens(total), formatTokens(in), formatTokens(out))
 		if a.activeSession != nil {
 			a.updateContextUsage(a.activeSession)
 		}

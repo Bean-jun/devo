@@ -7,6 +7,7 @@ type SessionInfo struct {
 	State            string            `json:"state"`
 	CreatedAt        string            `json:"created_at"`
 	LastActiveAt     string            `json:"last_active_at"`
+	MessageCount     int               `json:"message_count"`
 	TrustLevel       string            `json:"trust_level"`
 	ApprovalPolicy   map[string]string `json:"approval_policy,omitempty"`
 	TokenUsage       TokenUsage        `json:"token_usage"`

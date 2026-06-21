@@ -10,8 +10,6 @@ type StatusBar struct {
 	AppName         string
 	SessionTitle    string
 	SessionState    string
-	TokenUsage      string
-	ContextUsage    string
 	ServerPort      int
 	ServerConnected bool
 	Mode            string
@@ -23,7 +21,6 @@ func NewStatusBar() StatusBar {
 		AppName:         "Devo",
 		SessionTitle:    "",
 		SessionState:    "Idle",
-		TokenUsage:      "0 token",
 		ServerPort:      0,
 		ServerConnected: true,
 	}
@@ -43,10 +40,6 @@ func (s *StatusBar) View() string {
 		left += " · " + s.SessionTitle
 	}
 	left += " · " + stateDisplay
-	left += " · " + s.TokenUsage
-	if s.ContextUsage != "" {
-		left += " · " + s.ContextUsage
-	}
 
 	if s.Mode != "" {
 		modeStyle := lipgloss.NewStyle().

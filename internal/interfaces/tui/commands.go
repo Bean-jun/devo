@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"devo/internal/interfaces/tui/messages"
 	"devo/internal/interfaces/tui/types"
@@ -115,17 +117,16 @@ func (a *App) switchSessionCmd(sessionID string) tea.Cmd {
 	}
 }
 
-func (a *App) newSessionCmd() tea.Cmd {
+func (a *App) newSessionCmd(title string) tea.Cmd {
 	return func() tea.Msg {
-		dirName := a.workingDir
-		if idx := strings.LastIndex(dirName, "/"); idx >= 0 {
-			dirName = dirName[idx+1:]
-		}
-		if idx := strings.LastIndex(dirName, "\\"); idx >= 0 {
-			dirName = dirName[idx+1:]
+		if title == "" {
+			now := time.Now()
+			title = fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d",
+				now.Year(), now.Month(), now.Day(),
+				now.Hour(), now.Minute(), now.Second())
 		}
 
-		sess, err := a.apiClient.CreateSession(a.workingDir, dirName)
+		sess, err := a.apiClient.CreateSession(a.workingDir, title)
 		if err != nil {
 			return messages.APIResponse{Kind: "init_session", Err: err}
 		}
@@ -134,9 +135,30 @@ func (a *App) newSessionCmd() tea.Cmd {
 	}
 }
 
+func (a *App) renameSessionCmd(title string) tea.Cmd {
+	return func() tea.Msg {
+		if a.activeSession == nil {
+			return nil
+		}
+		if title == "" {
+			now := time.Now()
+			title = fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d",
+				now.Year(), now.Month(), now.Day(),
+				now.Hour(), now.Minute(), now.Second())
+		}
+		err := a.apiClient.RenameSession(a.activeSession.ID, title)
+		if err != nil {
+			return messages.APIResponse{Kind: "rename_done", Err: err}
+		}
+		a.activeSession.Title = title
+		a.statusBar.SessionTitle = title
+		return messages.APIResponse{Kind: "rename_done", Data: a.activeSession}
+	}
+}
+
 func (a *App) refreshSessionCmd() tea.Cmd {
 	return func() tea.Msg {
-		sessions, err := a.apiClient.ListSessions(20, 0)
+		sessions, err := a.apiClient.ListSessions(20, 0, a.workingDir)
 		if err != nil {
 			return messages.APIResponse{Kind: "sessions_listed", Err: err}
 		}

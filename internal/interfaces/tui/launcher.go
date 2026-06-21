@@ -7,8 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func Launch(baseURL string) {
-	app, err := NewAppWithURL(baseURL)
+func Launch(baseURL string, version string) {
+	app, err := NewAppWithURL(baseURL, version)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize TUI: %v\n", err)
 		os.Exit(1)

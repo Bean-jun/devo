@@ -33,17 +33,20 @@ type App struct {
 	msgs          []types.Message
 
 	statusBar      components.StatusBar
-	sidebar        components.SessionSidebar
 	chatView       components.ChatView
 	approvalModal  components.ApprovalModal
 	commandPalette components.CommandPalette
 	rollbackPicker components.RollbackPicker
+	sessionPicker  components.SessionPicker
+	inputPrompt    components.InputPrompt
 	toast          components.Toast
 
 	state              AppState
-	showSidebar        bool
 	showCommandPalette bool
 	showRollbackPicker bool
+	showSessionPicker  bool
+	showInputPrompt    bool
+	pendingInputAction string
 	width              int
 	height             int
 	workingDir         string
@@ -55,7 +58,7 @@ type App struct {
 	tickCount  int
 }
 
-func NewAppWithURL(baseURL string) (*App, error) {
+func NewAppWithURL(baseURL string, version string) (*App, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("get working directory: %w", err)
@@ -69,20 +72,23 @@ func NewAppWithURL(baseURL string) (*App, error) {
 		}
 	}
 
+	chatView := components.NewChatView()
+	chatView.InputArea.Version = "v" + version
+
 	return &App{
 		apiBaseURL:     baseURL,
-		showSidebar:    true,
 		workingDir:     wd,
 		width:          80,
 		height:         24,
 		state:          StateReady,
 		initStatus:     "Connecting to server...",
 		statusBar:      statusBar,
-		sidebar:        components.NewSessionSidebar(),
-		chatView:       components.NewChatView(),
+		chatView:       chatView,
 		approvalModal:  components.NewApprovalModal(),
 		commandPalette: components.NewCommandPalette(),
 		rollbackPicker: components.NewRollbackPicker(),
+		sessionPicker:  components.NewSessionPicker(),
+		inputPrompt:    components.NewInputPrompt(),
 		toast:          components.NewToast(),
 	}, nil
 }
@@ -136,6 +142,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		wasModalShowing := a.showCommandPalette || a.showRollbackPicker || a.showSessionPicker || a.showInputPrompt
 		cmd := a.handleKeyMsg(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -159,9 +166,23 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Batch(cmds...)
 		}
 
-		a.chatView, cmd = a.chatView.Update(msg)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
+		if a.showSessionPicker {
+			return a, tea.Batch(cmds...)
+		}
+
+		if a.showInputPrompt {
+			return a, tea.Batch(cmds...)
+		}
+
+		if wasModalShowing {
+			return a, tea.Batch(cmds...)
+		}
+
+		if msg.String() != "esc" {
+			a.chatView, cmd = a.chatView.Update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		}
 		return a, tea.Batch(cmds...)
 	}
@@ -208,7 +229,6 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			sessions := msg.Data.([]types.SessionInfo)
 			a.sessions = sessions
-			a.sidebar.SetSessions(sessions)
 			if len(sessions) > 0 {
 				Log("[TUI] Found %d existing sessions, loading most recent", len(sessions))
 				a.initStatus = "Loading session..."
@@ -226,10 +246,9 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			sess := msg.Data.(*types.SessionInfo)
 			a.activeSession = sess
-			a.sidebar.ActiveID = sess.ID
 			a.statusBar.SessionTitle = sess.Title
 			a.statusBar.SessionState = sess.State
-			a.statusBar.TokenUsage = fmt.Sprintf("%d token (↑%d ↓%d)",
+			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %d (↑%d ↓%d)",
 				sess.TokenUsage.Total, sess.TokenUsage.Input, sess.TokenUsage.Output)
 			a.ready = true
 			a.tickCount = 0
@@ -248,11 +267,9 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			sess := msg.Data.(*types.SessionInfo)
 			a.activeSession = sess
 			a.sessions = []types.SessionInfo{*sess}
-			a.sidebar.SetSessions(a.sessions)
-			a.sidebar.ActiveID = sess.ID
 			a.statusBar.SessionTitle = sess.Title
 			a.statusBar.SessionState = sess.State
-			a.statusBar.TokenUsage = fmt.Sprintf("%d token (↑%d ↓%d)",
+			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %d (↑%d ↓%d)",
 				sess.TokenUsage.Total, sess.TokenUsage.Input, sess.TokenUsage.Output)
 			a.ready = true
 			a.tickCount = 0
@@ -315,24 +332,11 @@ func (a *App) View() string {
 
 	statusBarView := a.statusBar.View()
 
-	sidebarView := ""
-	if a.showSidebar {
-		sidebarView = a.sidebar.View()
-	}
-
 	if a.showCommandPalette {
-		chatPaletteWidth := a.width
-		if a.showSidebar {
-			chatPaletteWidth = a.width - 30 - 1
-		}
-		a.commandPalette.Width = chatPaletteWidth
+		a.commandPalette.Width = a.width
 		a.chatView.CommandPaletteView = a.commandPalette.View()
 	} else if a.showRollbackPicker {
-		chatPaletteWidth := a.width
-		if a.showSidebar {
-			chatPaletteWidth = a.width - 30 - 1
-		}
-		a.rollbackPicker.Width = chatPaletteWidth
+		a.rollbackPicker.Width = a.width
 		a.chatView.CommandPaletteView = a.rollbackPicker.View()
 	} else {
 		a.chatView.CommandPaletteView = ""
@@ -341,13 +345,22 @@ func (a *App) View() string {
 	chatView := a.chatView.View()
 
 	var mainContent string
-	if a.showSidebar {
-		sidebarWidth := lipgloss.Width(sidebarView)
-		chatWidth := a.width - sidebarWidth
-		mainContent = lipgloss.JoinHorizontal(lipgloss.Top,
-			sidebarView,
-			lipgloss.NewStyle().Width(chatWidth).Render(chatView),
+	if a.showSessionPicker {
+		a.sessionPicker.Width = a.width
+		a.sessionPicker.Height = a.height
+		mainContent = lipgloss.Place(
+			a.width,
+			a.height-3,
+			lipgloss.Center,
+			lipgloss.Center,
+			a.sessionPicker.View(),
 		)
+	} else if a.showInputPrompt {
+		a.inputPrompt.Width = a.width
+		mainContent = lipgloss.NewStyle().
+			Width(a.width).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(a.inputPrompt.View())
 	} else {
 		mainContent = chatView
 	}
@@ -393,11 +406,7 @@ func (a *App) layout() {
 	a.statusBar.Width = a.width
 	a.toast.Width = a.width
 
-	sidebarWidth := 30
 	chatWidth := a.width
-	if a.showSidebar {
-		chatWidth = a.width - sidebarWidth - 1
-	}
 	if chatWidth < 20 {
 		chatWidth = 20
 	}
@@ -408,7 +417,5 @@ func (a *App) layout() {
 		chatHeight = 10
 	}
 
-	a.sidebar.Width = sidebarWidth
-	a.sidebar.Height = chatHeight
 	a.chatView.SetSize(chatWidth, chatHeight)
 }

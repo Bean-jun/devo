@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,6 +13,32 @@ import (
 
 func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
+
+	if a.showInputPrompt {
+		switch key {
+		case "esc":
+			a.showInputPrompt = false
+			a.inputPrompt.Hide()
+			a.focusInput()
+			return nil
+		case "enter":
+			value := a.inputPrompt.Value
+			a.showInputPrompt = false
+			a.inputPrompt.Hide()
+			a.focusInput()
+			return a.executeInputPromptAction(value)
+		case "backspace":
+			if len(a.inputPrompt.Value) > 0 {
+				a.inputPrompt.Value = a.inputPrompt.Value[:len(a.inputPrompt.Value)-1]
+			}
+			return nil
+		default:
+			if len(msg.Runes) == 1 && msg.Runes[0] >= ' ' {
+				a.inputPrompt.Value += string(msg.Runes[0])
+			}
+			return nil
+		}
+	}
 
 	if a.showRollbackPicker {
 		switch key {
@@ -39,6 +66,41 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 		return nil
+	}
+
+	if a.showSessionPicker {
+		switch key {
+		case "esc":
+			a.showSessionPicker = false
+			a.sessionPicker.Hide()
+			a.focusInput()
+			return nil
+		case "enter":
+			selected := a.sessionPicker.SelectedSession()
+			a.showSessionPicker = false
+			a.sessionPicker.Hide()
+			a.focusInput()
+			if selected != nil && selected.ID != a.activeSession.ID {
+				return a.switchSessionCmd(selected.ID)
+			}
+			return nil
+		case "up":
+			a.sessionPicker.CursorUp()
+			return nil
+		case "down":
+			a.sessionPicker.CursorDown()
+			return nil
+		case "backspace":
+			if len(a.sessionPicker.Query) > 0 {
+				a.sessionPicker.Query = a.sessionPicker.Query[:len(a.sessionPicker.Query)-1]
+			}
+			return nil
+		default:
+			if len(msg.Runes) == 1 && msg.Runes[0] >= ' ' {
+				a.sessionPicker.Query += string(msg.Runes[0])
+			}
+			return nil
+		}
 	}
 
 	if a.showCommandPalette {
@@ -87,10 +149,30 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		a.state = StateQuitting
 		return tea.Quit
 
-	case "ctrl+b":
-		a.showSidebar = !a.showSidebar
-		a.layout()
+	case "ctrl+p":
+		if a.activeSession == nil {
+			return nil
+		}
+		state := a.activeSession.State
+		if state == "Processing" {
+			return a.pauseCmd()
+		}
+		if state == "Paused" {
+			return a.resumeCmd()
+		}
+		a.toast.Show(fmt.Sprintf("当前状态为 %s，无法切换", state), true)
 		return nil
+
+	case "ctrl+r":
+		if a.activeSession == nil {
+			return nil
+		}
+		state := a.activeSession.State
+		if state != "Paused" {
+			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法恢复", state), true)
+			return nil
+		}
+		return a.resumeCmd()
 
 	case "enter":
 		if a.chatView.InputArea.Focused() && a.state == StateReady {
@@ -109,11 +191,6 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 				}
 				return a.sendMessageCmd(content)
 			}
-		} else if a.showSidebar {
-			selected := a.sidebar.SelectedSession()
-			if selected != nil && selected.ID != a.sidebar.ActiveID {
-				return a.switchSessionCmd(selected.ID)
-			}
 		}
 
 	case "/":
@@ -129,21 +206,12 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	case "esc":
 		if a.chatView.InputArea.Focused() {
 			a.chatView.Blur()
-			a.statusBar.Mode = "Sessions"
 		} else {
 			a.chatView.Focus()
-			a.statusBar.Mode = ""
 		}
 
 	case "up":
-		if a.showSidebar && !a.chatView.InputArea.Focused() {
-			a.sidebar.CursorUp()
-		}
-
 	case "down":
-		if a.showSidebar && !a.chatView.InputArea.Focused() {
-			a.sidebar.CursorDown()
-		}
 	}
 
 	return nil
@@ -174,30 +242,61 @@ func (a *App) buildRollbackItems() {
 func (a *App) executeCommand(action string) tea.Cmd {
 	switch action {
 	case "new":
-		return a.newSessionCmd()
+		a.pendingInputAction = "new"
+		a.showInputPrompt = true
+		a.inputPrompt.Show("创建新会话", "会话名称（可选，留空则自动生成）", "", "[创建  Enter]")
+		return nil
 	case "rollback":
 		return a.loadAllMessagesCmd(a.activeSession.ID)
-	case "cancel":
-		return a.cancelCmd()
-	case "usage":
-		usage := a.statusBar.TokenUsage
-		if usage == "" || usage == "0 tok" {
-			usage = "暂无 Token 消耗数据"
-		}
-		a.toast.Show("Token 用量: "+usage, false)
-		return nil
-	case "pause":
+	case "switch":
+		a.sessionPicker.Sessions = a.sessions
 		if a.activeSession != nil {
-			switch a.activeSession.State {
-			case "Processing":
-				return a.pauseCmd()
-			case "Paused":
-				return a.resumeCmd()
-			}
+			a.sessionPicker.ActiveID = a.activeSession.ID
 		}
+		a.showSessionPicker = true
+		a.sessionPicker.Show()
+		return a.refreshSessionCmd()
+	case "rename":
+		if a.activeSession == nil {
+			return nil
+		}
+		a.pendingInputAction = "rename"
+		a.showInputPrompt = true
+		a.inputPrompt.Show("重命名当前会话", "输入新名称", a.activeSession.Title, "[重命名  Enter]")
 		return nil
-	case "clear":
-		return tea.ClearScreen
+	case "cancel":
+		if a.activeSession == nil {
+			return nil
+		}
+		state := a.activeSession.State
+		if state != "Processing" && state != "AwaitingApproval" {
+			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法取消", state), true)
+			return nil
+		}
+		return a.cancelCmd()
+	case "pause":
+		if a.activeSession == nil {
+			return nil
+		}
+		state := a.activeSession.State
+		if state != "Processing" {
+			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法暂停", state), true)
+			return nil
+		}
+		return a.pauseCmd()
+	case "resume":
+		if a.activeSession == nil {
+			return nil
+		}
+		state := a.activeSession.State
+		if state != "Paused" {
+			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法恢复", state), true)
+			return nil
+		}
+		return a.resumeCmd()
+	case "help":
+		a.toast.Show("快捷键: Ctrl+P 暂停/恢复  Ctrl+R 恢复  Ctrl+C 取消  Ctrl+Q 退出", false)
+		return nil
 	case "quit":
 		a.state = StateQuitting
 		return tea.Quit
@@ -206,6 +305,18 @@ func (a *App) executeCommand(action string) tea.Cmd {
 			return a.exportArchiveCmd()
 		}
 		return nil
+	}
+	return nil
+}
+
+func (a *App) executeInputPromptAction(value string) tea.Cmd {
+	switch a.pendingInputAction {
+	case "new":
+		return a.newSessionCmd(value)
+	case "rename":
+		if a.activeSession != nil {
+			return a.renameSessionCmd(value)
+		}
 	}
 	return nil
 }
