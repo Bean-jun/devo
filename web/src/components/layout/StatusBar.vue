@@ -3,7 +3,6 @@ import { computed } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { STATUS_LABELS, STATUS_COLORS } from '@/utils/constants'
-import { formatTokenCount } from '@/utils/formatters'
 
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
@@ -13,20 +12,6 @@ const statusLabel = computed(() => STATUS_LABELS[sessionStore.sessionStatus] ?? 
 const statusColor = computed(() => STATUS_COLORS[sessionStore.sessionStatus] ?? '#34c759')
 const isProcessing = computed(() => sessionStore.isProcessing)
 const workingDir = computed(() => sessionStore.currentSession?.workingDirectory ?? '')
-
-const tokenUsage = computed(() => {
-  const usage = sessionStore.currentSession?.tokenUsage
-  const input = usage?.input ?? 0
-  const output = usage?.output ?? 0
-  const total = input + output
-  return `${formatTokenCount(total)} (↑${formatTokenCount(input)} ↓${formatTokenCount(output)})`
-})
-
-const contextUsage = computed(() => {
-  const usage = sessionStore.currentSession?.tokenUsage
-  const input = usage?.input ?? 0
-  return formatTokenCount(input)
-})
 
 const connectionStatusText = computed(() => {
   switch (uiStore.connectionStatus) {
@@ -45,8 +30,6 @@ const connectionDot = computed(() => {
 })
 
 const serverPort = computed(() => window.location.port)
-
-const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
 </script>
 
 <template>
@@ -66,13 +49,10 @@ const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
       </span>
     </div>
     <div class="statusbar-right">
-      <span class="context-usage" title="context">context: {{ contextUsage }}</span>
-      <span class="token-usage" title="输入/输出 Token">Tokens: {{ tokenUsage }}</span>
       <span class="connection-status" :title="connectionStatusText">
         {{ connectionDot }} {{ connectionStatusText }}
       </span>
       <span class="port-info" title="后端端口">:{{ serverPort }}</span>
-      <span class="version-info" title="版本号">v{{ appVersion }}</span>
     </div>
   </header>
 </template>
@@ -167,14 +147,5 @@ const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
   font-family: var(--font-mono);
   white-space: nowrap;
   line-height: 1;
-}
-
-.version-info {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  line-height: 1;
-  opacity: 0.7;
 }
 </style>

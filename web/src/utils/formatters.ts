@@ -51,7 +51,17 @@ export function truncateText(text: string, maxLength: number): string {
 }
 
 export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 3)
+  if (!text) return 0
+  let cjk = 0
+  let other = 0
+  for (const ch of text) {
+    if (/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/.test(ch)) {
+      cjk++
+    } else {
+      other++
+    }
+  }
+  return Math.ceil(cjk / 1.5 + other / 4)
 }
 
 export function generateId(): string {

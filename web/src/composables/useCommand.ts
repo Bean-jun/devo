@@ -80,19 +80,73 @@ export function useCommand() {
       id: 'pause',
       name: '/pause',
       description: '暂停当前会话',
-      action: () => {},
+      action: async () => {
+        const sid = sessionStore.currentSession?.id
+        if (!sid) return
+        if (!sessionStore.canPause) {
+          uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession?.state}，无法暂停`)
+          return
+        }
+        try {
+          const res = await fetch(`${API_BASE}/sessions/${sid}/pause`, { method: 'POST' })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error(data.message || `HTTP ${res.status}`)
+          }
+          sessionStore.updateSessionState(sid, 'paused')
+          uiStore.showToast('info', '会话已暂停')
+        } catch (e: any) {
+          uiStore.showToast('error', e.message || '暂停失败')
+        }
+      },
     },
     {
       id: 'resume',
       name: '/resume',
       description: '恢复当前会话',
-      action: () => {},
+      action: async () => {
+        const sid = sessionStore.currentSession?.id
+        if (!sid) return
+        if (!sessionStore.canResume) {
+          uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession?.state}，无法恢复`)
+          return
+        }
+        try {
+          const res = await fetch(`${API_BASE}/sessions/${sid}/resume`, { method: 'POST' })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error(data.message || `HTTP ${res.status}`)
+          }
+          sessionStore.updateSessionState(sid, 'processing')
+          uiStore.showToast('info', '会话已恢复')
+        } catch (e: any) {
+          uiStore.showToast('error', e.message || '恢复失败')
+        }
+      },
     },
     {
       id: 'cancel',
       name: '/cancel',
       description: '取消当前操作',
-      action: () => {},
+      action: async () => {
+        const sid = sessionStore.currentSession?.id
+        if (!sid) return
+        if (!sessionStore.canCancel) {
+          uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession?.state}，无法取消`)
+          return
+        }
+        try {
+          const res = await fetch(`${API_BASE}/sessions/${sid}/cancel`, { method: 'POST' })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error(data.message || `HTTP ${res.status}`)
+          }
+          sessionStore.updateSessionState(sid, 'idle')
+          uiStore.showToast('info', '操作已取消')
+        } catch (e: any) {
+          uiStore.showToast('error', e.message || '取消失败')
+        }
+      },
     },
     {
       id: 'help',

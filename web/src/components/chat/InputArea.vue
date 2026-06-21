@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useCommandStore } from '@/stores/command'
+import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { MAX_MESSAGE_LENGTH } from '@/utils/constants'
-import { estimateTokens } from '@/utils/formatters'
+import { estimateTokens, formatTokenCount } from '@/utils/formatters'
 
 const props = defineProps<{
   isDisabled: boolean
@@ -20,11 +21,27 @@ const emit = defineEmits<{
 const inputText = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const commandStore = useCommandStore()
+const sessionStore = useSessionStore()
 const uiStore = useUiStore()
 
 const charCount = computed(() => inputText.value.length)
 const tokenEstimate = computed(() => estimateTokens(inputText.value))
 const canSend = computed(() => inputText.value.trim().length > 0 && !props.isDisabled)
+
+const contextUsage = computed(() => {
+  const usage = sessionStore.currentSession?.tokenUsage
+  return formatTokenCount(usage?.input ?? 0)
+})
+
+const sessionTokenUsage = computed(() => {
+  const usage = sessionStore.currentSession?.tokenUsage
+  const input = usage?.input ?? 0
+  const output = usage?.output ?? 0
+  const total = input + output
+  return `${formatTokenCount(total)} (↑${formatTokenCount(input)} ↓${formatTokenCount(output)})`
+})
+
+const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
 
 function focusTextarea(): void {
   nextTick(() => {
@@ -115,6 +132,13 @@ watch(inputText, () => {
         </button>
       </div>
     </div>
+    <div class="input-footer">
+      <span class="footer-item">context {{ contextUsage }}</span>
+      <span class="footer-sep">·</span>
+      <span class="footer-item">Tokens {{ sessionTokenUsage }}</span>
+      <span class="footer-sep">·</span>
+      <span class="footer-item">v{{ appVersion }}</span>
+    </div>
   </div>
 </template>
 
@@ -122,9 +146,27 @@ watch(inputText, () => {
 .input-area {
   flex-shrink: 0;
   padding: var(--space-md) var(--space-lg);
-  padding-bottom: var(--space-lg);
+  padding-bottom: var(--space-xs);
   background: var(--color-bg-primary);
   border-top: 1px solid var(--color-border-light);
+}
+
+.input-footer {
+  max-width: 800px;
+  margin: var(--space-xs) auto 0;
+  padding: 0 var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  opacity: 0.85;
+  user-select: none;
+}
+
+.footer-sep {
+  opacity: 0.4;
 }
 
 .input-wrapper {

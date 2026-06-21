@@ -198,22 +198,92 @@ useKeyboard([
     ctrl: true,
     handler: async () => {
       if (!sessionStore.currentSession) return
-      const action = sessionStore.isPaused ? 'resume' : 'pause'
-      try {
-        await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/${action}`, {
-          method: 'POST',
-        })
-        sessionStore.updateSessionState(
-          sessionStore.currentSession.id,
-          action === 'pause' ? 'paused' : 'idle'
-        )
-      } catch {}
+      if (sessionStore.isPaused) {
+        if (!sessionStore.canResume) {
+          uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession.state}，无法恢复`)
+          return
+        }
+        try {
+          const res = await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/resume`, {
+            method: 'POST',
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error(data.message || '恢复失败')
+          }
+          sessionStore.updateSessionState(sessionStore.currentSession.id, 'processing')
+          uiStore.showToast('info', '会话已恢复')
+        } catch (e: any) {
+          uiStore.showToast('error', e.message || '恢复失败')
+        }
+      } else {
+        if (!sessionStore.canPause) {
+          uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession.state}，无法暂停`)
+          return
+        }
+        try {
+          const res = await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/pause`, {
+            method: 'POST',
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error(data.message || '暂停失败')
+          }
+          sessionStore.updateSessionState(sessionStore.currentSession.id, 'paused')
+          uiStore.showToast('info', '会话已暂停')
+        } catch (e: any) {
+          uiStore.showToast('error', e.message || '暂停失败')
+        }
+      }
     },
   },
   {
-    key: 'l',
+    key: 'r',
     ctrl: true,
-    handler: () => chatStore.clearMessages(),
+    handler: async () => {
+      if (!sessionStore.currentSession) return
+      if (!sessionStore.canResume) {
+        uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession.state}，无法恢复`)
+        return
+      }
+      try {
+        const res = await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/resume`, {
+          method: 'POST',
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.message || '恢复失败')
+        }
+        sessionStore.updateSessionState(sessionStore.currentSession.id, 'processing')
+        uiStore.showToast('info', '会话已恢复')
+      } catch (e: any) {
+        uiStore.showToast('error', e.message || '恢复失败')
+      }
+    },
+  },
+  {
+    key: 'c',
+    ctrl: true,
+    handler: async () => {
+      if (!sessionStore.currentSession) return
+      if (!sessionStore.canCancel) {
+        uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession.state}，无法取消`)
+        return
+      }
+      try {
+        const res = await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/cancel`, {
+          method: 'POST',
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.message || '取消失败')
+        }
+        sessionStore.updateSessionState(sessionStore.currentSession.id, 'idle')
+        uiStore.showToast('info', '操作已取消')
+      } catch (e: any) {
+        uiStore.showToast('error', e.message || '取消失败')
+      }
+    },
   },
 ])
 </script>

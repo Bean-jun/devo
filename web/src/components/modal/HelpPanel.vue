@@ -5,6 +5,7 @@ import { useUiStore } from '@/stores/ui'
 const uiStore = useUiStore()
 
 const isOpen = computed(() => uiStore.activeModal === 'help')
+const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
 
 const shortcuts = [
   { key: 'Enter', desc: '发送消息' },
@@ -14,8 +15,8 @@ const shortcuts = [
   { key: 'Y', desc: '批准操作（审批弹窗中）' },
   { key: 'N', desc: '拒绝操作（审批弹窗中）' },
   { key: 'Ctrl + P', desc: '暂停/恢复当前会话' },
+  { key: 'Ctrl + R', desc: '恢复当前会话' },
   { key: 'Ctrl + C', desc: '取消当前操作' },
-  { key: 'Ctrl + L', desc: '清屏' },
 ]
 
 const commands = [
@@ -69,7 +70,7 @@ function handleKeydown(e: KeyboardEvent) {
 
         <section class="help-section">
           <h4>关于</h4>
-          <p>Devo Web v1.0.0 — AI 编码助手</p>
+          <p>Devo Web v{{ appVersion }} — AI 编码助手</p>
         </section>
       </div>
     </div>

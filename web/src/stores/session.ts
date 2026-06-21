@@ -9,15 +9,22 @@ export const useSessionStore = defineStore('session', () => {
   const isLoading = ref(false)
   const workingDirectory = ref('')
 
-  const isProcessing = computed(() => currentSession.value?.state === 'processing')
-  const isAwaitingApproval = computed(() => currentSession.value?.state === 'awaiting_approval')
-  const isPaused = computed(() => currentSession.value?.state === 'paused')
-  const isArchived = computed(() => currentSession.value?.state === 'archived')
-  const sessionStatus = computed(() => currentSession.value?.state ?? 'idle')
+  const isProcessing = computed(() => currentSession.value?.state?.toLowerCase() === 'processing')
+  const isAwaitingApproval = computed(() => currentSession.value?.state?.toLowerCase() === 'awaiting_approval')
+  const isPaused = computed(() => currentSession.value?.state?.toLowerCase() === 'paused')
+  const isArchived = computed(() => currentSession.value?.state?.toLowerCase() === 'archived')
+  const sessionStatus = computed(() => (currentSession.value?.state ?? 'idle').toLowerCase())
   const isSessionActive = computed(() =>
     currentSession.value !== null &&
-    currentSession.value.state !== 'archived'
+    currentSession.value.state?.toLowerCase() !== 'archived'
   )
+
+  const canPause = computed(() => currentSession.value?.state?.toLowerCase() === 'processing')
+  const canResume = computed(() => currentSession.value?.state?.toLowerCase() === 'paused')
+  const canCancel = computed(() => {
+    const s = currentSession.value?.state?.toLowerCase()
+    return s === 'processing' || s === 'awaiting_approval'
+  })
 
   function defaultTitle(): string {
     const now = new Date()
@@ -193,6 +200,9 @@ export const useSessionStore = defineStore('session', () => {
     isAwaitingApproval,
     isPaused,
     isArchived,
+    canPause,
+    canResume,
+    canCancel,
     sessionStatus,
     isSessionActive,
     createSession,
