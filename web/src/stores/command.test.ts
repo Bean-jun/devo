@@ -4,10 +4,10 @@ import { useCommandStore } from '@/stores/command'
 import type { Command } from '@/stores/command'
 
 const mockCommands: Command[] = [
-  { id: 'new', name: '/new', description: '创建新会话', action: () => {} },
-  { id: 'switch', name: '/switch', description: '切换会话', action: () => {} },
-  { id: 'export', name: '/export', description: '下载当前会话记录', action: () => {} },
-  { id: 'help', name: '/help', description: '显示帮助', action: () => {} },
+  { id: 'new', name: '/new', description: '创建新会话' },
+  { id: 'switch', name: '/switch', description: '切换会话' },
+  { id: 'export', name: '/export', description: '下载当前会话记录' },
+  { id: 'help', name: '/help', description: '显示帮助' },
 ]
 
 describe('CommandStore', () => {
@@ -142,27 +142,16 @@ describe('CommandStore', () => {
   })
 
   describe('select', () => {
-    it('should call action and close', () => {
-      const store = useCommandStore()
-      let called = false
-      const cmd: Command = { id: 'test', name: '/test', description: 'test', action: () => { called = true } }
-
-      store.open([cmd])
-      store.select()
-
-      expect(called).toBe(true)
-      expect(store.isOpen).toBe(false)
-    })
-
-    it('should call onSelect callback', () => {
+    it('should call onSelect callback and close', () => {
       const store = useCommandStore()
       let selectedCmd: Command | null = null
-      const cmd: Command = { id: 'test', name: '/test', description: 'test', action: () => {} }
+      const cmd: Command = { id: 'test', name: '/test', description: 'test' }
 
       store.open([cmd], (c: Command) => { selectedCmd = c })
       store.select()
 
       expect(selectedCmd!.id).toBe('test')
+      expect(store.isOpen).toBe(false)
     })
 
     it('should do nothing when no commands match', () => {

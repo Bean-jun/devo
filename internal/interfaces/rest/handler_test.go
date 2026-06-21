@@ -18,7 +18,7 @@ func setupTestServer() (*httptest.Server, *session.InMemoryStore) {
 	store := session.NewInMemoryStore()
 	llm := llmclient.NewMockClient()
 	loop := agentloop.New(store, llm)
-	handler := NewHandler(store, loop)
+	handler := NewHandler(store, loop, "0.0.1")
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
@@ -34,7 +34,7 @@ func setupTestServerWithTools() (*httptest.Server, *session.InMemoryStore, *agen
 
 	llm := &approvalMockClient{}
 	loop := agentloop.NewWithTools(store, llm, toolRegistry)
-	handler := NewHandler(store, loop)
+	handler := NewHandler(store, loop, "0.0.1")
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)

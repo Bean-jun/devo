@@ -16,6 +16,7 @@ const emit = defineEmits<{
   stop: []
   clear: []
   openCommand: []
+  executeCommand: [text: string]
 }>()
 
 const inputText = ref('')
@@ -23,6 +24,13 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const commandStore = useCommandStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
+
+const inputHistory: string[] = []
+let historyIndex = -1
+
+const pastedFullText = ref('')
+const pasteLabel = ref('')
+const PASTE_THRESHOLD = 200
 
 const charCount = computed(() => inputText.value.length)
 const tokenEstimate = computed(() => estimateTokens(inputText.value))
@@ -57,6 +65,14 @@ watch(() => commandStore.isOpen, (open) => {
   if (!open) focusTextarea()
 })
 
+watch(() => uiStore.pendingCommand, (cmd) => {
+  if (cmd) {
+    inputText.value = cmd
+    uiStore.clearPendingCommand()
+    focusTextarea()
+  }
+})
+
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
@@ -64,16 +80,92 @@ function handleKeydown(e: KeyboardEvent) {
   } else if (e.key === '/' && inputText.value === '') {
     e.preventDefault()
     emit('openCommand')
+  } else if (e.key === 'ArrowUp' && e.shiftKey) {
+    e.preventDefault()
+    historyPrev()
+  } else if (e.key === 'ArrowDown' && e.shiftKey) {
+    e.preventDefault()
+    historyNext()
+  }
+}
+
+function pushHistory(text: string) {
+  if (!text) return
+  if (inputHistory.length > 0 && inputHistory[inputHistory.length - 1] === text) return
+  inputHistory.push(text)
+  historyIndex = inputHistory.length
+}
+
+function historyPrev() {
+  if (inputHistory.length === 0) return
+  if (historyIndex > 0) {
+    historyIndex--
+    inputText.value = inputHistory[historyIndex]
+  }
+}
+
+function historyNext() {
+  if (inputHistory.length === 0) return
+  if (historyIndex < inputHistory.length - 1) {
+    historyIndex++
+    inputText.value = inputHistory[historyIndex]
+  } else {
+    historyIndex = inputHistory.length
+    inputText.value = ''
   }
 }
 
 function send() {
-  const text = inputText.value.trim()
-  if (!text || !canSend.value) return
-  emit('send', text)
+  const rawText = inputText.value.trim()
+  if (!rawText || !canSend.value) return
+
+  const text = (pastedFullText.value && rawText === pasteLabel.value)
+    ? pastedFullText.value
+    : rawText
+
+  pushHistory(text)
+  if (text.startsWith('/')) {
+    emit('executeCommand', text)
+  } else {
+    emit('send', text)
+  }
   inputText.value = ''
+  pastedFullText.value = ''
+  pasteLabel.value = ''
   autoResize()
 }
+
+function handlePaste(e: ClipboardEvent) {
+  const pasted = e.clipboardData?.getData('text') || ''
+  if (!pasted) return
+
+  const textarea = textareaRef.value
+  if (!textarea) return
+
+  const currentText = inputText.value
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+
+  const newText = currentText.slice(0, start) + pasted + currentText.slice(end)
+  const lines = newText.split('\n')
+
+  if (newText.length > PASTE_THRESHOLD || lines.length > 3) {
+    e.preventDefault()
+    pastedFullText.value = newText
+    const prefix = currentText.slice(0, start)
+    const suffix = currentText.slice(end)
+    pasteLabel.value = prefix + `[已粘贴 ${lines.length} 行文本]` + suffix
+    inputText.value = pasteLabel.value
+  }
+}
+
+watch(inputText, (val) => {
+  if (pasteLabel.value && val !== pasteLabel.value) {
+    pastedFullText.value = ''
+    pasteLabel.value = ''
+  }
+  autoResize()
+})
 
 function autoResize() {
   const el = textareaRef.value
@@ -81,10 +173,6 @@ function autoResize() {
   el.style.height = 'auto'
   el.style.height = Math.min(el.scrollHeight, 200) + 'px'
 }
-
-watch(inputText, () => {
-  autoResize()
-})
 </script>
 
 <template>
@@ -100,6 +188,7 @@ watch(inputText, () => {
         :maxlength="MAX_MESSAGE_LENGTH"
         rows="1"
         @keydown="handleKeydown"
+        @paste="handlePaste"
       />
 
       <div class="input-actions">

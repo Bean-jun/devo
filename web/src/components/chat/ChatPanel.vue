@@ -60,7 +60,136 @@ function handleClear() {
 }
 
 function handleOpenCommand() {
-  openPalette()
+  openPalette((cmd) => {
+    uiStore.setPendingCommand(cmd.name + ' ')
+  })
+}
+
+async function handleExecuteCommand(text: string) {
+  const parts = text.trim().split(/\s+/)
+  const cmd = parts[0].slice(1)
+  const arg = parts.slice(1).join(' ') || undefined
+
+  switch (cmd) {
+    case 'new': {
+      await sessionStore.createSession({
+        title: arg || undefined,
+        workingDirectory: sessionStore.workingDirectory,
+      })
+      uiStore.showToast('success', '会话已创建')
+      break
+    }
+    case 'switch': {
+      uiStore.setActiveModal('session-picker')
+      break
+    }
+    case 'rename': {
+      if (!sessionStore.currentSession) {
+        uiStore.showToast('error', '没有当前会话')
+        return
+      }
+      try {
+        await sessionStore.renameSession(sessionStore.currentSession.id, arg || '')
+        uiStore.showToast('success', '会话已重命名')
+      } catch (e: any) {
+        uiStore.showToast('error', e.message || '重命名失败')
+      }
+      break
+    }
+    case 'export': {
+      if (!sessionStore.currentSession) {
+        uiStore.showToast('error', '没有当前会话')
+        return
+      }
+      try {
+        const sid = sessionStore.currentSession.id
+        await fetch(`${API_BASE}/sessions/${sid}/sync-archive`, { method: 'POST' })
+        const url = `${API_BASE}/sessions/${sid}/archive`
+        const filename = `${sid}.md`
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+      } catch {
+        uiStore.showToast('error', '导出失败')
+      }
+      break
+    }
+    case 'rollback': {
+      uiStore.setActiveModal('rollback-picker')
+      break
+    }
+    case 'pause': {
+      const sid = sessionStore.currentSession?.id
+      if (!sid) return
+      if (!sessionStore.canPause) {
+        uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession?.state}，无法暂停`)
+        return
+      }
+      try {
+        const res = await fetch(`${API_BASE}/sessions/${sid}/pause`, { method: 'POST' })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.message || `HTTP ${res.status}`)
+        }
+        sessionStore.updateSessionState(sid, 'paused')
+        uiStore.showToast('info', '会话已暂停')
+      } catch (e: any) {
+        uiStore.showToast('error', e.message || '暂停失败')
+      }
+      break
+    }
+    case 'resume': {
+      const sid = sessionStore.currentSession?.id
+      if (!sid) return
+      if (!sessionStore.canResume) {
+        uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession?.state}，无法恢复`)
+        return
+      }
+      try {
+        const res = await fetch(`${API_BASE}/sessions/${sid}/resume`, { method: 'POST' })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.message || `HTTP ${res.status}`)
+        }
+        sessionStore.updateSessionState(sid, 'processing')
+        uiStore.showToast('info', '会话已恢复')
+      } catch (e: any) {
+        uiStore.showToast('error', e.message || '恢复失败')
+      }
+      break
+    }
+    case 'cancel': {
+      const sid = sessionStore.currentSession?.id
+      if (!sid) return
+      if (!sessionStore.canCancel) {
+        uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession?.state}，无法取消`)
+        return
+      }
+      try {
+        const res = await fetch(`${API_BASE}/sessions/${sid}/cancel`, { method: 'POST' })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.message || `HTTP ${res.status}`)
+        }
+        sessionStore.updateSessionState(sid, 'idle')
+        uiStore.showToast('info', '操作已取消')
+      } catch (e: any) {
+        uiStore.showToast('error', e.message || '取消失败')
+      }
+      break
+    }
+    case 'help': {
+      uiStore.setActiveModal('help')
+      break
+    }
+    default: {
+      uiStore.showToast('error', `未知命令: /${cmd}`)
+      break
+    }
+  }
 }
 </script>
 
@@ -90,6 +219,7 @@ function handleOpenCommand() {
       @stop="handleStop"
       @clear="handleClear"
       @open-command="handleOpenCommand"
+      @execute-command="handleExecuteCommand"
     />
   </div>
 </template>

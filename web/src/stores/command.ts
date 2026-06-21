@@ -5,7 +5,6 @@ export interface Command {
   id: string
   name: string
   description: string
-  action: (args?: string) => void | Promise<void>
   placeholder?: string
 }
 
@@ -66,9 +65,7 @@ export const useCommandStore = defineStore('command', () => {
   function select(index?: number): void {
     const cmd = index !== undefined ? filteredCommands.value[index] : selectedCommand.value
     if (cmd) {
-      const args = query.value.replace(cmd.name, '').trim() || undefined
       onSelectCallback.value?.(cmd)
-      cmd.action(args)
       close()
     }
   }

@@ -17,7 +17,6 @@ import ApprovalModal from '@/components/modal/ApprovalModal.vue'
 import SessionPicker from '@/components/modal/SessionPicker.vue'
 import RollbackPicker from '@/components/modal/RollbackPicker.vue'
 import HelpPanel from '@/components/modal/HelpPanel.vue'
-import InputModal from '@/components/modal/InputModal.vue'
 
 const sessionStore = useSessionStore()
 const chatStore = useChatStore()
@@ -184,7 +183,9 @@ useKeyboard([
   {
     key: 'k',
     ctrl: true,
-    handler: () => commandStore.isOpen ? commandStore.close() : openPalette(),
+    handler: () => commandStore.isOpen ? commandStore.close() : openPalette((cmd) => {
+      uiStore.setPendingCommand(cmd.name + ' ')
+    }),
   },
   {
     key: 'Escape',
@@ -299,7 +300,6 @@ useKeyboard([
       <SessionPicker />
       <RollbackPicker />
       <HelpPanel />
-      <InputModal />
     </Teleport>
   </div>
 </template>

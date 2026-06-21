@@ -1,8 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useCommand } from '@/composables/useCommand'
 import { useCommandStore } from '@/stores/command'
-import { useUiStore } from '@/stores/ui'
 
 describe('useCommand', () => {
   beforeEach(() => {

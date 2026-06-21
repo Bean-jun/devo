@@ -18,8 +18,8 @@ describe('CommandPalette', () => {
   it('should render command list when open', async () => {
     const commandStore = useCommandStore()
     commandStore.open([
-      { id: 'new', name: '/new', description: '创建新会话', action: () => {} },
-      { id: 'help', name: '/help', description: '显示帮助', action: () => {} },
+      { id: 'new', name: '/new', description: '创建新会话' },
+      { id: 'help', name: '/help', description: '显示帮助' },
     ])
 
     const wrapper = mount(CommandPalette)
@@ -31,8 +31,8 @@ describe('CommandPalette', () => {
   it('should filter by query', async () => {
     const commandStore = useCommandStore()
     commandStore.open([
-      { id: 'new', name: '/new', description: '创建新会话', action: () => {} },
-      { id: 'help', name: '/help', description: '显示帮助', action: () => {} },
+      { id: 'new', name: '/new', description: '创建新会话' },
+      { id: 'help', name: '/help', description: '显示帮助' },
     ])
     commandStore.setQuery('new')
 
@@ -46,7 +46,7 @@ describe('CommandPalette', () => {
   it('should show empty state when no match', () => {
     const commandStore = useCommandStore()
     commandStore.open([
-      { id: 'new', name: '/new', description: '创建新会话', action: () => {} },
+      { id: 'new', name: '/new', description: '创建新会话' },
     ])
     commandStore.setQuery('zzz')
 
@@ -58,8 +58,8 @@ describe('CommandPalette', () => {
   it('should highlight selected item', () => {
     const commandStore = useCommandStore()
     commandStore.open([
-      { id: 'new', name: '/new', description: '创建', action: () => {} },
-      { id: 'help', name: '/help', description: '帮助', action: () => {} },
+      { id: 'new', name: '/new', description: '创建' },
+      { id: 'help', name: '/help', description: '帮助' },
     ])
     commandStore.selectedIndex = 1
 

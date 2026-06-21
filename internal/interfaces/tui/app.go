@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,20 +39,27 @@ type App struct {
 	commandPalette components.CommandPalette
 	rollbackPicker components.RollbackPicker
 	sessionPicker  components.SessionPicker
-	inputPrompt    components.InputPrompt
 	toast          components.Toast
 
 	state              AppState
 	showCommandPalette bool
 	showRollbackPicker bool
 	showSessionPicker  bool
-	showInputPrompt    bool
-	pendingInputAction string
 	width              int
 	height             int
 	workingDir         string
 	ready              bool
 	apiBaseURL         string
+
+	inputHistory   []string
+	historyIndex   int
+	pastedFullText string
+	pasteLabel     string
+	lastKeyTime    time.Time
+	isPasting      bool
+	pasteBuffer    string
+	preKeyValue    string
+	prePreKeyValue string
 
 	initStatus string
 	initErr    error
@@ -88,7 +96,6 @@ func NewAppWithURL(baseURL string, version string) (*App, error) {
 		commandPalette: components.NewCommandPalette(),
 		rollbackPicker: components.NewRollbackPicker(),
 		sessionPicker:  components.NewSessionPicker(),
-		inputPrompt:    components.NewInputPrompt(),
 		toast:          components.NewToast(),
 	}, nil
 }
@@ -119,6 +126,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.TickMsg:
 		a.toast.Tick()
+		if a.isPasting && time.Since(a.lastKeyTime) > 120*time.Millisecond {
+			a.finishPaste()
+		}
 		cmds = append(cmds, tea.Tick(time.Second, func(t time.Time) tea.Msg {
 			return messages.TickMsg(t)
 		}))
@@ -142,7 +152,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
-		wasModalShowing := a.showCommandPalette || a.showRollbackPicker || a.showSessionPicker || a.showInputPrompt
+		wasModalShowing := a.showCommandPalette || a.showRollbackPicker || a.showSessionPicker
 		cmd := a.handleKeyMsg(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
@@ -170,15 +180,32 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Batch(cmds...)
 		}
 
-		if a.showInputPrompt {
-			return a, tea.Batch(cmds...)
-		}
-
 		if wasModalShowing {
 			return a, tea.Batch(cmds...)
 		}
 
 		if msg.String() != "esc" {
+			now := time.Now()
+			elapsed := now.Sub(a.lastKeyTime)
+			a.lastKeyTime = now
+
+			if a.isPasting {
+				if elapsed > 120*time.Millisecond {
+					a.finishPaste()
+				} else {
+					a.appendToPasteBuffer(msg)
+					return a, tea.Batch(cmds...)
+				}
+			} else if elapsed < 40*time.Millisecond && a.isPasteableKey(msg) {
+				a.isPasting = true
+				a.pasteBuffer = a.chatView.InputArea.Value()
+				a.chatView.InputArea.SetValue(a.preKeyValue)
+				a.appendToPasteBuffer(msg)
+				return a, tea.Batch(cmds...)
+			}
+
+			a.prePreKeyValue = a.preKeyValue
+			a.preKeyValue = a.chatView.InputArea.Value()
 			a.chatView, cmd = a.chatView.Update(msg)
 			if cmd != nil {
 				cmds = append(cmds, cmd)
@@ -194,6 +221,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd != nil {
 		cmds = append(cmds, cmd)
 	}
+	a.compressPasteIfNeeded()
 
 	if a.approvalModal.Visible {
 		a.approvalModal, cmd = a.approvalModal.Update(msg)
@@ -355,12 +383,6 @@ func (a *App) View() string {
 			lipgloss.Center,
 			a.sessionPicker.View(),
 		)
-	} else if a.showInputPrompt {
-		a.inputPrompt.Width = a.width
-		mainContent = lipgloss.NewStyle().
-			Width(a.width).
-			Align(lipgloss.Center, lipgloss.Center).
-			Render(a.inputPrompt.View())
 	} else {
 		mainContent = chatView
 	}
@@ -400,6 +422,113 @@ func (a *App) View() string {
 func (a *App) focusInput() {
 	a.chatView.Focus()
 	a.statusBar.Mode = ""
+}
+
+func (a *App) pushInputHistory(text string) {
+	if text == "" {
+		return
+	}
+	if len(a.inputHistory) > 0 && a.inputHistory[len(a.inputHistory)-1] == text {
+		return
+	}
+	a.inputHistory = append(a.inputHistory, text)
+	a.historyIndex = len(a.inputHistory)
+}
+
+func (a *App) historyPrev() {
+	if len(a.inputHistory) == 0 {
+		return
+	}
+	if a.historyIndex > 0 {
+		a.historyIndex--
+		a.chatView.InputArea.SetValue(a.inputHistory[a.historyIndex])
+	}
+}
+
+func (a *App) historyNext() {
+	if len(a.inputHistory) == 0 {
+		return
+	}
+	if a.historyIndex < len(a.inputHistory)-1 {
+		a.historyIndex++
+		a.chatView.InputArea.SetValue(a.inputHistory[a.historyIndex])
+	} else {
+		a.historyIndex = len(a.inputHistory)
+		a.chatView.InputArea.Reset()
+	}
+}
+
+func (a *App) isPasteableKey(msg tea.KeyMsg) bool {
+	key := msg.String()
+	if key == "enter" {
+		return true
+	}
+	return len(msg.Runes) == 1 && msg.Runes[0] >= ' '
+}
+
+func (a *App) appendToPasteBuffer(msg tea.KeyMsg) {
+	key := msg.String()
+	if key == "enter" {
+		a.pasteBuffer += "\n"
+	} else if len(msg.Runes) == 1 {
+		a.pasteBuffer += string(msg.Runes[0])
+	}
+}
+
+func (a *App) finishPaste() {
+	a.isPasting = false
+	val := a.pasteBuffer
+	a.pasteBuffer = ""
+
+	lines := strings.Split(val, "\n")
+	if len(val) > 200 || len(lines) > 3 {
+		a.pastedFullText = val
+		prefix := a.preKeyValue
+		if len(prefix) > 60 {
+			prefix = prefix[:60] + "..."
+		}
+		if prefix != "" {
+			prefix += " "
+		}
+		a.pasteLabel = prefix + fmt.Sprintf("[已粘贴 %d 行文本]", len(lines))
+		a.chatView.InputArea.SetValue(a.pasteLabel)
+	} else {
+		a.chatView.InputArea.SetValue(val)
+	}
+}
+
+func (a *App) compressPasteIfNeeded() {
+	// During rapid input (paste), skip compression to avoid flashing
+	if time.Since(a.lastKeyTime) < 100*time.Millisecond {
+		return
+	}
+
+	val := a.chatView.InputArea.Value()
+	if val == "" {
+		return
+	}
+
+	if a.pasteLabel != "" && val == a.pasteLabel {
+		return
+	}
+
+	if a.pasteLabel != "" && val != a.pasteLabel {
+		a.pastedFullText = ""
+		a.pasteLabel = ""
+		return
+	}
+
+	lines := strings.Split(val, "\n")
+	if len(val) > 200 || len(lines) > 3 {
+		a.pastedFullText = val
+		// Keep first line of existing text as visual context
+		firstLine := lines[0]
+		if len(firstLine) > 60 {
+			firstLine = firstLine[:60] + "..."
+		}
+		a.pasteLabel = firstLine + fmt.Sprintf(" [已粘贴 %d 行文本]", len(lines))
+		a.chatView.InputArea.SetValue(a.pasteLabel)
+	}
 }
 
 func (a *App) layout() {

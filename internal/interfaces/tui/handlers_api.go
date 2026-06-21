@@ -106,7 +106,7 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 		} else {
 			a.toast.Show("重命名成功", false)
 		}
-		return nil
+		return a.refreshSessionCmd()
 
 	case "rollback_done":
 		result := msg.Data.(*types.RollbackResult)

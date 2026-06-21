@@ -51,6 +51,10 @@ func (i *InputArea) Reset() {
 	i.textarea.Reset()
 }
 
+func (i *InputArea) SetValue(v string) {
+	i.textarea.SetValue(v)
+}
+
 func (i *InputArea) SetWidth(w int) {
 	i.Width = w
 	// textarea width = outer width - border(2) - padding(2) - style overhead(2)

@@ -14,32 +14,6 @@ import (
 func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
 
-	if a.showInputPrompt {
-		switch key {
-		case "esc":
-			a.showInputPrompt = false
-			a.inputPrompt.Hide()
-			a.focusInput()
-			return nil
-		case "enter":
-			value := a.inputPrompt.Value
-			a.showInputPrompt = false
-			a.inputPrompt.Hide()
-			a.focusInput()
-			return a.executeInputPromptAction(value)
-		case "backspace":
-			if len(a.inputPrompt.Value) > 0 {
-				a.inputPrompt.Value = a.inputPrompt.Value[:len(a.inputPrompt.Value)-1]
-			}
-			return nil
-		default:
-			if len(msg.Runes) == 1 && msg.Runes[0] >= ' ' {
-				a.inputPrompt.Value += string(msg.Runes[0])
-			}
-			return nil
-		}
-	}
-
 	if a.showRollbackPicker {
 		switch key {
 		case "esc":
@@ -112,20 +86,35 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			a.focusInput()
 			return nil
 		case "enter":
-			action := a.commandPalette.SelectedAction()
+			if len(a.commandPalette.Items) == 0 {
+				return nil
+			}
+			label := a.commandPalette.SelectedLabel()
 			a.showCommandPalette = false
 			a.commandPalette.Hide()
-			a.chatView.InputArea.Reset()
+			a.chatView.InputArea.SetValue(label + " ")
+			a.chatView.Focus()
 			a.focusInput()
-			return a.executeCommand(action)
+			return nil
 		case "up":
 			a.commandPalette.CursorUp()
 			return nil
 		case "down":
 			a.commandPalette.CursorDown()
 			return nil
+		case "backspace":
+			if len(a.commandPalette.Query) > 0 {
+				a.commandPalette.Query = a.commandPalette.Query[:len(a.commandPalette.Query)-1]
+				a.commandPalette.Filter()
+			}
+			return nil
+		default:
+			if len(msg.Runes) == 1 && msg.Runes[0] >= ' ' {
+				a.commandPalette.Query += string(msg.Runes[0])
+				a.commandPalette.Filter()
+			}
+			return nil
 		}
-		return nil
 	}
 
 	if a.state == StateAwaitingApproval {
@@ -175,19 +164,43 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		return a.resumeCmd()
 
 	case "enter":
+		if a.isPasting {
+			return nil
+		}
 		if a.chatView.InputArea.Focused() && a.state == StateReady {
 			content := strings.TrimSpace(a.chatView.InputArea.Value())
 			if content != "" {
-				if strings.HasPrefix(content, "/") {
-					if strings.TrimSpace(content) == "/rollback" {
-						a.chatView.InputArea.Reset()
-						a.chatView.Blur()
-						return a.loadAllMessagesCmd(a.activeSession.ID)
-					}
-					a.showCommandPalette = true
-					a.commandPalette.Show()
-					a.chatView.Blur()
+				// Paste detection: if Enter arrives <50ms after last key, it's
+				// part of a multi-line paste — let textarea handle it as newline.
+				if time.Since(a.lastKeyTime) < 50*time.Millisecond {
 					return nil
+				}
+				// Unwrap pasted content if label is intact
+				if a.pastedFullText != "" && content == a.pasteLabel {
+					content = a.pastedFullText
+					a.pastedFullText = ""
+					a.pasteLabel = ""
+					a.pushInputHistory(content)
+					if strings.HasPrefix(content, "/") {
+						return a.executeSlashCommand(content)
+					}
+					return a.sendMessageCmd(content)
+				}
+				// If content is too long and not yet compressed, compress now
+				lines := strings.Split(content, "\n")
+				if len(content) > 200 || len(lines) > 3 {
+					a.pastedFullText = content
+					firstLine := lines[0]
+					if len(firstLine) > 60 {
+						firstLine = firstLine[:60] + "..."
+					}
+					a.pasteLabel = firstLine + fmt.Sprintf(" [已粘贴 %d 行文本]", len(lines))
+					a.chatView.InputArea.SetValue(a.pasteLabel)
+					return nil
+				}
+				a.pushInputHistory(content)
+				if strings.HasPrefix(content, "/") {
+					return a.executeSlashCommand(content)
 				}
 				return a.sendMessageCmd(content)
 			}
@@ -208,6 +221,16 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			a.chatView.Blur()
 		} else {
 			a.chatView.Focus()
+		}
+
+	case "shift+up":
+		if a.chatView.InputArea.Focused() && !a.showCommandPalette {
+			a.historyPrev()
+		}
+
+	case "shift+down":
+		if a.chatView.InputArea.Focused() && !a.showCommandPalette {
+			a.historyNext()
 		}
 
 	case "up":
@@ -239,15 +262,26 @@ func (a *App) buildRollbackItems() {
 	a.rollbackPicker.Show(items)
 }
 
-func (a *App) executeCommand(action string) tea.Cmd {
-	switch action {
+func (a *App) executeSlashCommand(input string) tea.Cmd {
+	parts := strings.SplitN(input, " ", 2)
+	cmd := strings.TrimPrefix(parts[0], "/")
+	arg := ""
+	if len(parts) > 1 {
+		arg = strings.TrimSpace(parts[1])
+	}
+
+	a.chatView.InputArea.Reset()
+
+	switch cmd {
 	case "new":
-		a.pendingInputAction = "new"
-		a.showInputPrompt = true
-		a.inputPrompt.Show("创建新会话", "会话名称（可选，留空则自动生成）", "", "[创建  Enter]")
-		return nil
-	case "rollback":
-		return a.loadAllMessagesCmd(a.activeSession.ID)
+		return a.newSessionCmd(arg)
+
+	case "rename":
+		if a.activeSession == nil {
+			return nil
+		}
+		return a.renameSessionCmd(arg)
+
 	case "switch":
 		a.sessionPicker.Sessions = a.sessions
 		if a.activeSession != nil {
@@ -255,15 +289,36 @@ func (a *App) executeCommand(action string) tea.Cmd {
 		}
 		a.showSessionPicker = true
 		a.sessionPicker.Show()
+		a.chatView.Blur()
 		return a.refreshSessionCmd()
-	case "rename":
+
+	case "rollback":
 		if a.activeSession == nil {
 			return nil
 		}
-		a.pendingInputAction = "rename"
-		a.showInputPrompt = true
-		a.inputPrompt.Show("重命名当前会话", "输入新名称", a.activeSession.Title, "[重命名  Enter]")
-		return nil
+		a.chatView.Blur()
+		return a.loadAllMessagesCmd(a.activeSession.ID)
+
+	case "pause":
+		if a.activeSession == nil {
+			return nil
+		}
+		if a.activeSession.State != "Processing" {
+			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法暂停", a.activeSession.State), true)
+			return nil
+		}
+		return a.pauseCmd()
+
+	case "resume":
+		if a.activeSession == nil {
+			return nil
+		}
+		if a.activeSession.State != "Paused" {
+			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法恢复", a.activeSession.State), true)
+			return nil
+		}
+		return a.resumeCmd()
+
 	case "cancel":
 		if a.activeSession == nil {
 			return nil
@@ -274,49 +329,20 @@ func (a *App) executeCommand(action string) tea.Cmd {
 			return nil
 		}
 		return a.cancelCmd()
-	case "pause":
-		if a.activeSession == nil {
-			return nil
-		}
-		state := a.activeSession.State
-		if state != "Processing" {
-			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法暂停", state), true)
-			return nil
-		}
-		return a.pauseCmd()
-	case "resume":
-		if a.activeSession == nil {
-			return nil
-		}
-		state := a.activeSession.State
-		if state != "Paused" {
-			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法恢复", state), true)
-			return nil
-		}
-		return a.resumeCmd()
+
 	case "help":
-		a.toast.Show("快捷键: Ctrl+P 暂停/恢复  Ctrl+R 恢复  Ctrl+C 取消  Ctrl+Q 退出", false)
+		a.toast.Show("快捷键: Ctrl+P 暂停/恢复  Ctrl+R 恢复  Ctrl+C 取消  Ctrl+Q 退出  Shift+↑↓ 历史", false)
 		return nil
+
 	case "quit":
 		a.state = StateQuitting
 		return tea.Quit
+
 	case "export":
 		if a.activeSession != nil {
 			return a.exportArchiveCmd()
 		}
 		return nil
-	}
-	return nil
-}
-
-func (a *App) executeInputPromptAction(value string) tea.Cmd {
-	switch a.pendingInputAction {
-	case "new":
-		return a.newSessionCmd(value)
-	case "rename":
-		if a.activeSession != nil {
-			return a.renameSessionCmd(value)
-		}
 	}
 	return nil
 }

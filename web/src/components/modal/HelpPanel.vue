@@ -10,6 +10,7 @@ const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
 const shortcuts = [
   { key: 'Enter', desc: '发送消息' },
   { key: 'Shift + Enter', desc: '换行' },
+  { key: 'Shift + ↑/↓', desc: '切换输入历史' },
   { key: 'Escape', desc: '关闭弹窗/面板' },
   { key: 'Ctrl + K', desc: '打开命令面板' },
   { key: 'Y', desc: '批准操作（审批弹窗中）' },

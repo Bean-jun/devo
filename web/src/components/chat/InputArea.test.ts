@@ -117,4 +117,31 @@ describe('InputArea', () => {
 
     expect(wrapper.emitted('stop')).toBeTruthy()
   })
+
+  it('should emit executeCommand when input starts with /', async () => {
+    const wrapper = mount(InputArea, {
+      props: { isDisabled: false, isProcessing: false },
+    })
+    const textarea = wrapper.find('textarea')
+
+    await textarea.setValue('/new my session')
+    await textarea.trigger('keydown', { key: 'Enter', shiftKey: false })
+
+    expect(wrapper.emitted('executeCommand')).toBeTruthy()
+    expect(wrapper.emitted('executeCommand')![0]).toEqual(['/new my session'])
+    expect(wrapper.emitted('send')).toBeFalsy()
+  })
+
+  it('should emit executeCommand for parameterless commands', async () => {
+    const wrapper = mount(InputArea, {
+      props: { isDisabled: false, isProcessing: false },
+    })
+    const textarea = wrapper.find('textarea')
+
+    await textarea.setValue('/pause')
+    await textarea.trigger('keydown', { key: 'Enter', shiftKey: false })
+
+    expect(wrapper.emitted('executeCommand')).toBeTruthy()
+    expect(wrapper.emitted('executeCommand')![0]).toEqual(['/pause'])
+  })
 })
