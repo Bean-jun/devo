@@ -38,7 +38,7 @@
     "compile": "node esbuild.js --production",
     "dev": "node esbuild.js --watch",
     "lint": "eslint src --ext ts",
-    "vsix": "npm run compile && vsce package --allow-star-activation --skip-license --allow-missing-repository --no-dependencies"
+    "vsix": "npm run compile && vsce package --skip-license --allow-missing-repository --no-dependencies"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
