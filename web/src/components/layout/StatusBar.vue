@@ -13,6 +13,13 @@ const statusColor = computed(() => STATUS_COLORS[sessionStore.sessionStatus] ?? 
 const isProcessing = computed(() => sessionStore.isProcessing)
 const workingDir = computed(() => sessionStore.currentSession?.workingDirectory ?? '')
 
+const themeIcon = computed(() => uiStore.theme === 'dark' ? '☀️' : '🌙')
+const themeLabel = computed(() => uiStore.theme === 'dark' ? '浅色' : '深色')
+
+function toggleTheme() {
+  uiStore.toggleTheme()
+}
+
 const connectionStatusText = computed(() => {
   switch (uiStore.connectionStatus) {
     case 'connected': return '已连接'
@@ -49,6 +56,9 @@ const serverPort = computed(() => window.location.port)
       </span>
     </div>
     <div class="statusbar-right">
+      <button class="theme-toggle" :title="themeLabel" @click="toggleTheme">
+        {{ themeIcon }}
+      </button>
       <span class="connection-status" :title="connectionStatusText">
         {{ connectionDot }} {{ connectionStatusText }}
       </span>
@@ -147,5 +157,26 @@ const serverPort = computed(() => window.location.port)
   font-family: var(--font-mono);
   white-space: nowrap;
   line-height: 1;
+}
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-light);
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+.theme-toggle:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border);
 }
 </style>

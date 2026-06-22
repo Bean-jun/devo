@@ -17,7 +17,7 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("agent loop panic for session %s: %v", sessionID, r)
-			l.handleLoopError(sessionID, fmt.Errorf("panic: %v", r))
+			l.handleLoopError(sessionID, fmt.Errorf("panic: %v", r), eventBus)
 		}
 	}()
 
@@ -27,14 +27,14 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 
 	sess, err := l.store.Get(sessionID)
 	if err != nil {
-		l.handleLoopError(sessionID, fmt.Errorf("get session: %w", err))
+		l.handleLoopError(sessionID, fmt.Errorf("get session: %w", err), eventBus)
 		return
 	}
 
 	sess.ToolCallCount = 0
 	sess.LastLoopTerminationReason = ""
 	if err := l.store.Update(sess); err != nil {
-		l.handleLoopError(sessionID, fmt.Errorf("update session: %w", err))
+		l.handleLoopError(sessionID, fmt.Errorf("update session: %w", err), eventBus)
 		return
 	}
 
@@ -44,7 +44,7 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 	for {
 		msgs, _, err := l.store.GetMessages(sessionID, 0, 0)
 		if err != nil {
-			l.handleLoopError(sessionID, fmt.Errorf("get messages: %w", err))
+			l.handleLoopError(sessionID, fmt.Errorf("get messages: %w", err), eventBus)
 			return
 		}
 
@@ -60,20 +60,20 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 
 		msgs, _, err = l.store.GetMessages(sessionID, 0, 0)
 		if err != nil {
-			l.handleLoopError(sessionID, fmt.Errorf("get messages after compress: %w", err))
+			l.handleLoopError(sessionID, fmt.Errorf("get messages after compress: %w", err), eventBus)
 			return
 		}
 
 		sess, err := l.store.Get(sessionID)
 		if err != nil {
-			l.handleLoopError(sessionID, fmt.Errorf("get session: %w", err))
+			l.handleLoopError(sessionID, fmt.Errorf("get session: %w", err), eventBus)
 			return
 		}
 		activeMsgs := compressor.FilterActiveMessages(msgs, sess.CompressionState)
 
 		result, err := l.llmClient.Complete(ctx, activeMsgs, l.systemPrompt)
 		if err != nil {
-			l.handleLoopError(sessionID, fmt.Errorf("llm complete: %w", err))
+			l.handleLoopError(sessionID, fmt.Errorf("llm complete: %w", err), eventBus)
 			return
 		}
 
@@ -99,7 +99,7 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 				CreatedAt: time.Now(),
 			}
 			if err := l.store.AddMessage(sessionID, assistantMsg); err != nil {
-				l.handleLoopError(sessionID, fmt.Errorf("add assistant message with tool calls: %w", err))
+				l.handleLoopError(sessionID, fmt.Errorf("add assistant message with tool calls: %w", err), eventBus)
 				return
 			}
 
@@ -237,6 +237,14 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 				}
 
 				if err != nil {
+					toolResult := &tools.ToolResult{
+						ToolCallID: tc.ID,
+						Success:    false,
+						Error:      err.Error(),
+					}
+					toolMsg := l.toolResultToMessage(toolResult)
+					l.store.AddMessage(sessionID, toolMsg)
+
 					eventBus.Publish("tool_result", map[string]any{
 						"tool_name": tc.ToolName,
 						"success":   false,
@@ -266,7 +274,7 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 				toolResult.ToolCallID = tc.ID
 				toolMsg := l.toolResultToMessage(toolResult)
 				if err := l.store.AddMessage(sessionID, toolMsg); err != nil {
-					l.handleLoopError(sessionID, fmt.Errorf("add tool result message: %w", err))
+					l.handleLoopError(sessionID, fmt.Errorf("add tool result message: %w", err), eventBus)
 					return
 				}
 
@@ -312,7 +320,7 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 			CreatedAt: time.Now(),
 		}
 		if err := l.store.AddMessage(sessionID, assistantMsg); err != nil {
-			l.handleLoopError(sessionID, fmt.Errorf("add assistant message: %w", err))
+			l.handleLoopError(sessionID, fmt.Errorf("add assistant message: %w", err), eventBus)
 			return
 		}
 
@@ -331,7 +339,7 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 
 		freshSess, err := l.store.Get(sessionID)
 		if err != nil {
-			l.handleLoopError(sessionID, fmt.Errorf("get session for state update: %w", err))
+			l.handleLoopError(sessionID, fmt.Errorf("get session for state update: %w", err), eventBus)
 			return
 		}
 
@@ -339,7 +347,7 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 		freshSess.State = session.StateIdle
 		freshSess.LastActiveAt = time.Now()
 		if err := l.store.Update(freshSess); err != nil {
-			l.handleLoopError(sessionID, fmt.Errorf("update session state to idle: %w", err))
+			l.handleLoopError(sessionID, fmt.Errorf("update session state to idle: %w", err), eventBus)
 			return
 		}
 

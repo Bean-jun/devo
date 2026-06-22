@@ -23,6 +23,14 @@ const chatStore = useChatStore()
 const uiStore = useUiStore()
 const commandStore = useCommandStore()
 const approvalStore = useApprovalStore()
+
+watch(
+  () => uiStore.theme,
+  (theme) => {
+    document.documentElement.setAttribute('data-theme', theme)
+  },
+  { immediate: true }
+)
 const { connect, disconnect, onEvent, onStatusChange } = useSSE()
 const { openPalette } = useCommand()
 

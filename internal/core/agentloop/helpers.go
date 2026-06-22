@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"devo/internal/core/session"
@@ -104,13 +106,15 @@ func (l *Loop) incrementToolCallCount(sessionID string, eventBus *session.EventB
 	return false
 }
 
-func (l *Loop) handleLoopError(sessionID string, err error) {
+func (l *Loop) handleLoopError(sessionID string, err error, eventBus *session.EventBus) {
 	log.Printf("agent loop error for session %s: %v", sessionID, err)
 
 	sess, getErr := l.store.Get(sessionID)
 	if getErr != nil {
 		return
 	}
+
+	oldState := string(sess.State)
 
 	if sess.ChildPID != nil {
 		killChildProcess(*sess.ChildPID)
@@ -123,6 +127,41 @@ func (l *Loop) handleLoopError(sessionID string, err error) {
 	sess.ChildPID = nil
 	sess.BackgroundPIDs = nil
 	l.store.Update(sess)
+
+	eventBus.Publish("session_state_change", map[string]any{
+		"old_state": oldState,
+		"new_state": string(session.StateIdle),
+		"reason":    "error",
+	})
+	eventBus.Publish("error", map[string]any{
+		"message": friendlyLLMErrorMessage(err),
+	})
+}
+
+func friendlyLLMErrorMessage(err error) string {
+	errStr := err.Error()
+
+	const prefix = "openai api error (status "
+	if idx := strings.Index(errStr, prefix); idx != -1 {
+		rest := errStr[idx+len(prefix):]
+		endIdx := strings.Index(rest, ")")
+		if endIdx != -1 {
+			statusStr := rest[:endIdx]
+			statusCode, parseErr := strconv.Atoi(statusStr)
+			if parseErr == nil {
+				switch statusCode {
+				case 401:
+					return "认证失败：API Key 无效或已过期，请检查 API Key 配置"
+				case 402:
+					return "余额不足：账户余额不足，请充值后重试"
+				case 429:
+					return "请求速率达到上限：API 请求过于频繁，请稍后重试"
+				}
+			}
+		}
+	}
+
+	return errStr
 }
 
 func (l *Loop) recordChildPID(sessionID, toolName string, tr *tools.ToolResult) {

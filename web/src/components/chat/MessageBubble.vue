@@ -206,6 +206,9 @@ async function copyContent() {
 .markdown-body :deep(code) {
   font-family: var(--font-mono);
   font-size: 0.85em;
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+  background: var(--color-bg-tertiary);
 }
 
 .markdown-body :deep(pre code) {

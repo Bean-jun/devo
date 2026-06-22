@@ -12,7 +12,22 @@ export interface Toast {
   duration: number
 }
 
+export type ThemeType = 'light' | 'dark'
 export type ModalType = 'approval' | 'session-picker' | 'rollback-picker' | 'help' | null
+
+function loadTheme(): ThemeType {
+  try {
+    const stored = localStorage.getItem('devo-theme')
+    if (stored === 'dark' || stored === 'light') return stored
+  } catch {}
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+function saveTheme(theme: ThemeType): void {
+  try {
+    localStorage.setItem('devo-theme', theme)
+  } catch {}
+}
 
 export const useUiStore = defineStore('ui', () => {
   const toasts = ref<Toast[]>([])
@@ -20,6 +35,7 @@ export const useUiStore = defineStore('ui', () => {
   const connectionStatus = ref<'connected' | 'disconnected' | 'connecting'>('disconnected')
   const focusInputCounter = ref(0)
   const pendingCommand = ref<string | null>(null)
+  const theme = ref<ThemeType>(loadTheme())
 
   function requestFocusInput(): void {
     focusInputCounter.value++
@@ -31,6 +47,16 @@ export const useUiStore = defineStore('ui', () => {
 
   function clearPendingCommand(): void {
     pendingCommand.value = null
+  }
+
+  function toggleTheme(): void {
+    theme.value = theme.value === 'light' ? 'dark' : 'light'
+    saveTheme(theme.value)
+  }
+
+  function setTheme(newTheme: ThemeType): void {
+    theme.value = newTheme
+    saveTheme(theme.value)
   }
 
   function showToast(type: ToastType, message: string, duration: number = TOAST_DURATION): void {
@@ -75,6 +101,7 @@ export const useUiStore = defineStore('ui', () => {
     connectionStatus,
     focusInputCounter,
     pendingCommand,
+    theme,
     showToast,
     removeToast,
     setConnectionStatus,
@@ -82,5 +109,7 @@ export const useUiStore = defineStore('ui', () => {
     setPendingCommand,
     clearPendingCommand,
     requestFocusInput,
+    toggleTheme,
+    setTheme,
   }
 })

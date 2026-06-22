@@ -132,9 +132,47 @@ func selectMessagesToCompress(msgs []session.Message, keepRecent int) (remaining
 		splitIdx = 0
 	}
 
+	// Collect tool_call_ids from tool messages in the compressible area.
+	// These tool results must be preserved, so their owning assistant
+	// messages must also be preserved to form valid API request pairs.
+	toolCallIDsInCompressible := make(map[string]bool)
 	for _, msg := range msgs[:splitIdx] {
-		if msg.Role == session.RoleSystem || msg.Role == session.RoleTool {
+		if msg.Role == session.RoleTool && msg.ToolCallID != "" {
+			toolCallIDsInCompressible[msg.ToolCallID] = true
+		}
+	}
+
+	// Also collect tool_call_ids from the recent area, because an assistant
+	// in the compressible area may own a tool call whose result is in the
+	// recent area. If we compress the assistant, the tool result becomes
+	// orphaned and the API call will fail with a 400 error.
+	toolCallIDsInRecent := make(map[string]bool)
+	for _, msg := range msgs[splitIdx:] {
+		if msg.Role == session.RoleTool && msg.ToolCallID != "" {
+			toolCallIDsInRecent[msg.ToolCallID] = true
+		}
+	}
+
+	for _, msg := range msgs[:splitIdx] {
+		if msg.Role == session.RoleSystem {
 			remaining = append(remaining, msg)
+		} else if msg.Role == session.RoleTool {
+			remaining = append(remaining, msg)
+		} else if msg.Role == session.RoleAssistant && len(msg.ToolCalls) > 0 {
+			// Preserve assistant if any of its tool calls have results in
+			// either the compressible area or the recent area.
+			preserve := false
+			for _, tc := range msg.ToolCalls {
+				if toolCallIDsInCompressible[tc.ID] || toolCallIDsInRecent[tc.ID] {
+					preserve = true
+					break
+				}
+			}
+			if preserve {
+				remaining = append(remaining, msg)
+			} else {
+				toCompress = append(toCompress, msg)
+			}
 		} else {
 			toCompress = append(toCompress, msg)
 		}
