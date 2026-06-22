@@ -16,6 +16,7 @@ type createSessionRequest struct {
 	WorkingDirectory       string `json:"working_directory"`
 	Title                  string `json:"title,omitempty"`
 	ApprovalTimeoutSeconds int    `json:"approval_timeout_seconds,omitempty"`
+	SystemPromptOverride   string `json:"system_prompt_override,omitempty"`
 }
 
 type createSessionResponse struct {
@@ -69,6 +70,7 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 		TrustLevel:             string(approval.TrustNormal),
 		ApprovalPolicy:         make(map[string]string),
 		ApprovalTimeoutSeconds: timeoutSeconds,
+		SystemPromptOverride:   req.SystemPromptOverride,
 	}
 
 	if err := h.store.Create(sess); err != nil {

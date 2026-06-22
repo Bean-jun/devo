@@ -105,6 +105,14 @@ type Session struct {
 	MaxConcurrentToolCalls    int                   `json:"max_concurrent_tool_calls"`
 	MaxConcurrentSubprocesses int                   `json:"max_concurrent_subprocesses"`
 	ArchivePath               string                `json:"archive_path,omitempty"`
+	SystemPromptOverride      string                `json:"system_prompt_override,omitempty"`
+	CachedDirectorySummary    *DirectorySummary     `json:"-"`
+}
+
+type DirectorySummary struct {
+	Content     string    `json:"content"`
+	GeneratedAt time.Time `json:"generated_at"`
+	Valid       bool      `json:"valid"`
 }
 
 var (

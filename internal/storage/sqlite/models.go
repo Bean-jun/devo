@@ -32,6 +32,7 @@ type SessionModel struct {
 	CompressThreshold         int    `gorm:"default:0"`
 	KeepRecent                int    `gorm:"default:0"`
 	MaxContextTokens          int    `gorm:"default:0"`
+	SystemPromptOverride      string `gorm:"type:text"`
 }
 
 type MessageModel struct {
@@ -75,10 +76,11 @@ func (m *SessionModel) ToDomain() *session.Session {
 			Output: m.TokenUsageOutput,
 			Total:  m.TokenUsageTotal,
 		},
-		CompressionCount:  m.CompressionCount,
-		CompressThreshold: m.CompressThreshold,
-		KeepRecent:        m.KeepRecent,
-		MaxContextTokens:  m.MaxContextTokens,
+		CompressionCount:     m.CompressionCount,
+		CompressThreshold:    m.CompressThreshold,
+		KeepRecent:           m.KeepRecent,
+		MaxContextTokens:     m.MaxContextTokens,
+		SystemPromptOverride: m.SystemPromptOverride,
 	}
 
 	if m.ApprovalPolicyJSON != "" {
@@ -119,6 +121,7 @@ func fromDomain(s *session.Session) *SessionModel {
 		CompressThreshold:         s.CompressThreshold,
 		KeepRecent:                s.KeepRecent,
 		MaxContextTokens:          s.MaxContextTokens,
+		SystemPromptOverride:      s.SystemPromptOverride,
 	}
 
 	if s.ApprovalPolicy != nil && len(s.ApprovalPolicy) > 0 {

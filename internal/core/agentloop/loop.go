@@ -10,13 +10,12 @@ import (
 	"devo/internal/core/archive"
 	"devo/internal/core/compressor"
 	"devo/internal/core/concurrency"
+	"devo/internal/core/prompt"
 	"devo/internal/core/session"
 	"devo/internal/core/tokenmeter"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
 )
-
-const defaultSystemPrompt = "You are a helpful coding assistant. Respond concisely and helpfully."
 
 type ToolExecutor interface {
 	Execute(workingDir string, toolName string, params map[string]interface{}) (*tools.ToolResult, error)
@@ -33,7 +32,7 @@ type ApprovalDecision struct {
 type Loop struct {
 	store            session.SessionStore
 	llmClient        llmclient.Client
-	systemPrompt     string
+	promptAssembler  *prompt.Assembler
 	toolExecutor     ToolExecutor
 	approvalManager  *approval.Manager
 	approvalChannels map[string]chan ApprovalDecision
@@ -49,7 +48,7 @@ func New(store session.SessionStore, llmClient llmclient.Client) *Loop {
 	return &Loop{
 		store:            store,
 		llmClient:        llmClient,
-		systemPrompt:     defaultSystemPrompt,
+		promptAssembler:  prompt.NewAssembler(),
 		approvalManager:  approval.NewManager(),
 		approvalChannels: make(map[string]chan ApprovalDecision),
 		tokenMeter:       tokenmeter.NewMeter(store),
@@ -64,7 +63,7 @@ func NewWithTools(store session.SessionStore, llmClient llmclient.Client, toolEx
 	return &Loop{
 		store:            store,
 		llmClient:        llmClient,
-		systemPrompt:     defaultSystemPrompt,
+		promptAssembler:  prompt.NewAssembler(),
 		toolExecutor:     toolExecutor,
 		approvalManager:  approval.NewManager(),
 		approvalChannels: make(map[string]chan ApprovalDecision),
@@ -155,4 +154,8 @@ func (l *Loop) GetArchiveContent(sessionID string) ([]byte, error) {
 
 func (l *Loop) SyncArchive(sessionID string) (string, error) {
 	return l.archiveManager.SyncArchive(sessionID)
+}
+
+func (l *Loop) SetPromptAssembler(pa *prompt.Assembler) {
+	l.promptAssembler = pa
 }

@@ -40,6 +40,7 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 
 	var stepSeq int
 	var totalStepTokens int
+	hasFileChange := true
 
 	for {
 		msgs, _, err := l.store.GetMessages(sessionID, 0, 0)
@@ -71,7 +72,10 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 		}
 		activeMsgs := compressor.FilterActiveMessages(msgs, sess.CompressionState)
 
-		result, err := l.llmClient.Complete(ctx, activeMsgs, l.systemPrompt)
+		dynamicPrompt := l.promptAssembler.Assemble(sess, hasFileChange)
+		hasFileChange = false
+
+		result, err := l.llmClient.Complete(ctx, activeMsgs, dynamicPrompt)
 		if err != nil {
 			l.handleLoopError(sessionID, fmt.Errorf("llm complete: %w", err), eventBus)
 			return
@@ -269,6 +273,7 @@ func (l *Loop) runAgentLoop(ctx context.Context, sessionID string, eventBus *ses
 							CausedByMessageID: assistantMsg.ID,
 						})
 					}
+					hasFileChange = true
 				}
 
 				toolResult.ToolCallID = tc.ID
