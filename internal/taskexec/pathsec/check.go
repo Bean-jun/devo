@@ -11,11 +11,22 @@ var (
 	ErrPathNormalization  = errors.New("failed to normalize path")
 )
 
+// NormalizePath normalizes a path for consistent comparison.
+// On Windows, this ensures the drive letter is uppercase (e.g., "C:\" instead of "c:\").
+func NormalizePath(p string) string {
+	p = filepath.Clean(p)
+	if len(p) >= 2 && p[1] == ':' {
+		p = strings.ToUpper(p[:1]) + p[1:]
+	}
+	return p
+}
+
 func CheckPath(workingDir, requestedPath string) (string, error) {
 	absWorkDir, err := filepath.Abs(workingDir)
 	if err != nil {
 		return "", ErrPathNormalization
 	}
+	absWorkDir = NormalizePath(absWorkDir)
 
 	var absRequested string
 	if filepath.IsAbs(requestedPath) {
@@ -28,6 +39,7 @@ func CheckPath(workingDir, requestedPath string) (string, error) {
 	if err != nil {
 		return "", ErrPathNormalization
 	}
+	absRequested = NormalizePath(absRequested)
 
 	if !strings.HasPrefix(absRequested, absWorkDir) {
 		return "", ErrPathOutsideWorkDir
@@ -46,6 +58,7 @@ func CheckRelativePath(workingDir, requestedPath string) (string, error) {
 	if err != nil {
 		return "", ErrPathNormalization
 	}
+	absWorkDir = NormalizePath(absWorkDir)
 
 	rel, err := filepath.Rel(absWorkDir, absPath)
 	if err != nil {

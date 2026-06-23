@@ -10,6 +10,7 @@ import (
 
 	"devo/internal/core/approval"
 	"devo/internal/core/session"
+	"devo/internal/taskexec/pathsec"
 )
 
 type createSessionRequest struct {
@@ -46,7 +47,9 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	info, err := os.Stat(req.WorkingDirectory)
+	workingDir := pathsec.NormalizePath(req.WorkingDirectory)
+
+	info, err := os.Stat(workingDir)
 	if err != nil || !info.IsDir() {
 		writeError(w, http.StatusBadRequest, "working_directory does not exist or is not accessible")
 		return
@@ -63,7 +66,7 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 	sess := &session.Session{
 		ID:                     session.GenerateID("sess"),
 		Title:                  title,
-		WorkingDirectory:       req.WorkingDirectory,
+		WorkingDirectory:       workingDir,
 		State:                  session.StateIdle,
 		CreatedAt:              now,
 		LastActiveAt:           now,
@@ -213,6 +216,51 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, listSessionsResponse{
 		Sessions: items,
 		Total:    total,
+	})
+}
+
+type renameSessionRequest struct {
+	Title string `json:"title"`
+}
+
+type renameSessionResponse struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+func (h *Handler) RenameSession(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var req renameSessionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Title == "" {
+		writeError(w, http.StatusBadRequest, "title is required")
+		return
+	}
+
+	sess, err := h.store.Get(id)
+	if err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	sess.Title = req.Title
+	if err := h.store.Update(sess); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to rename session")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, renameSessionResponse{
+		ID:    sess.ID,
+		Title: sess.Title,
 	})
 }
 

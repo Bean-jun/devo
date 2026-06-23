@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { STATUS_LABELS, STATUS_COLORS } from '@/utils/constants'
 
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
+
+const isRenaming = ref(false)
+const renameValue = ref('')
+const renameInputRef = ref<HTMLInputElement>()
 
 const sessionName = computed(() => sessionStore.currentSession?.title ?? '未连接')
 const statusLabel = computed(() => STATUS_LABELS[sessionStore.sessionStatus] ?? '空闲')
@@ -16,8 +20,44 @@ const workingDir = computed(() => sessionStore.currentSession?.workingDirectory 
 const themeIcon = computed(() => uiStore.theme === 'dark' ? '☀️' : '🌙')
 const themeLabel = computed(() => uiStore.theme === 'dark' ? '浅色' : '深色')
 
-function toggleTheme() {
-  uiStore.toggleTheme()
+const emit = defineEmits<{
+  (e: 'toggle-theme', x: number, y: number): void
+}>()
+
+async function startRename() {
+  if (!sessionStore.currentSession) return
+  renameValue.value = sessionName.value
+  isRenaming.value = true
+  await nextTick()
+  renameInputRef.value?.focus()
+  renameInputRef.value?.select()
+}
+
+async function confirmRename() {
+  if (!isRenaming.value) return
+  const newName = renameValue.value.trim()
+  isRenaming.value = false
+  if (newName && newName !== sessionName.value && sessionStore.currentSession) {
+    try {
+      await sessionStore.renameSession(sessionStore.currentSession.id, newName)
+      uiStore.showToast('success', '会话已重命名')
+    } catch {
+      uiStore.showToast('error', '重命名失败')
+    }
+  }
+}
+
+function cancelRename() {
+  isRenaming.value = false
+}
+
+defineExpose({ startRename })
+
+function toggleTheme(event: MouseEvent) {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const x = rect.left + rect.width / 2
+  const y = rect.top + rect.height / 2
+  emit('toggle-theme', x, y)
 }
 
 const connectionStatusText = computed(() => {
@@ -42,7 +82,16 @@ const serverPort = computed(() => window.location.port)
 <template>
   <header class="statusbar">
     <div class="statusbar-left">
-      <span class="session-name" :title="sessionName">{{ sessionName }}</span>
+      <input
+        v-if="isRenaming"
+        ref="renameInputRef"
+        v-model="renameValue"
+        class="session-name-input"
+        @keydown.enter="confirmRename"
+        @keydown.escape="cancelRename"
+        @blur="confirmRename"
+      />
+      <span v-else class="session-name" :title="sessionName" @dblclick="startRename">{{ sessionName }}</span>
       <span
         class="status-indicator"
         :class="{ processing: isProcessing }"
@@ -98,6 +147,19 @@ const serverPort = computed(() => window.location.port)
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+}
+
+.session-name-input {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  width: 180px;
+  outline: none;
+  font-family: inherit;
 }
 
 .status-indicator {

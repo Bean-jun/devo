@@ -19,6 +19,7 @@ import (
 	"devo/internal/interfaces/tui"
 	"devo/internal/storage/sqlite"
 	"devo/internal/taskexec/llmclient/providers"
+	"devo/internal/taskexec/pathsec"
 	"devo/internal/taskexec/tools"
 	webembed "devo/web"
 
@@ -36,10 +37,11 @@ func main() {
 	flag.Parse()
 
 	if *workspaceFlag != "" {
-		if err := os.Chdir(*workspaceFlag); err != nil {
+		normalized := pathsec.NormalizePath(*workspaceFlag)
+		if err := os.Chdir(normalized); err != nil {
 			log.Fatalf("[devo] Failed to change working directory to %s: %v", *workspaceFlag, err)
 		}
-		log.Printf("[devo] Working directory set to: %s", *workspaceFlag)
+		log.Printf("[devo] Working directory set to: %s", normalized)
 	}
 
 	cfg, err := config.Load()

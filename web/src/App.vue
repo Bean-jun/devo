@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted, watch, ref } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useChatStore } from '@/stores/chat'
 import { useUiStore } from '@/stores/ui'
@@ -8,6 +8,7 @@ import { useApprovalStore } from '@/stores/approval'
 import { useSSE } from '@/composables/useSSE'
 import { useKeyboard } from '@/composables/useKeyboard'
 import { useCommand } from '@/composables/useCommand'
+import { useThemeTransition } from '@/composables/useThemeTransition'
 import { API_BASE } from '@/utils/constants'
 import StatusBar from '@/components/layout/StatusBar.vue'
 import ToastContainer from '@/components/layout/ToastContainer.vue'
@@ -23,6 +24,9 @@ const chatStore = useChatStore()
 const uiStore = useUiStore()
 const commandStore = useCommandStore()
 const approvalStore = useApprovalStore()
+const { startTransition } = useThemeTransition()
+
+const statusBarRef = ref<InstanceType<typeof StatusBar>>()
 
 watch(
   () => uiStore.theme,
@@ -31,6 +35,16 @@ watch(
   },
   { immediate: true }
 )
+
+async function handleToggleTheme(x: number, y: number) {
+  const newTheme = uiStore.theme === 'light' ? 'dark' : 'light'
+  const originX = newTheme === 'light' ? 0 : x
+  const originY = newTheme === 'light' ? window.innerHeight : y
+  await startTransition(originX, originY, () => {
+    uiStore.setTheme(newTheme)
+  })
+}
+
 const { connect, disconnect, onEvent, onStatusChange } = useSSE()
 const { openPalette } = useCommand()
 
@@ -196,6 +210,12 @@ useKeyboard([
     }),
   },
   {
+    key: 'F2',
+    handler: () => {
+      statusBarRef.value?.startRename()
+    },
+  },
+  {
     key: 'Escape',
     handler: () => {
       if (commandStore.isOpen) commandStore.close()
@@ -205,6 +225,7 @@ useKeyboard([
   {
     key: 'p',
     ctrl: true,
+    shift: true,
     handler: async () => {
       if (!sessionStore.currentSession) return
       if (sessionStore.isPaused) {
@@ -249,6 +270,7 @@ useKeyboard([
   {
     key: 'r',
     ctrl: true,
+    shift: true,
     handler: async () => {
       if (!sessionStore.currentSession) return
       if (!sessionStore.canResume) {
@@ -273,6 +295,7 @@ useKeyboard([
   {
     key: 'c',
     ctrl: true,
+    shift: true,
     handler: async () => {
       if (!sessionStore.currentSession) return
       if (!sessionStore.canCancel) {
@@ -299,7 +322,7 @@ useKeyboard([
 
 <template>
   <div class="app-shell">
-    <StatusBar />
+    <StatusBar ref="statusBarRef" @toggle-theme="handleToggleTheme" />
     <ChatPanel />
     <Teleport to="body">
       <ToastContainer />

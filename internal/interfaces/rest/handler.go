@@ -26,6 +26,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/sessions", h.ListSessions)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/files", h.GetFiles)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", h.GetSession)
+	mux.HandleFunc("PUT /api/v1/sessions/{id}", h.RenameSession)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/config", h.UpdateConfig)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/messages", h.PostMessage)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/messages", h.GetMessages)

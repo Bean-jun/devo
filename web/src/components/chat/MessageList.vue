@@ -70,12 +70,17 @@ watch(
 <template>
   <div class="message-list">
     <div v-if="allMessages.length === 0 && !chatStore.isStreaming" class="empty-state">
-      <div class="empty-icon">🤖</div>
-      <h2>欢迎使用 Devo</h2>
-      <p>AI 编码助手，帮你写代码、调 Bug、管理项目</p>
+      <pre class="ascii-banner">
+██████╗ ███████╗██╗   ██╗ ██████╗ 
+██╔══██╗██╔════╝██║   ██║██╔═══██╗
+██║  ██║█████╗  ██║   ██║██║   ██║
+██║  ██║██╔══╝  ╚██╗ ██╔╝██║   ██║
+██████╔╝███████╗ ╚████╔╝ ╚██████╔╝
+╚═════╝ ╚══════╝  ╚═══╝   ╚═════╝ 
+      </pre>
+      <div class="empty-subtitle">AI 编码助手 — 写代码 · 调 Bug · 管理项目</div>
       <div class="empty-hints">
-        <p>输入 <kbd>/help</kbd> 查看可用命令</p>
-        <p>直接输入需求开始对话</p>
+        <p><kbd>/help</kbd> 查看命令 • 直接输入需求开始对话</p>
       </div>
     </div>
 
@@ -106,25 +111,25 @@ watch(
   animation: fadeIn var(--transition-slow) ease;
 }
 
-.empty-icon {
-  font-size: 48px;
+.ascii-banner {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.15;
+  color: var(--color-accent);
+  margin: 0 0 var(--space-lg) 0;
+  white-space: pre;
+  user-select: none;
+  opacity: 0.85;
+}
+
+.empty-subtitle {
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text-secondary);
   margin-bottom: var(--space-lg);
 }
 
-.empty-state h2 {
-  font-size: var(--font-size-xl);
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin-bottom: var(--space-sm);
-}
-
-.empty-state p {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-base);
-}
-
 .empty-hints {
-  margin-top: var(--space-xl);
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
