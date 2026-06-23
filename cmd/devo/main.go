@@ -14,6 +14,8 @@ import (
 
 	"devo/internal/config"
 	"devo/internal/core/agentloop"
+	"devo/internal/core/concurrency"
+	"devo/internal/core/memory"
 	"devo/internal/core/session"
 	"devo/internal/interfaces/rest"
 	"devo/internal/interfaces/tui"
@@ -88,7 +90,16 @@ func main() {
 
 	llm := providers.NewClient(cfg, toolRegistry)
 	loop := agentloop.NewWithTools(store, llm, toolRegistry)
-	handler := rest.NewHandler(store, loop, Version)
+
+	pathLockManager := concurrency.NewPathLockManager()
+	memoryFileStore, err := memory.DefaultFileStore()
+	if err != nil {
+		log.Fatalf("[devo] Failed to create memory file store: %v", err)
+	}
+	memoryManager := memory.NewManager(memoryFileStore, pathLockManager, loop.GetApprovalManager())
+	loop.SetMemoryManager(memoryManager)
+
+	handler := rest.NewHandler(store, loop, memoryManager, Version)
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)

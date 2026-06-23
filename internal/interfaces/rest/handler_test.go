@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"devo/internal/core/agentloop"
+	"devo/internal/core/approval"
+	"devo/internal/core/concurrency"
+	"devo/internal/core/memory"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
@@ -18,7 +21,12 @@ func setupTestServer() (*httptest.Server, *session.InMemoryStore) {
 	store := session.NewInMemoryStore()
 	llm := llmclient.NewMockClient()
 	loop := agentloop.New(store, llm)
-	handler := NewHandler(store, loop, "0.0.1")
+	memStore, _ := memory.NewFileStore("")
+	pathLock := concurrency.NewPathLockManager()
+	approvalMgr := approval.NewManager()
+	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
+	loop.SetMemoryManager(memManager)
+	handler := NewHandler(store, loop, memManager, "0.0.1")
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
@@ -34,7 +42,12 @@ func setupTestServerWithTools() (*httptest.Server, *session.InMemoryStore, *agen
 
 	llm := &approvalMockClient{}
 	loop := agentloop.NewWithTools(store, llm, toolRegistry)
-	handler := NewHandler(store, loop, "0.0.1")
+	memStore, _ := memory.NewFileStore("")
+	pathLock := concurrency.NewPathLockManager()
+	approvalMgr := approval.NewManager()
+	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
+	loop.SetMemoryManager(memManager)
+	handler := NewHandler(store, loop, memManager, "0.0.1")
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)

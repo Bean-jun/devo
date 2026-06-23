@@ -10,6 +10,7 @@ import (
 	"devo/internal/core/archive"
 	"devo/internal/core/compressor"
 	"devo/internal/core/concurrency"
+	"devo/internal/core/memory"
 	"devo/internal/core/prompt"
 	"devo/internal/core/session"
 	"devo/internal/core/tokenmeter"
@@ -40,6 +41,7 @@ type Loop struct {
 	compressor       *compressor.Compressor
 	pathLockManager  *concurrency.PathLockManager
 	archiveManager   *archive.ArchiveManager
+	memoryManager    *memory.Manager
 	mu               sync.Mutex
 }
 
@@ -158,4 +160,15 @@ func (l *Loop) SyncArchive(sessionID string) (string, error) {
 
 func (l *Loop) SetPromptAssembler(pa *prompt.Assembler) {
 	l.promptAssembler = pa
+}
+
+func (l *Loop) SetMemoryManager(mm *memory.Manager) {
+	l.memoryManager = mm
+	if l.promptAssembler != nil {
+		l.promptAssembler.SetMemoryProvider(mm)
+	}
+}
+
+func (l *Loop) GetApprovalManager() *approval.Manager {
+	return l.approvalManager
 }

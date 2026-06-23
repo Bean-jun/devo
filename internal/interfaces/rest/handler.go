@@ -6,17 +6,19 @@ import (
 	"os"
 
 	"devo/internal/core/agentloop"
+	"devo/internal/core/memory"
 	"devo/internal/core/session"
 )
 
 type Handler struct {
-	store   session.SessionStore
-	loop    *agentloop.Loop
-	version string
+	store         session.SessionStore
+	loop          *agentloop.Loop
+	memoryManager *memory.Manager
+	version       string
 }
 
-func NewHandler(store session.SessionStore, loop *agentloop.Loop, version string) *Handler {
-	return &Handler{store: store, loop: loop, version: version}
+func NewHandler(store session.SessionStore, loop *agentloop.Loop, memoryManager *memory.Manager, version string) *Handler {
+	return &Handler{store: store, loop: loop, memoryManager: memoryManager, version: version}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
@@ -44,6 +46,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sessions/{id}/rollback", h.Rollback)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/archive", h.GetArchive)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/sync-archive", h.SyncArchive)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/memory", h.GetMemories)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/memory", h.UpsertMemory)
+	mux.HandleFunc("DELETE /api/v1/sessions/{id}/memory/{memory_id}", h.DeleteMemory)
 }
 
 func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
