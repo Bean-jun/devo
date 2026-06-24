@@ -109,6 +109,7 @@ function connectSSE(sessionId: string) {
         output: data.output_tokens ?? 0,
         session_input_tokens: data.session_input_tokens,
         session_output_tokens: data.session_output_tokens,
+        currentContextTokens: data.current_context_tokens,
       })
     }
   })

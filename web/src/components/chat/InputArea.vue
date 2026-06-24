@@ -37,8 +37,8 @@ const tokenEstimate = computed(() => estimateTokens(inputText.value))
 const canSend = computed(() => inputText.value.trim().length > 0 && !props.isDisabled)
 
 const contextUsage = computed(() => {
-  const usage = sessionStore.currentSession?.tokenUsage
-  return formatTokenCount(usage?.input ?? 0)
+  const tokens = sessionStore.currentSession?.currentContextTokens
+  return formatTokenCount(tokens ?? 0)
 })
 
 const sessionTokenUsage = computed(() => {

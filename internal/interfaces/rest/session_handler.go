@@ -33,6 +33,7 @@ type createSessionResponse struct {
 	MaxContextTokens          int                `json:"max_context_tokens"`
 	MaxConcurrentToolCalls    int                `json:"max_concurrent_tool_calls"`
 	MaxConcurrentSubprocesses int                `json:"max_concurrent_subprocesses"`
+	CurrentContextTokens      int                `json:"current_context_tokens"`
 }
 
 func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
@@ -94,6 +95,7 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 		MaxContextTokens:          sess.MaxContextTokens,
 		MaxConcurrentToolCalls:    sess.MaxConcurrentToolCalls,
 		MaxConcurrentSubprocesses: sess.MaxConcurrentSubprocesses,
+		CurrentContextTokens:      sess.CurrentContextTokens,
 	})
 }
 
@@ -113,6 +115,7 @@ type getSessionResponse struct {
 	MaxContextTokens          int                `json:"max_context_tokens"`
 	MaxConcurrentToolCalls    int                `json:"max_concurrent_tool_calls"`
 	MaxConcurrentSubprocesses int                `json:"max_concurrent_subprocesses"`
+	CurrentContextTokens      int                `json:"current_context_tokens"`
 }
 
 func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
@@ -148,18 +151,20 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 		MaxContextTokens:          sess.MaxContextTokens,
 		MaxConcurrentToolCalls:    sess.MaxConcurrentToolCalls,
 		MaxConcurrentSubprocesses: sess.MaxConcurrentSubprocesses,
+		CurrentContextTokens:      sess.CurrentContextTokens,
 	})
 }
 
 type listSessionsItem struct {
-	ID           string             `json:"id"`
-	Title        string             `json:"title"`
-	ProjectPath  string             `json:"project_path"`
-	State        string             `json:"state"`
-	CreatedAt    string             `json:"created_at"`
-	LastActiveAt string             `json:"last_active_at"`
-	MessageCount int                `json:"message_count"`
-	TokenUsage   session.TokenUsage `json:"token_usage"`
+	ID                   string             `json:"id"`
+	Title                string             `json:"title"`
+	ProjectPath          string             `json:"project_path"`
+	State                string             `json:"state"`
+	CreatedAt            string             `json:"created_at"`
+	LastActiveAt         string             `json:"last_active_at"`
+	MessageCount         int                `json:"message_count"`
+	TokenUsage           session.TokenUsage `json:"token_usage"`
+	CurrentContextTokens int                `json:"current_context_tokens"`
 }
 
 type listSessionsResponse struct {
@@ -202,14 +207,15 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	items := make([]listSessionsItem, len(sessions))
 	for i, s := range sessions {
 		items[i] = listSessionsItem{
-			ID:           s.ID,
-			Title:        s.Title,
-			ProjectPath:  s.WorkingDirectory,
-			State:        s.State.ToSnakeCase(),
-			CreatedAt:    s.CreatedAt.Format(time.RFC3339),
-			LastActiveAt: s.LastActiveAt.Format(time.RFC3339),
-			MessageCount: s.MessageCount,
-			TokenUsage:   s.TokenUsage,
+			ID:                   s.ID,
+			Title:                s.Title,
+			ProjectPath:          s.WorkingDirectory,
+			State:                s.State.ToSnakeCase(),
+			CreatedAt:            s.CreatedAt.Format(time.RFC3339),
+			LastActiveAt:         s.LastActiveAt.Format(time.RFC3339),
+			MessageCount:         s.MessageCount,
+			TokenUsage:           s.TokenUsage,
+			CurrentContextTokens: s.CurrentContextTokens,
 		}
 	}
 

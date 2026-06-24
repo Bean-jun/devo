@@ -65,6 +65,7 @@ func (s *GormStore) Update(sess *session.Session) error {
 		"compression_count":            sess.CompressionCount,
 		"compress_threshold":           sess.CompressThreshold,
 		"keep_recent":                  sess.KeepRecent,
+		"current_context_tokens":       sess.CurrentContextTokens,
 		"system_prompt_override":       sess.SystemPromptOverride,
 	}
 

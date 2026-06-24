@@ -48,6 +48,14 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 	}
 	activeMsgs := compressor.FilterActiveMessages(msgs, sess.CompressionState)
 
+	currentContextTokens := compressor.EstimateContextTokens(msgs, sess.CompressionState)
+	if currentContextTokens != sess.CurrentContextTokens {
+		sess.CurrentContextTokens = currentContextTokens
+		if err := l.store.Update(sess); err != nil {
+			return LoopStateError, fmt.Errorf("update session context tokens: %w", err)
+		}
+	}
+
 	dynamicPrompt := l.promptAssembler.Assemble(sess)
 
 	lc.ActiveMsgs = activeMsgs
@@ -83,12 +91,13 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 
 				sess, _ := l.store.Get(lc.SessionID)
 				lc.EventBus.Publish("token_usage", map[string]any{
-					"step":                  lc.StepSeq,
-					"input_tokens":          evt.TokenUsage.InputTokens,
-					"output_tokens":         evt.TokenUsage.OutputTokens,
-					"session_total_tokens":  sess.TokenUsage.Total,
-					"session_input_tokens":  sess.TokenUsage.Input,
-					"session_output_tokens": sess.TokenUsage.Output,
+					"step":                   lc.StepSeq,
+					"input_tokens":           evt.TokenUsage.InputTokens,
+					"output_tokens":          evt.TokenUsage.OutputTokens,
+					"session_total_tokens":   sess.TokenUsage.Total,
+					"session_input_tokens":   sess.TokenUsage.Input,
+					"session_output_tokens":  sess.TokenUsage.Output,
+					"current_context_tokens": sess.CurrentContextTokens,
 				})
 			}
 

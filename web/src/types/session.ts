@@ -27,6 +27,7 @@ export interface Session {
   trustLevel: TrustLevel
   approvalPolicy: ApprovalPolicy
   maxContextTokens?: number
+  currentContextTokens?: number
 }
 
 export interface CreateSessionRequest {

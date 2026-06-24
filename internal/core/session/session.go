@@ -122,6 +122,7 @@ type Session struct {
 	MaxConcurrentSubprocesses int                   `json:"max_concurrent_subprocesses"`
 	ArchivePath               string                `json:"archive_path,omitempty"`
 	SystemPromptOverride      string                `json:"system_prompt_override,omitempty"`
+	CurrentContextTokens      int                   `json:"current_context_tokens"`
 	CachedDirectorySummary    *DirectorySummary     `json:"-"`
 }
 

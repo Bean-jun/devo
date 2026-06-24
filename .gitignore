@@ -10,3 +10,4 @@ playwright-report/
 test-results/
 dist/
 build/
+tests/mock_server/requests/

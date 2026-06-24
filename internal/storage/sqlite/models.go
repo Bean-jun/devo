@@ -32,6 +32,7 @@ type SessionModel struct {
 	CompressThreshold         int    `gorm:"default:0"`
 	KeepRecent                int    `gorm:"default:0"`
 	MaxContextTokens          int    `gorm:"default:0"`
+	CurrentContextTokens      int    `gorm:"default:0"`
 	SystemPromptOverride      string `gorm:"type:text"`
 }
 
@@ -80,6 +81,7 @@ func (m *SessionModel) ToDomain() *session.Session {
 		CompressThreshold:    m.CompressThreshold,
 		KeepRecent:           m.KeepRecent,
 		MaxContextTokens:     m.MaxContextTokens,
+		CurrentContextTokens: m.CurrentContextTokens,
 		SystemPromptOverride: m.SystemPromptOverride,
 	}
 
@@ -121,6 +123,7 @@ func fromDomain(s *session.Session) *SessionModel {
 		CompressThreshold:         s.CompressThreshold,
 		KeepRecent:                s.KeepRecent,
 		MaxContextTokens:          s.MaxContextTokens,
+		CurrentContextTokens:      s.CurrentContextTokens,
 		SystemPromptOverride:      s.SystemPromptOverride,
 	}
 
