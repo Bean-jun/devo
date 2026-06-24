@@ -321,11 +321,6 @@ func TestParallelToolExecution_FileChange(t *testing.T) {
 	}
 
 	drainEvents(ch, 5*time.Second)
-
-	lc := newTestLoopContext("sess-file-change", store)
-	if !lc.HasFileChange {
-		t.Log("file change tracking not applicable for read/list tools")
-	}
 }
 
 func TestParallelToolExecution_SingleTool(t *testing.T) {

@@ -12,7 +12,6 @@ type LoopContext struct {
 
 	StepSeq         int
 	TotalStepTokens int
-	HasFileChange   bool
 
 	ActiveMsgs    []session.Message
 	DynamicPrompt string

@@ -75,28 +75,6 @@ func TestPreparingHandler_GetMessagesError(t *testing.T) {
 	}
 }
 
-func TestPreparingHandler_SetsHasFileChangeFalse(t *testing.T) {
-	loop, store := setupTestLoop()
-	createTestSession(store, "sess-filechange")
-	lc := newTestLoopContext("sess-filechange", store)
-	lc.HasFileChange = true
-
-	store.AddMessage("sess-filechange", session.Message{
-		ID:        "msg-1",
-		Role:      session.RoleUser,
-		Content:   "Hello",
-		CreatedAt: time.Now(),
-	})
-
-	_, err := loop.preparingHandler(context.Background(), lc)
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if lc.HasFileChange {
-		t.Error("expected HasFileChange to be reset to false")
-	}
-}
-
 func TestThinkingHandler_StreamingTokens(t *testing.T) {
 	loop, store := setupTestLoop()
 	createTestSession(store, "sess-think")

@@ -48,8 +48,7 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 	}
 	activeMsgs := compressor.FilterActiveMessages(msgs, sess.CompressionState)
 
-	dynamicPrompt := l.promptAssembler.Assemble(sess, lc.HasFileChange)
-	lc.HasFileChange = false
+	dynamicPrompt := l.promptAssembler.Assemble(sess)
 
 	lc.ActiveMsgs = activeMsgs
 	lc.DynamicPrompt = dynamicPrompt
@@ -327,10 +326,7 @@ func (l *Loop) executeSingleTool(ctx context.Context, lc *LoopContext, tc sessio
 				CausedByMessageID: session.GenerateID("msg"),
 			})
 		}
-		lc.HasFileChange = true
 	}
-
-	toolResult.ToolCallID = tc.ID
 	toolMsg := l.toolResultToMessage(toolResult)
 	if err := l.store.AddMessage(lc.SessionID, toolMsg); err != nil {
 		return LoopStateError, fmt.Errorf("add tool result message: %w", err)
@@ -444,7 +440,6 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 
 	var mu sync.Mutex
 	var tooManyTools bool
-	var hasFileChange bool
 
 	for _, tc := range toolCalls {
 		tc := tc
@@ -517,7 +512,6 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 						CausedByMessageID: session.GenerateID("msg"),
 					})
 				}
-				hasFileChange = true
 			}
 
 			toolResult.ToolCallID = tc.ID
@@ -567,10 +561,6 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 		default:
 		}
 		return LoopStateError, fmt.Errorf("parallel tool execution: %w", err)
-	}
-
-	if hasFileChange {
-		lc.HasFileChange = true
 	}
 
 	if tooManyTools {

@@ -3,24 +3,53 @@ package prompt
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"devo/internal/core/session"
 )
 
-const defaultBasePrompt = "You are a helpful coding assistant. Respond concisely and helpfully."
+const defaultBasePrompt = `You are Devo, a coding agent that helps users with software engineering tasks. Use the tools available to you to assist the user. Follow these instructions strictly.
+
+# Output Style
+Be concise and technical. No fluff, no emojis, no emotional language. Focus on task completion. Only explain when the user explicitly asks.
+
+# Code Conventions
+- Read files before editing them. Never modify code without context.
+- Mimic existing code style: naming, indentation, import order, and patterns.
+- Use existing libraries and utilities. Don't introduce new dependencies unless necessary.
+- Never add comments unless the logic is genuinely non-obvious.
+- Don't create files unless absolutely necessary for the task.
+- Don't add features, abstractions, type annotations, or error handling beyond what was asked.
+- Don't over-engineer for hypothetical future needs. Solve only the stated problem.
+
+# Tool Usage
+- Use file tools (read_file, write_file, edit_file, list_files) for all file operations.
+- Prefer exec_python for most runtime tasks: data processing, string manipulation, JSON handling, quick calculations, and scripting.
+- Use execute_command only when you specifically need a shell: build, test, install dependencies, logs.
+- Use search_codebase to understand the project before making changes.
+- Call independent tools in parallel to minimize round trips.
+- Each tool call must have a clear, specific purpose.
+
+# Restrictions
+- Never execute git commands (commit, push, rebase, merge, etc.). Git operations are the user's responsibility.
+
+# Multi-File Tasks
+1. Explore project structure first: list_files, read config files, understand the codebase.
+2. Break work into independent subtasks that can run in parallel.
+3. After all changes, run build or tests to verify nothing is broken.
+4. If verification fails, debug and fix before marking the task complete.
+
+# Response Language
+Always respond in the same language as the user's latest message.`
 
 type Assembler struct {
 	basePrompt     string
 	skillsProvider SkillsProvider
 	memoryProvider MemoryProvider
-	dirTreeConfig  DirTreeConfig
 }
 
 func NewAssembler() *Assembler {
 	return &Assembler{
-		basePrompt:    defaultBasePrompt,
-		dirTreeConfig: DefaultDirTreeConfig(),
+		basePrompt: defaultBasePrompt,
 	}
 }
 
@@ -36,11 +65,7 @@ func (a *Assembler) SetMemoryProvider(mp MemoryProvider) {
 	a.memoryProvider = mp
 }
 
-func (a *Assembler) SetDirTreeConfig(cfg DirTreeConfig) {
-	a.dirTreeConfig = cfg
-}
-
-func (a *Assembler) Assemble(sess *session.Session, hasFileChange bool) string {
+func (a *Assembler) Assemble(sess *session.Session) string {
 	var parts []string
 
 	parts = append(parts, a.buildBasePrompt(sess))
@@ -61,10 +86,6 @@ func (a *Assembler) Assemble(sess *session.Session, hasFileChange bool) string {
 		}
 	}
 
-	if dirTree := a.buildDirTree(sess, hasFileChange); dirTree != "" {
-		parts = append(parts, dirTree)
-	}
-
 	parts = append(parts, a.buildDynamicInfo(sess))
 
 	return strings.Join(parts, "\n\n")
@@ -80,48 +101,6 @@ func (a *Assembler) buildBasePrompt(sess *session.Session) string {
 	return prompt
 }
 
-func (a *Assembler) buildDirTree(sess *session.Session, hasFileChange bool) string {
-	if !hasFileChange && sess.CachedDirectorySummary != nil && sess.CachedDirectorySummary.Valid {
-		return sess.CachedDirectorySummary.Content
-	}
-
-	changed, err := IsDirTreeChanged(sess.WorkingDirectory, sess.CachedDirectorySummary)
-	if err != nil || changed {
-		tree, err := GenerateDirTree(sess.WorkingDirectory, a.dirTreeConfig)
-		if err != nil {
-			return ""
-		}
-		sess.CachedDirectorySummary = &session.DirectorySummary{
-			Content:     tree,
-			GeneratedAt: time.Now(),
-			Valid:       true,
-		}
-		return tree
-	}
-
-	if sess.CachedDirectorySummary != nil {
-		return sess.CachedDirectorySummary.Content
-	}
-
-	return ""
-}
-
 func (a *Assembler) buildDynamicInfo(sess *session.Session) string {
-	parts := []string{
-		fmt.Sprintf("会话 ID: %s", sess.ID),
-		fmt.Sprintf("工作目录: %s", sess.WorkingDirectory),
-		fmt.Sprintf("信任级别: %s", sess.TrustLevel),
-		fmt.Sprintf("工具调用上限: %d", sess.ToolCallLimit),
-		fmt.Sprintf("当前工具调用计数: %d", sess.ToolCallCount),
-	}
-
-	if len(sess.ApprovalPolicy) > 0 {
-		var policies []string
-		for opType, policy := range sess.ApprovalPolicy {
-			policies = append(policies, fmt.Sprintf("  %s: %s", opType, policy))
-		}
-		parts = append(parts, "审批策略:\n"+strings.Join(policies, "\n"))
-	}
-
-	return strings.Join(parts, "\n")
+	return fmt.Sprintf("会话 ID: %s\n工作目录: %s", sess.ID, sess.WorkingDirectory)
 }
