@@ -26,23 +26,29 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 		a.activeSession = sess
 		a.msgs = nil
 		a.chatView.MessageView.SetMessages(nil)
-		a.chatView.InputArea.TokenUsage = "0 token"
+		a.chatView.InputArea.TokenUsage = ""
 		a.chatView.InputArea.ContextUsage = ""
 
 		found := false
 		for i, s := range a.sessions {
 			if s.ID == sess.ID {
+				sess.NormalizeState()
 				a.sessions[i] = *sess
 				found = true
 				break
 			}
 		}
 		if !found {
+			sess.NormalizeState()
 			a.sessions = append(a.sessions, *sess)
 		}
 
 		a.statusBar.SessionTitle = sess.Title
 		a.statusBar.SessionState = sess.State
+		if sess.TokenUsage.Total > 0 {
+			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)",
+				formatTokens(sess.TokenUsage.Total), formatTokens(sess.TokenUsage.Input), formatTokens(sess.TokenUsage.Output))
+		}
 		a.updateContextUsage(sess)
 		a.ready = true
 		a.focusInput()
@@ -61,6 +67,7 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 
 	case "session_loaded":
 		sess := msg.Data.(*types.SessionInfo)
+		sess.NormalizeState()
 		a.activeSession = sess
 		a.msgs = nil
 		a.statusBar.SessionTitle = sess.Title
@@ -93,7 +100,7 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 
 	case "approval_done":
 		a.state = StateProcessing
-		a.statusBar.SessionState = "Processing"
+		a.statusBar.SessionState = "processing"
 		a.chatView.Processing = true
 		return nil
 
@@ -150,39 +157,9 @@ func (a *App) handleApprovalDecision(msg messages.ApprovalDecision) tea.Cmd {
 }
 
 func (a *App) updateContextUsage(sess *types.SessionInfo) {
-	_ = sess
-	used := a.estimateContextTokens()
-	if used == 0 && len(a.msgs) > 0 {
-		used = len(a.msgs) * 50
+	if sess != nil && sess.TokenUsage.Input > 0 {
+		a.chatView.InputArea.ContextUsage = fmt.Sprintf("context %s", formatTokens(sess.TokenUsage.Input))
 	}
-	a.chatView.InputArea.ContextUsage = fmt.Sprintf("context %s",
-		formatTokens(used))
-}
-
-func (a *App) estimateContextTokens() int {
-	total := 0
-	for _, msg := range a.msgs {
-		if msg.Content == "" {
-			continue
-		}
-		cjk := 0
-		other := 0
-		for _, ch := range msg.Content {
-			if (ch >= 0x4e00 && ch <= 0x9fff) ||
-				(ch >= 0x3400 && ch <= 0x4dbf) ||
-				(ch >= 0xf900 && ch <= 0xfaff) {
-				cjk++
-			} else {
-				other++
-			}
-		}
-		tokens := cjk*2/3 + other/4
-		if tokens < 1 {
-			tokens = 1
-		}
-		total += tokens
-	}
-	return total
 }
 
 func formatTokens(n int) string {

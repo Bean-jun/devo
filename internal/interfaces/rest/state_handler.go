@@ -19,7 +19,7 @@ func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"state": string(session.StateIdle)})
+	writeJSON(w, http.StatusOK, map[string]string{"state": session.StateIdle.ToSnakeCase()})
 }
 
 func (h *Handler) Pause(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +34,7 @@ func (h *Handler) Pause(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"state": string(session.StatePaused)})
+	writeJSON(w, http.StatusOK, map[string]string{"state": session.StatePaused.ToSnakeCase()})
 }
 
 func (h *Handler) Resume(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +49,7 @@ func (h *Handler) Resume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"state": string(session.StateProcessing)})
+	writeJSON(w, http.StatusOK, map[string]string{"state": session.StateProcessing.ToSnakeCase()})
 }
 
 func (h *Handler) Complete(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +64,7 @@ func (h *Handler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"state": string(session.StateCompleted)})
+	writeJSON(w, http.StatusOK, map[string]string{"state": session.StateCompleted.ToSnakeCase()})
 }
 
 func (h *Handler) Archive(w http.ResponseWriter, r *http.Request) {
@@ -79,5 +79,5 @@ func (h *Handler) Archive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"state": string(session.StateArchived)})
+	writeJSON(w, http.StatusOK, map[string]string{"state": session.StateArchived.ToSnakeCase()})
 }

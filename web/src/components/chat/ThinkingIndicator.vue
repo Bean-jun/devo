@@ -1,22 +1,32 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useChatStore } from '@/stores/chat'
 
 const chatStore = useChatStore()
+
+const hasContent = computed(() => chatStore.streamingContent.length > 0)
 </script>
 
 <template>
   <div class="thinking-indicator" data-test="thinking-indicator">
-    <div class="thinking-bubble">
-      <span class="thinking-label">Devo 思考中</span>
-      <span class="thinking-dots">
-        <span class="dot"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
-      </span>
-    </div>
-    <div v-if="chatStore.streamingContent" class="streaming-preview">
-      {{ chatStore.streamingContent.slice(-100) }}
-      <span class="cursor-blink">|</span>
+    <div class="streaming-bubble">
+      <div class="bubble-header">
+        <span class="bubble-role">
+          Devo
+          <span class="thinking-dots">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </span>
+        </span>
+      </div>
+
+      <div v-if="hasContent" class="bubble-content">
+        <pre class="streaming-text">{{ chatStore.streamingContent }}<span class="cursor-blink">|</span></pre>
+      </div>
+      <div v-else class="bubble-content bubble-empty">
+        <span class="empty-hint">正在思考...</span>
+      </div>
     </div>
   </div>
 </template>
@@ -27,62 +37,99 @@ const chatStore = useChatStore()
   animation: fadeIn var(--transition-fast) ease;
 }
 
-.thinking-bubble {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
+.streaming-bubble {
   background: var(--color-assistant-bubble);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-lg);
-  max-width: 200px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
-.thinking-label {
+.bubble-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-bg-tertiary);
+}
+
+.bubble-role {
   font-size: var(--font-size-sm);
+  font-weight: 600;
   color: var(--color-text-secondary);
-  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 .thinking-dots {
   display: flex;
   gap: 3px;
+  align-items: center;
 }
 
 .dot {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: var(--color-text-tertiary);
+  background: var(--color-accent);
   animation: bounce 1.4s ease-in-out infinite;
 }
 
-.dot:nth-child(1) {
-  animation-delay: 0s;
+.dot:nth-child(1) { animation-delay: 0s; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 
-.dot:nth-child(2) {
-  animation-delay: 0.2s;
+.bubble-content {
+  padding: var(--space-md);
 }
 
-.dot:nth-child(3) {
-  animation-delay: 0.4s;
+.bubble-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.streaming-preview {
-  margin-top: var(--space-xs);
-  padding: var(--space-xs) var(--space-md);
+.empty-hint {
   font-size: var(--font-size-sm);
   color: var(--color-text-tertiary);
   font-style: italic;
-  max-width: 600px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.streaming-text {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: 1.65;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: none;
+  border: none;
+  overflow: visible;
 }
 
 .cursor-blink {
-  animation: pulse 1s ease-in-out infinite;
+  animation: blink 1s step-end infinite;
   color: var(--color-accent);
+  font-weight: 400;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 </style>

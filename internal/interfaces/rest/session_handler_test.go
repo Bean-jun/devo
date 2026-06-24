@@ -40,8 +40,8 @@ func TestCreateSession_Success(t *testing.T) {
 	if result.ID == "" {
 		t.Error("expected non-empty id")
 	}
-	if result.State != "Idle" {
-		t.Errorf("expected state Idle, got %q", result.State)
+	if result.State != "idle" {
+		t.Errorf("expected state idle, got %q", result.State)
 	}
 	if result.Title != "My Test Session" {
 		t.Errorf("expected title 'My Test Session', got %q", result.Title)
@@ -343,8 +343,8 @@ func TestListSessionsFilterByStatus(t *testing.T) {
 	json.NewDecoder(resp.Body).Decode(&result)
 
 	for _, s := range result.Sessions {
-		if s.State != "Idle" {
-			t.Errorf("expected all sessions to be Idle, got %q for %s", s.State, s.ID)
+		if s.State != "idle" {
+			t.Errorf("expected all sessions to be idle, got %q for %s", s.State, s.ID)
 		}
 	}
 }

@@ -20,11 +20,11 @@ describe('useSSE', () => {
     const { connect, onEvent } = useSSE()
     const handler = vi.fn()
 
-    onEvent('message_chunk', handler)
+    onEvent('streaming_token', handler)
     connect('sess-001')
 
     const instance = (globalThis.EventSource as any).instances[0]
-    instance.dispatchEvent('message', JSON.stringify({ type: 'message_chunk', data: { content: 'Hello' } }))
+    instance.dispatchEvent('message', JSON.stringify({ type: 'streaming_token', data: { content: 'Hello' } }))
 
     expect(handler).toHaveBeenCalledWith({ content: 'Hello' })
   })
@@ -37,9 +37,9 @@ describe('useSSE', () => {
     connect('sess-001')
 
     const instance = (globalThis.EventSource as any).instances[0]
-    instance.dispatchEvent('message', JSON.stringify({ type: 'message_chunk', data: { content: 'Hello' } }))
+    instance.dispatchEvent('message', JSON.stringify({ type: 'streaming_token', data: { content: 'Hello' } }))
 
-    expect(handler).toHaveBeenCalledWith({ type: 'message_chunk', data: { content: 'Hello' } })
+    expect(handler).toHaveBeenCalledWith({ type: 'streaming_token', data: { content: 'Hello' } })
   })
 
   it('should set isConnected to true on open', () => {
@@ -86,12 +86,12 @@ describe('useSSE', () => {
     const { connect, onEvent, offEvent } = useSSE()
     const handler = vi.fn()
 
-    onEvent('message_chunk', handler)
-    offEvent('message_chunk', handler)
+    onEvent('streaming_token', handler)
+    offEvent('streaming_token', handler)
     connect('sess-001')
 
     const instance = (globalThis.EventSource as any).instances[0]
-    instance.dispatchEvent('message', JSON.stringify({ type: 'message_chunk', data: { content: 'Hello' } }))
+    instance.dispatchEvent('message', JSON.stringify({ type: 'streaming_token', data: { content: 'Hello' } }))
 
     expect(handler).not.toHaveBeenCalled()
   })

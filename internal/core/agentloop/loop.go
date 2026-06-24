@@ -20,6 +20,7 @@ import (
 
 type ToolExecutor interface {
 	Execute(workingDir string, toolName string, params map[string]interface{}) (*tools.ToolResult, error)
+	ExecuteAsync(ctx context.Context, workingDir string, toolName string, params map[string]interface{}, onProgress func(tools.ToolProgress)) (*tools.ToolResult, error)
 	GetTool(name string) (tools.Tool, bool)
 	ListTools() []tools.Tool
 }
@@ -42,12 +43,14 @@ type Loop struct {
 	pathLockManager  *concurrency.PathLockManager
 	archiveManager   *archive.ArchiveManager
 	memoryManager    *memory.Manager
+	stateMachine     *StateMachine
+	activeLoops      sync.Map
 	mu               sync.Mutex
 }
 
 func New(store session.SessionStore, llmClient llmclient.Client) *Loop {
 	pathLockManager := concurrency.NewPathLockManager()
-	return &Loop{
+	l := &Loop{
 		store:            store,
 		llmClient:        llmClient,
 		promptAssembler:  prompt.NewAssembler(),
@@ -58,11 +61,14 @@ func New(store session.SessionStore, llmClient llmclient.Client) *Loop {
 		pathLockManager:  pathLockManager,
 		archiveManager:   archive.NewArchiveManager(store, pathLockManager),
 	}
+	l.stateMachine = NewStateMachine()
+	l.registerHandlers(l.stateMachine)
+	return l
 }
 
 func NewWithTools(store session.SessionStore, llmClient llmclient.Client, toolExecutor ToolExecutor) *Loop {
 	pathLockManager := concurrency.NewPathLockManager()
-	return &Loop{
+	l := &Loop{
 		store:            store,
 		llmClient:        llmClient,
 		promptAssembler:  prompt.NewAssembler(),
@@ -74,6 +80,9 @@ func NewWithTools(store session.SessionStore, llmClient llmclient.Client, toolEx
 		pathLockManager:  pathLockManager,
 		archiveManager:   archive.NewArchiveManager(store, pathLockManager),
 	}
+	l.stateMachine = NewStateMachine()
+	l.registerHandlers(l.stateMachine)
+	return l
 }
 
 func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) error {
@@ -145,7 +154,30 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		return fmt.Errorf("get event bus: %w", err)
 	}
 
-	go l.runAgentLoop(context.Background(), sessionID, eventBus)
+	eventBus.Publish("thinking", map[string]string{
+		"message": "开始处理用户请求...",
+	})
+
+	lc := &LoopContext{
+		SessionID: sessionID,
+		EventBus:  eventBus,
+		CancelCh:  make(chan struct{}, 1),
+		PauseCh:   make(chan struct{}, 1),
+		ResumeCh:  make(chan struct{}, 1),
+	}
+
+	l.activeLoops.Store(sessionID, lc)
+	go func() {
+		defer l.activeLoops.Delete(sessionID)
+		l.stateMachine.Run(context.Background(), lc)
+
+		sess, err := l.store.Get(sessionID)
+		if err == nil {
+			sess.State = session.StateIdle
+			sess.LastActiveAt = time.Now()
+			l.store.Update(sess)
+		}
+	}()
 
 	return nil
 }

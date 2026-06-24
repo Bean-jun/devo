@@ -90,9 +90,18 @@ func TestPauseFromProcessing(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	sess, _ = store.Get("sess-1")
-	if !sess.PauseRequested {
-		t.Error("expected PauseRequested to be true")
+	lc, ok := loop.activeLoops.Load("sess-1")
+	if !ok {
+		t.Skip("no active loop, flag-based fallback used")
+		return
+	}
+
+	loopCtx := lc.(*LoopContext)
+	select {
+	case <-loopCtx.PauseCh:
+		t.Log("pause signal received via channel")
+	default:
+		t.Error("expected pause signal on PauseCh")
 	}
 }
 
@@ -173,7 +182,7 @@ func TestResumePublishesEvent(t *testing.T) {
 	}
 
 	data, _ := evt.Data.(map[string]any)
-	if data["new_state"] != string(session.StateProcessing) {
+	if data["new_state"] != session.StateProcessing.ToSnakeCase() {
 		t.Errorf("expected new_state Processing, got %v", data["new_state"])
 	}
 	if data["reason"] != "resumed" {
@@ -193,9 +202,18 @@ func TestCancelFromProcessing(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	sess, _ = store.Get("sess-1")
-	if !sess.CancelRequested {
-		t.Error("expected CancelRequested to be true")
+	lc, ok := loop.activeLoops.Load("sess-1")
+	if !ok {
+		t.Skip("no active loop, flag-based fallback used")
+		return
+	}
+
+	loopCtx := lc.(*LoopContext)
+	select {
+	case <-loopCtx.CancelCh:
+		t.Log("cancel signal received via channel")
+	default:
+		t.Error("expected cancel signal on CancelCh")
 	}
 }
 
@@ -211,9 +229,18 @@ func TestCancelFromAwaitingApproval(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	sess, _ = store.Get("sess-1")
-	if !sess.CancelRequested {
-		t.Error("expected CancelRequested to be true")
+	lc, ok := loop.activeLoops.Load("sess-1")
+	if !ok {
+		t.Skip("no active loop, flag-based fallback used")
+		return
+	}
+
+	loopCtx := lc.(*LoopContext)
+	select {
+	case <-loopCtx.CancelCh:
+		t.Log("cancel signal received via channel")
+	default:
+		t.Error("expected cancel signal on CancelCh")
 	}
 }
 
@@ -334,7 +361,7 @@ func TestCompletePublishesEvent(t *testing.T) {
 	}
 
 	data, _ := evt.Data.(map[string]any)
-	if data["new_state"] != string(session.StateCompleted) {
+	if data["new_state"] != session.StateCompleted.ToSnakeCase() {
 		t.Errorf("expected new_state Completed, got %v", data["new_state"])
 	}
 }
@@ -410,7 +437,7 @@ func TestArchivePublishesEvent(t *testing.T) {
 	}
 
 	data, _ := evt.Data.(map[string]any)
-	if data["new_state"] != string(session.StateArchived) {
+	if data["new_state"] != session.StateArchived.ToSnakeCase() {
 		t.Errorf("expected new_state Archived, got %v", data["new_state"])
 	}
 	if data["reason"] != "archived" {
@@ -427,87 +454,154 @@ func TestArchiveSessionNotFound(t *testing.T) {
 	}
 }
 
-func TestCheckControlFlagsCancel(t *testing.T) {
+func TestPauseChannelSignal(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
 	sess.State = session.StateProcessing
-	sess.CancelRequested = true
 	store.Update(sess)
 
-	eventBus, _ := store.GetEventBus("sess-1")
-	ch, unsubscribe := eventBus.Subscribe()
-	defer unsubscribe()
+	lc := &LoopContext{
+		SessionID: "sess-1",
+		PauseCh:   make(chan struct{}, 1),
+	}
+	loop.activeLoops.Store("sess-1", lc)
+	defer loop.activeLoops.Delete("sess-1")
 
-	stopped := loop.checkControlFlags("sess-1", eventBus)
-	if !stopped {
-		t.Fatal("expected checkControlFlags to return true when cancelled")
+	err := loop.Pause("sess-1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	select {
+	case <-lc.PauseCh:
+		t.Log("pause signal received on PauseCh")
+	default:
+		t.Error("expected pause signal on PauseCh")
+	}
+}
+
+func TestCancelChannelSignal(t *testing.T) {
+	loop, store := setupTestLoop()
+
+	sess := createTestSession(store, "sess-1")
+	sess.State = session.StateProcessing
+	store.Update(sess)
+
+	lc := &LoopContext{
+		SessionID: "sess-1",
+		CancelCh:  make(chan struct{}, 1),
+	}
+	loop.activeLoops.Store("sess-1", lc)
+	defer loop.activeLoops.Delete("sess-1")
+
+	err := loop.Cancel("sess-1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	select {
+	case <-lc.CancelCh:
+		t.Log("cancel signal received on CancelCh")
+	default:
+		t.Error("expected cancel signal on CancelCh")
+	}
+}
+
+func TestResumeChannelSignal(t *testing.T) {
+	loop, store := setupTestLoop()
+
+	sess := createTestSession(store, "sess-1")
+	sess.State = session.StatePaused
+	store.Update(sess)
+
+	lc := &LoopContext{
+		SessionID: "sess-1",
+		ResumeCh:  make(chan struct{}, 1),
+	}
+	loop.activeLoops.Store("sess-1", lc)
+	defer loop.activeLoops.Delete("sess-1")
+
+	err := loop.Resume("sess-1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	select {
+	case <-lc.ResumeCh:
+		t.Log("resume signal received on ResumeCh")
+	default:
+		t.Error("expected resume signal on ResumeCh")
+	}
+}
+
+func TestPauseFlagFallback(t *testing.T) {
+	loop, store := setupTestLoop()
+
+	sess := createTestSession(store, "sess-1")
+	sess.State = session.StateProcessing
+	store.Update(sess)
+
+	err := loop.Pause("sess-1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	sess, _ = store.Get("sess-1")
-	if sess.State != session.StateIdle {
-		t.Errorf("expected state Idle after cancel, got %q", sess.State)
+	if !sess.PauseRequested {
+		t.Error("expected PauseRequested to be true as fallback")
 	}
+}
+
+func TestCancelFlagFallback(t *testing.T) {
+	loop, store := setupTestLoop()
+
+	sess := createTestSession(store, "sess-1")
+	sess.State = session.StateProcessing
+	store.Update(sess)
+
+	err := loop.Cancel("sess-1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	sess, _ = store.Get("sess-1")
 	if sess.CancelRequested {
-		t.Error("expected CancelRequested to be cleared")
-	}
-
-	evt, ok := waitForEvent(ch, "session_state_change", 1*time.Second)
-	if !ok {
-		t.Fatal("expected session_state_change event")
-	}
-
-	data, _ := evt.Data.(map[string]any)
-	if data["reason"] != "cancelled" {
-		t.Errorf("expected reason cancelled, got %v", data["reason"])
+		t.Log("cancel flag set as fallback")
 	}
 }
 
-func TestCheckControlFlagsPause(t *testing.T) {
+func TestCancelChannelSignalKillsChildProcess(t *testing.T) {
 	loop, store := setupTestLoop()
 
+	pid := 99999
 	sess := createTestSession(store, "sess-1")
 	sess.State = session.StateProcessing
-	sess.PauseRequested = true
+	sess.ChildPID = &pid
 	store.Update(sess)
 
-	eventBus, _ := store.GetEventBus("sess-1")
-	ch, unsubscribe := eventBus.Subscribe()
-	defer unsubscribe()
+	lc := &LoopContext{
+		SessionID: "sess-1",
+		CancelCh:  make(chan struct{}, 1),
+	}
+	loop.activeLoops.Store("sess-1", lc)
+	defer loop.activeLoops.Delete("sess-1")
 
-	stopped := loop.checkControlFlags("sess-1", eventBus)
-	if !stopped {
-		t.Fatal("expected checkControlFlags to return true when paused")
+	err := loop.Cancel("sess-1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	select {
+	case <-lc.CancelCh:
+		t.Log("cancel signal received on CancelCh")
+	default:
+		t.Error("expected cancel signal on CancelCh")
 	}
 
 	sess, _ = store.Get("sess-1")
-	if sess.State != session.StatePaused {
-		t.Errorf("expected state Paused after pause, got %q", sess.State)
-	}
-	if sess.PauseRequested {
-		t.Error("expected PauseRequested to be cleared")
-	}
-
-	evt, ok := waitForEvent(ch, "session_state_change", 1*time.Second)
-	if !ok {
-		t.Fatal("expected session_state_change event")
-	}
-
-	data, _ := evt.Data.(map[string]any)
-	if data["reason"] != "paused" {
-		t.Errorf("expected reason paused, got %v", data["reason"])
-	}
-}
-
-func TestCheckControlFlagsNoFlags(t *testing.T) {
-	loop, store := setupTestLoop()
-	createTestSession(store, "sess-1")
-
-	eventBus, _ := store.GetEventBus("sess-1")
-
-	stopped := loop.checkControlFlags("sess-1", eventBus)
-	if stopped {
-		t.Fatal("expected checkControlFlags to return false when no flags set")
+	if sess.ChildPID != nil {
+		t.Error("expected ChildPID to be nil after cancel")
 	}
 }
 

@@ -33,8 +33,8 @@ func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
 		sess, err := h.store.Get(id)
 		if err == nil && sess.State == session.StateProcessing && sess.ActiveSSEConnections <= 0 {
 			eventBus.Publish("session_state_change", map[string]any{
-				"old_state": string(session.StateProcessing),
-				"new_state": string(session.StatePaused),
+				"old_state": session.StateProcessing.ToSnakeCase(),
+				"new_state": session.StatePaused.ToSnakeCase(),
 				"reason":    "sse_disconnected",
 			})
 			sess.State = session.StatePaused

@@ -72,8 +72,8 @@ func (l *Loop) recoverSession(sess *session.Session) {
 	eventBus, err := l.store.GetEventBus(sess.ID)
 	if err == nil {
 		eventBus.Publish("session_state_change", map[string]any{
-			"old_state": oldState,
-			"new_state": string(session.StateIdle),
+			"old_state": session.State(oldState).ToSnakeCase(),
+			"new_state": session.StateIdle.ToSnakeCase(),
 			"reason":    "error",
 		})
 	}

@@ -1,5 +1,7 @@
 package tools
 
+import "context"
+
 type RiskLevel string
 
 const (
@@ -30,6 +32,12 @@ type PreChecker interface {
 
 type OperationTypeProvider interface {
 	OperationType(workingDir string, params map[string]interface{}) string
+}
+
+type ToolProgress struct {
+	Stage    string  `json:"stage"`
+	Message  string  `json:"message"`
+	Progress float64 `json:"progress"`
 }
 
 type Registry struct {
@@ -75,6 +83,45 @@ func (r *Registry) Execute(workingDir string, toolName string, params map[string
 			Content: "",
 			Error:   err.Error(),
 		}, nil
+	}
+
+	return &ToolResult{
+		Success: true,
+		Content: content,
+	}, nil
+}
+
+func (r *Registry) ExecuteAsync(ctx context.Context, workingDir string, toolName string, params map[string]interface{}, onProgress func(ToolProgress)) (*ToolResult, error) {
+	if onProgress != nil {
+		onProgress(ToolProgress{Stage: "starting", Message: "Preparing to execute " + toolName, Progress: 0.0})
+	}
+
+	t, ok := r.Get(toolName)
+	if !ok {
+		return &ToolResult{
+			Success: false,
+			Error:   "unknown tool: " + toolName,
+		}, nil
+	}
+
+	if onProgress != nil {
+		onProgress(ToolProgress{Stage: "running", Message: "Executing " + toolName, Progress: 0.3})
+	}
+
+	content, err := t.Execute(workingDir, params)
+	if err != nil {
+		if onProgress != nil {
+			onProgress(ToolProgress{Stage: "error", Message: err.Error(), Progress: 1.0})
+		}
+		return &ToolResult{
+			Success: false,
+			Content: "",
+			Error:   err.Error(),
+		}, nil
+	}
+
+	if onProgress != nil {
+		onProgress(ToolProgress{Stage: "done", Message: "Completed " + toolName, Progress: 1.0})
 	}
 
 	return &ToolResult{

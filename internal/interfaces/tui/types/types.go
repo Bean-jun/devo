@@ -14,6 +14,11 @@ type SessionInfo struct {
 	MaxContextTokens int               `json:"max_context_tokens"`
 }
 
+// NormalizeState converts the State field from PascalCase to snake_case.
+func (s *SessionInfo) NormalizeState() {
+	s.State = ToSnakeCase(s.State)
+}
+
 type TokenUsage struct {
 	Input  int `json:"input"`
 	Output int `json:"output"`
@@ -60,6 +65,22 @@ type CreateSessionRequest struct {
 
 type SendMessageRequest struct {
 	Content string `json:"content"`
+}
+
+// ToSnakeCase converts PascalCase to snake_case (e.g., "AwaitingApproval" -> "awaiting_approval")
+func ToSnakeCase(s string) string {
+	var result []byte
+	for i, ch := range s {
+		if ch >= 'A' && ch <= 'Z' {
+			if i > 0 {
+				result = append(result, '_')
+			}
+			result = append(result, byte(ch+32))
+		} else {
+			result = append(result, byte(ch))
+		}
+	}
+	return string(result)
 }
 
 type ApproveRequest struct {

@@ -274,10 +274,10 @@ func TestRecoverCrashedSessions_SSEEventPublished(t *testing.T) {
 			data, ok := evt.Data.(map[string]any)
 			if ok && data["reason"] == "error" {
 				found = true
-				if data["new_state"] != string(session.StateIdle) {
+				if data["new_state"] != session.StateIdle.ToSnakeCase() {
 					t.Errorf("expected new_state Idle, got %v", data["new_state"])
 				}
-				if data["old_state"] != string(session.StateProcessing) {
+				if data["old_state"] != session.StateProcessing.ToSnakeCase() {
 					t.Errorf("expected old_state Processing, got %v", data["old_state"])
 				}
 			}

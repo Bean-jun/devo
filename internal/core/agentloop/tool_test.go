@@ -52,6 +52,16 @@ func (m *toolCallingMockClient) Complete(ctx context.Context, messages []session
 	return &llmclient.CompleteResult{Text: "OK"}, nil
 }
 
+func (m *toolCallingMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
+}
+
 func TestAgentLoopWithToolCalling(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("hello from tool"), 0644)
@@ -154,6 +164,16 @@ func (m *multiToolMockClient) Complete(ctx context.Context, messages []session.M
 	return &llmclient.CompleteResult{Text: "OK"}, nil
 }
 
+func (m *multiToolMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
+}
+
 func TestAgentLoopWithMultipleToolCalls(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Mkdir(filepath.Join(tmpDir, "nested"), 0755)
@@ -180,9 +200,12 @@ func TestAgentLoopWithMultipleToolCalls(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	for i := 0; i < 10; i++ {
-		_, ok := waitForEvent(ch, "", 500*time.Millisecond)
+	for i := 0; i < 50; i++ {
+		evt, ok := waitForEvent(ch, "", 500*time.Millisecond)
 		if !ok {
+			break
+		}
+		if evt.Type == "loop.loop_completed" {
 			break
 		}
 	}
@@ -283,6 +306,16 @@ func (m *limitedToolMockClient) Complete(ctx context.Context, messages []session
 	}
 
 	return &llmclient.CompleteResult{Text: "OK"}, nil
+}
+
+func (m *limitedToolMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
 }
 
 func TestToolCallLimitReached(t *testing.T) {
@@ -578,6 +611,17 @@ func TestContinuationWithNewTask(t *testing.T) {
 
 	if err := loop.ProcessMessage(context.Background(), "sess-1", "Do a completely different task now"); err != nil {
 		t.Fatalf("new task message: %v", err)
+	}
+
+	for {
+		evt, ok := waitForEvent(ch, "session_state_change", 3*time.Second)
+		if !ok {
+			break
+		}
+		data, _ := evt.Data.(map[string]any)
+		if data["new_state"] == "Idle" {
+			break
+		}
 	}
 
 	msgsAfterContinue, _, _ := store.GetMessages("sess-1", 0, 0)

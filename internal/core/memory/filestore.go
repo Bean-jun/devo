@@ -175,6 +175,9 @@ func (s *FileStore) Close() error {
 func (s *FileStore) readSections(filePath string) (map[string]string, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return make(map[string]string), nil
+		}
 		return nil, err
 	}
 	defer f.Close()

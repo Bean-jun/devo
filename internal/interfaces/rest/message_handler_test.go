@@ -287,7 +287,7 @@ func TestFullConversationFlow(t *testing.T) {
 	var sessResp getSessionResponse
 	json.NewDecoder(resp4.Body).Decode(&sessResp)
 
-	if sessResp.State != "Idle" {
-		t.Errorf("session should be Idle after message completes, got %q", sessResp.State)
+	if sessResp.State != "idle" {
+		t.Errorf("session should be idle after message completes, got %q", sessResp.State)
 	}
 }

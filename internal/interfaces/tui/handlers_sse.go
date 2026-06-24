@@ -74,7 +74,7 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 		}
 		a.approvalModal.Show(req, a.width, a.height)
 		a.state = StateAwaitingApproval
-		a.statusBar.SessionState = "AwaitingApproval"
+		a.statusBar.SessionState = "awaiting_approval"
 
 	case "approval_auto":
 		summary, _ := msg.Data["summary"].(string)
@@ -83,12 +83,25 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 		a.chatView.MessageView.AddSystemNotice(notice)
 
 	case "token_usage":
-		inputTokens, _ := msg.Data["input_tokens"].(float64)
-		outputTokens, _ := msg.Data["output_tokens"].(float64)
-		in := int(inputTokens)
-		out := int(outputTokens)
-		total := in + out
-		a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)", formatTokens(total), formatTokens(in), formatTokens(out))
+		var in, out, total int
+		if si, ok := msg.Data["session_input_tokens"].(float64); ok {
+			in = int(si)
+		}
+		if so, ok := msg.Data["session_output_tokens"].(float64); ok {
+			out = int(so)
+		}
+		if st, ok := msg.Data["session_total_tokens"].(float64); ok {
+			total = int(st)
+		}
+		if total == 0 {
+			it, _ := msg.Data["input_tokens"].(float64)
+			ot, _ := msg.Data["output_tokens"].(float64)
+			in = int(it)
+			out = int(ot)
+			total = in + out
+		}
+		a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)",
+			formatTokens(total), formatTokens(in), formatTokens(out))
 		if a.activeSession != nil {
 			a.updateContextUsage(a.activeSession)
 		}

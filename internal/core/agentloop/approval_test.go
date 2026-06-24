@@ -52,6 +52,16 @@ func (m *approvalMockClient) Complete(ctx context.Context, messages []session.Me
 	return &llmclient.CompleteResult{Text: "OK"}, nil
 }
 
+func (m *approvalMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
+}
+
 func TestAgentLoopWithApproval_Approve(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -166,6 +176,16 @@ func (m *rejectionMockClient) Complete(ctx context.Context, messages []session.M
 	}
 
 	return &llmclient.CompleteResult{Text: "OK"}, nil
+}
+
+func (m *rejectionMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
 }
 
 func TestAgentLoopWithApproval_Reject(t *testing.T) {
@@ -284,6 +304,16 @@ func (m *readOnlyMockClient) Complete(ctx context.Context, messages []session.Me
 	return &llmclient.CompleteResult{Text: "OK"}, nil
 }
 
+func (m *readOnlyMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
+}
+
 func TestAgentLoop_ReadOnlyToolsNoApproval(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("read-only content"), 0644)
@@ -393,6 +423,10 @@ func TestApprovalRequiredEventFields(t *testing.T) {
 	if data["risk_level"] != "medium" {
 		t.Errorf("expected risk_level 'medium', got %v", data["risk_level"])
 	}
+
+	if approvalID, ok := data["approval_id"].(string); ok && approvalID != "" {
+		loop.ResolveApproval("sess-1", approvalID, "reject")
+	}
 }
 
 type policyAutoApprovalMockClient struct {
@@ -431,6 +465,16 @@ func (m *policyAutoApprovalMockClient) Complete(ctx context.Context, messages []
 	}
 
 	return &llmclient.CompleteResult{Text: "OK"}, nil
+}
+
+func (m *policyAutoApprovalMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
 }
 
 func TestAgentLoop_PolicySessionTrust_AutoApprove(t *testing.T) {
@@ -694,6 +738,16 @@ func (m *overwriteApprovalMockClient) Complete(ctx context.Context, messages []s
 	return &llmclient.CompleteResult{Text: "OK"}, nil
 }
 
+func (m *overwriteApprovalMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
+}
+
 func TestApprovalRequest_WriteFileDiff(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "existing.txt"), []byte("old line1\nold line2\n"), 0644)
@@ -813,6 +867,16 @@ func (m *editApprovalMockClient) Complete(ctx context.Context, messages []sessio
 	}
 
 	return &llmclient.CompleteResult{Text: "OK"}, nil
+}
+
+func (m *editApprovalMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
 }
 
 func TestApprovalRequest_EditFileDiff(t *testing.T) {
@@ -950,6 +1014,16 @@ func (m *editFailureMockClient) Complete(ctx context.Context, messages []session
 	return &llmclient.CompleteResult{Text: "OK"}, nil
 }
 
+func (m *editFailureMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
+}
+
 func TestApprovalRequest_EditFileDiffFailureNoApproval(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "dup.txt"), []byte("hello\nhello\n"), 0644)
@@ -1062,6 +1136,16 @@ func (m *execCommandApprovalMockClient) Complete(ctx context.Context, messages [
 	}
 
 	return &llmclient.CompleteResult{Text: "OK"}, nil
+}
+
+func (m *execCommandApprovalMockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
 }
 
 func TestApprovalRequest_ExecuteCommandContext(t *testing.T) {

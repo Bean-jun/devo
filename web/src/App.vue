@@ -93,11 +93,22 @@ function connectSSE(sessionId: string) {
     chatStore.startStreaming()
   })
 
+  onEvent('streaming_token', (data: any) => {
+    chatStore.appendStreamChunk(data.content || data.token || '')
+  })
+
+  onEvent('streaming_complete', (_data: any) => {
+    // streaming_complete arrives before message_complete
+    // Actual message finalization is handled in message_complete
+  })
+
   onEvent('token_usage', (data: any) => {
     if (sessionStore.currentSession) {
       sessionStore.updateTokenUsage(sessionStore.currentSession.id, {
         input: data.input_tokens ?? 0,
         output: data.output_tokens ?? 0,
+        session_input_tokens: data.session_input_tokens,
+        session_output_tokens: data.session_output_tokens,
       })
     }
   })
@@ -150,6 +161,18 @@ function connectSSE(sessionId: string) {
     }
   })
 
+  onEvent('tool_progress', (data: any) => {
+    const toolName = data.tool_name || ''
+    const msgs = chatStore.messages
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const msg = msgs[i]
+      if (msg.toolCall && msg.toolCall.name === toolName && msg.toolCall.status === 'pending') {
+        chatStore.updateToolCallStatus(msg.toolCall.id, 'executing')
+        break
+      }
+    }
+  })
+
   onEvent('approval_required', (data: any) => {
     const details = data.details || {}
     approvalStore.setApproval({
@@ -174,6 +197,13 @@ function connectSSE(sessionId: string) {
     chatStore.appendSystemMessage(`已根据信任策略（${policy}）自动批准：${summary}`)
   })
 
+  onEvent('approval_resolved', (_data: any) => {
+    approvalStore.clearApproval()
+    if (uiStore.activeModal === 'approval') {
+      uiStore.setActiveModal(null)
+    }
+  })
+
   onEvent('session_state_change', (data: any) => {
     if (sessionStore.currentSession) {
       const newState = data.new_state || 'idle'
@@ -194,6 +224,10 @@ function connectSSE(sessionId: string) {
     const count = data.compressed_count ?? 0
     const tokens = data.tokens_removed ?? 0
     chatStore.appendSystemMessage(`上下文已压缩：${count} 条消息，释放约 ${tokens} tokens`)
+  })
+
+  onEvent('file_state_warning', (data: any) => {
+    chatStore.appendSystemMessage(`文件状态警告：${data.message || '文件可能已被外部修改'}`)
   })
 
   onEvent('error', (data: any) => {

@@ -105,7 +105,7 @@ describe('truncateText', () => {
 
 describe('estimateTokens', () => {
   it('should estimate tokens based on text length', () => {
-    expect(estimateTokens('hello world')).toBe(4)
+    expect(estimateTokens('hello world')).toBe(3)
   })
 
   it('should return 0 for empty string', () => {

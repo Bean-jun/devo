@@ -2,7 +2,9 @@ package rest
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -269,9 +271,30 @@ func TestApprove_ApproveDecision(t *testing.T) {
 	}
 	store.Create(sess)
 
-	loop.ProcessMessage(nil, "sess-test-1", "Write test_approve.txt")
+	eventBus, _ := store.GetEventBus("sess-test-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
 
-	time.Sleep(200 * time.Millisecond)
+	loop.ProcessMessage(context.Background(), "sess-test-1", "Write test_approve.txt")
+
+	var approvalID string
+	timeout := time.After(2 * time.Second)
+loop:
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timeout waiting for approval_required event")
+		case evt, ok := <-ch:
+			if !ok {
+				t.Fatal("event channel closed")
+			}
+			if evt.Type == "approval_required" {
+				data := evt.Data.(map[string]any)
+				approvalID = data["approval_id"].(string)
+				break loop
+			}
+		}
+	}
 
 	sessGot, _ := store.Get("sess-test-1")
 	if sessGot.State != session.StateAwaitingApproval {
@@ -281,7 +304,8 @@ func TestApprove_ApproveDecision(t *testing.T) {
 	body := map[string]string{"decision": "approve"}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/approve", "application/json", bytes.NewReader(jsonBody))
+	url := fmt.Sprintf("%s/api/v1/sessions/sess-test-1/approve/%s", server.URL, approvalID)
+	resp, err := http.Post(url, "application/json", bytes.NewReader(jsonBody))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -293,8 +317,8 @@ func TestApprove_ApproveDecision(t *testing.T) {
 
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["decision"] != "approved" {
-		t.Errorf("expected decision approved, got %v", result["decision"])
+	if result["decision"] != "approve" {
+		t.Errorf("expected decision approve, got %v", result["decision"])
 	}
 }
 
@@ -311,9 +335,30 @@ func TestApprove_RejectDecision(t *testing.T) {
 	}
 	store.Create(sess)
 
-	loop.ProcessMessage(nil, "sess-test-1", "Write test_approve.txt")
+	eventBus, _ := store.GetEventBus("sess-test-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
 
-	time.Sleep(200 * time.Millisecond)
+	loop.ProcessMessage(context.Background(), "sess-test-1", "Write test_approve.txt")
+
+	var approvalID string
+	timeout := time.After(2 * time.Second)
+loop:
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timeout waiting for approval_required event")
+		case evt, ok := <-ch:
+			if !ok {
+				t.Fatal("event channel closed")
+			}
+			if evt.Type == "approval_required" {
+				data := evt.Data.(map[string]any)
+				approvalID = data["approval_id"].(string)
+				break loop
+			}
+		}
+	}
 
 	sessGot, _ := store.Get("sess-test-1")
 	if sessGot.State != session.StateAwaitingApproval {
@@ -323,7 +368,8 @@ func TestApprove_RejectDecision(t *testing.T) {
 	body := map[string]string{"decision": "reject"}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/approve", "application/json", bytes.NewReader(jsonBody))
+	url := fmt.Sprintf("%s/api/v1/sessions/sess-test-1/approve/%s", server.URL, approvalID)
+	resp, err := http.Post(url, "application/json", bytes.NewReader(jsonBody))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -335,8 +381,8 @@ func TestApprove_RejectDecision(t *testing.T) {
 
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["decision"] != "rejected" {
-		t.Errorf("expected decision rejected, got %v", result["decision"])
+	if result["decision"] != "reject" {
+		t.Errorf("expected decision reject, got %v", result["decision"])
 	}
 }
 
@@ -356,7 +402,8 @@ func TestApprove_InvalidDecision(t *testing.T) {
 	body := map[string]string{"decision": "maybe"}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/approve", "application/json", bytes.NewReader(jsonBody))
+	url := fmt.Sprintf("%s/api/v1/sessions/sess-test-1/approve/dummy-id", server.URL)
+	resp, _ := http.Post(url, "application/json", bytes.NewReader(jsonBody))
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusBadRequest {
@@ -377,22 +424,44 @@ func TestApprove_TimeoutReturns409(t *testing.T) {
 	}
 	store.Create(sess)
 
-	loop.ProcessMessage(nil, "sess-test-1", "Write test_approve.txt")
+	eventBus, _ := store.GetEventBus("sess-test-1")
+	ch, unsubscribe := eventBus.Subscribe()
+	defer unsubscribe()
 
-	time.Sleep(200 * time.Millisecond)
+	loop.ProcessMessage(context.Background(), "sess-test-1", "Write test_approve.txt")
+
+	var approvalID string
+	timeout := time.After(2 * time.Second)
+loop:
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timeout waiting for approval_required event")
+		case evt, ok := <-ch:
+			if !ok {
+				t.Fatal("event channel closed")
+			}
+			if evt.Type == "approval_required" {
+				data := evt.Data.(map[string]any)
+				approvalID = data["approval_id"].(string)
+				break loop
+			}
+		}
+	}
 
 	sessGot, _ := store.Get("sess-test-1")
 	if sessGot.State != session.StateAwaitingApproval {
 		t.Fatalf("expected state AwaitingApproval, got %q", sessGot.State)
 	}
 
-	sessGot.ApprovalTimeoutSeconds = 0
-	store.Update(sessGot)
+	// Make the approval request expired by setting timeout to past
+	loop.GetApprovalManager().SetTimeout(approvalID, time.Now().Add(-1*time.Second))
 
 	body := map[string]string{"decision": "approve"}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/approve", "application/json", bytes.NewReader(jsonBody))
+	url := fmt.Sprintf("%s/api/v1/sessions/sess-test-1/approve/%s", server.URL, approvalID)
+	resp, _ := http.Post(url, "application/json", bytes.NewReader(jsonBody))
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {
@@ -407,7 +476,8 @@ func TestApprove_SessionNotFound(t *testing.T) {
 	body := map[string]string{"decision": "approve"}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/nonexistent/approve", "application/json", bytes.NewReader(jsonBody))
+	url := fmt.Sprintf("%s/api/v1/sessions/nonexistent/approve/dummy-id", server.URL)
+	resp, _ := http.Post(url, "application/json", bytes.NewReader(jsonBody))
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -431,7 +501,8 @@ func TestApprove_NotAwaitingApproval(t *testing.T) {
 	body := map[string]string{"decision": "approve"}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/approve", "application/json", bytes.NewReader(jsonBody))
+	url := fmt.Sprintf("%s/api/v1/sessions/sess-test-1/approve/dummy-id", server.URL)
+	resp, _ := http.Post(url, "application/json", bytes.NewReader(jsonBody))
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {

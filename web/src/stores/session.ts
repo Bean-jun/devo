@@ -169,9 +169,31 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
-  function updateTokenUsage(id: string, usage: { input: number; output: number }): void {
+  function updateTokenUsage(id: string, usage: {
+    input: number
+    output: number
+    session_total_tokens?: number
+    session_input_tokens?: number
+    session_output_tokens?: number
+  }): void {
     if (currentSession.value?.id === id) {
-      currentSession.value = { ...currentSession.value, tokenUsage: usage }
+      if (usage.session_input_tokens != null || usage.session_output_tokens != null) {
+        currentSession.value = {
+          ...currentSession.value,
+          tokenUsage: {
+            input: usage.session_input_tokens ?? 0,
+            output: usage.session_output_tokens ?? 0,
+          },
+        }
+      } else {
+        currentSession.value = {
+          ...currentSession.value,
+          tokenUsage: {
+            input: (currentSession.value.tokenUsage?.input ?? 0) + usage.input,
+            output: (currentSession.value.tokenUsage?.output ?? 0) + usage.output,
+          },
+        }
+      }
     }
   }
 

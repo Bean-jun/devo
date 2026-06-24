@@ -42,7 +42,7 @@ func (a *App) sendMessageCmd(content string) tea.Cmd {
 	a.chatView.MessageView.AddMessage(userMsg)
 	a.chatView.InputArea.Reset()
 	a.state = StateProcessing
-	a.statusBar.SessionState = "Processing"
+	a.statusBar.SessionState = "processing"
 	a.chatView.Processing = true
 	if a.activeSession != nil {
 		a.updateContextUsage(a.activeSession)
@@ -166,6 +166,7 @@ func (a *App) refreshSessionCmd() tea.Cmd {
 		if a.activeSession != nil {
 			sess, err := a.apiClient.GetSession(a.activeSession.ID)
 			if err == nil {
+				sess.NormalizeState()
 				a.activeSession = sess
 				a.statusBar.SessionState = sess.State
 			}

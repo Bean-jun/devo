@@ -18,6 +18,22 @@ const (
 	StateArchived         State = "Archived"
 )
 
+// ToSnakeCase converts PascalCase state to snake_case (e.g., "AwaitingApproval" → "awaiting_approval")
+func (s State) ToSnakeCase() string {
+	var result []byte
+	for i, ch := range s {
+		if ch >= 'A' && ch <= 'Z' {
+			if i > 0 {
+				result = append(result, '_')
+			}
+			result = append(result, byte(ch+32))
+		} else {
+			result = append(result, byte(ch))
+		}
+	}
+	return string(result)
+}
+
 type Role string
 
 const (

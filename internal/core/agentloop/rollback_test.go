@@ -136,8 +136,8 @@ func TestRollbackToolResultAdsorption(t *testing.T) {
 	if !result.Adjusted {
 		t.Fatal("expected adjustment for tool result message")
 	}
-	if result.ActualRollbackMessageID != "msg-2" {
-		t.Errorf("expected rollback to msg-2 (tool call request), got %s", result.ActualRollbackMessageID)
+	if result.ActualRollbackMessageID != "msg-1" {
+		t.Errorf("expected rollback to msg-1 (user message before tool call), got %s", result.ActualRollbackMessageID)
 	}
 
 	remaining, total, _ := store.GetMessages("sess-1", 0, 0)
@@ -357,7 +357,7 @@ func TestRollbackPublishesStateChangeEvent(t *testing.T) {
 	}
 
 	data, _ := evt.Data.(map[string]any)
-	if data["new_state"] != string(session.StateIdle) {
+	if data["new_state"] != session.StateIdle.ToSnakeCase() {
 		t.Errorf("expected new_state Idle, got %v", data["new_state"])
 	}
 	if data["reason"] != "rollback" {

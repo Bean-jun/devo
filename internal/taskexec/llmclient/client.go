@@ -3,6 +3,8 @@ package llmclient
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"devo/internal/core/session"
 	"devo/internal/core/tokenmeter"
@@ -14,8 +16,21 @@ type CompleteResult struct {
 	TokenUsage *tokenmeter.TokenUsage `json:"token_usage,omitempty"`
 }
 
+type StreamEvent struct {
+	Type         string                 `json:"type"`
+	Token        string                 `json:"token,omitempty"`
+	ToolCalls    []session.ToolCall     `json:"tool_calls,omitempty"`
+	FullText     string                 `json:"full_text,omitempty"`
+	FinishReason string                 `json:"finish_reason,omitempty"`
+	TokenUsage   *tokenmeter.TokenUsage `json:"token_usage,omitempty"`
+	Err          error                  `json:"-"`
+}
+
+type StreamCallback func(event StreamEvent)
+
 type Client interface {
 	Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*CompleteResult, error)
+	CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback StreamCallback) error
 }
 
 type MockClient struct {
@@ -92,4 +107,39 @@ func (m *MockClient) Complete(ctx context.Context, messages []session.Message, s
 			Source:       tokenmeter.SourceEstimated,
 		},
 	}, nil
+}
+
+func (m *MockClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback StreamCallback) error {
+	result, err := m.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(StreamEvent{Type: "error", Err: err})
+		return err
+	}
+
+	words := strings.Fields(result.Text)
+	for i, word := range words {
+		fullText := strings.Join(words[:i+1], " ")
+		select {
+		case <-ctx.Done():
+			callback(StreamEvent{Type: "error", Err: ctx.Err()})
+			return ctx.Err()
+		default:
+		}
+		callback(StreamEvent{
+			Type:     "token",
+			Token:    word,
+			FullText: fullText,
+		})
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	callback(StreamEvent{
+		Type:         "done",
+		FullText:     result.Text,
+		ToolCalls:    result.ToolCalls,
+		FinishReason: "stop",
+		TokenUsage:   result.TokenUsage,
+	})
+
+	return nil
 }

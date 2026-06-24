@@ -40,6 +40,12 @@ func TestTokenUsageEventPublished(t *testing.T) {
 	if _, hasTotal := data["session_total_tokens"]; !hasTotal {
 		t.Error("token_usage event missing 'session_total_tokens' field")
 	}
+	if _, hasSessionInput := data["session_input_tokens"]; !hasSessionInput {
+		t.Error("token_usage event missing 'session_input_tokens' field")
+	}
+	if _, hasSessionOutput := data["session_output_tokens"]; !hasSessionOutput {
+		t.Error("token_usage event missing 'session_output_tokens' field")
+	}
 }
 
 func TestMessageCompleteHasTotalStepTokens(t *testing.T) {

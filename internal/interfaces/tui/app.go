@@ -273,6 +273,7 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, a.initSessionCmd()
 			}
 			sess := msg.Data.(*types.SessionInfo)
+			sess.NormalizeState()
 			a.activeSession = sess
 			a.statusBar.SessionTitle = sess.Title
 			a.statusBar.SessionState = sess.State
@@ -293,6 +294,7 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a, nil
 			}
 			sess := msg.Data.(*types.SessionInfo)
+			sess.NormalizeState()
 			a.activeSession = sess
 			a.sessions = []types.SessionInfo{*sess}
 			a.statusBar.SessionTitle = sess.Title

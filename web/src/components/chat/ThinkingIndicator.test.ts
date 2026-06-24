@@ -15,19 +15,21 @@ describe('ThinkingIndicator', () => {
     expect(wrapper.find('[data-test="thinking-indicator"]').exists()).toBe(true)
   })
 
-  it('should show streaming preview when content exists', () => {
+  it('should show streaming text when content exists', () => {
     const chatStore = useChatStore()
     chatStore.startStreaming()
     chatStore.appendStreamChunk('Streaming text preview...')
 
     const wrapper = mount(ThinkingIndicator)
 
-    expect(wrapper.find('.streaming-preview').exists()).toBe(true)
+    expect(wrapper.find('.streaming-text').exists()).toBe(true)
+    expect(wrapper.find('.streaming-text').text()).toContain('Streaming text preview...')
   })
 
-  it('should not show streaming preview when no content', () => {
+  it('should show empty hint when no content', () => {
     const wrapper = mount(ThinkingIndicator)
 
-    expect(wrapper.find('.streaming-preview').exists()).toBe(false)
+    expect(wrapper.find('.streaming-text').exists()).toBe(false)
+    expect(wrapper.find('.empty-hint').exists()).toBe(true)
   })
 })

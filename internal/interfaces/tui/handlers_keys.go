@@ -143,10 +143,10 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 		state := a.activeSession.State
-		if state == "Processing" {
+		if state == "processing" {
 			return a.pauseCmd()
 		}
-		if state == "Paused" {
+		if state == "paused" {
 			return a.resumeCmd()
 		}
 		a.toast.Show(fmt.Sprintf("当前状态为 %s，无法切换", state), true)
@@ -157,7 +157,7 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 		state := a.activeSession.State
-		if state != "Paused" {
+		if state != "paused" {
 			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法恢复", state), true)
 			return nil
 		}
@@ -303,7 +303,7 @@ func (a *App) executeSlashCommand(input string) tea.Cmd {
 		if a.activeSession == nil {
 			return nil
 		}
-		if a.activeSession.State != "Processing" {
+		if a.activeSession.State != "processing" {
 			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法暂停", a.activeSession.State), true)
 			return nil
 		}
@@ -313,7 +313,7 @@ func (a *App) executeSlashCommand(input string) tea.Cmd {
 		if a.activeSession == nil {
 			return nil
 		}
-		if a.activeSession.State != "Paused" {
+		if a.activeSession.State != "paused" {
 			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法恢复", a.activeSession.State), true)
 			return nil
 		}
@@ -324,7 +324,7 @@ func (a *App) executeSlashCommand(input string) tea.Cmd {
 			return nil
 		}
 		state := a.activeSession.State
-		if state != "Processing" && state != "AwaitingApproval" {
+		if state != "processing" && state != "awaiting_approval" {
 			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法取消", state), true)
 			return nil
 		}

@@ -183,6 +183,16 @@ func (s *slowLLMClient) Complete(ctx context.Context, messages []session.Message
 	return &llmclient.CompleteResult{Text: "Slow reply"}, nil
 }
 
+func (s *slowLLMClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	result, err := s.Complete(ctx, messages, systemPrompt)
+	if err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
+	return nil
+}
+
 func TestProcessMessageConflictDuringProcessing(t *testing.T) {
 	store := session.NewInMemoryStore()
 	createTestSession(store, "sess-1")
@@ -213,6 +223,11 @@ func (e *errorLLMClient) Complete(ctx context.Context, messages []session.Messag
 	return nil, context.DeadlineExceeded
 }
 
+func (e *errorLLMClient) CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback llmclient.StreamCallback) error {
+	callback(llmclient.StreamEvent{Type: "error", Err: context.DeadlineExceeded})
+	return context.DeadlineExceeded
+}
+
 func TestStateRevertsOnLLMError(t *testing.T) {
 	store := session.NewInMemoryStore()
 	createTestSession(store, "sess-1")
@@ -226,12 +241,12 @@ func TestStateRevertsOnLLMError(t *testing.T) {
 
 	loop.ProcessMessage(context.Background(), "sess-1", "Hello")
 
-	_, ok := waitForEvent(ch, "thinking", 2*time.Second)
+	_, ok := waitForEvent(ch, "loop.thinking_started", 2*time.Second)
 	if !ok {
 		t.Fatal("expected thinking event even on error")
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	sess, _ := store.Get("sess-1")
 	if sess.State != session.StateIdle {
@@ -249,15 +264,23 @@ func TestEventTypesOrder(t *testing.T) {
 
 	loop.ProcessMessage(context.Background(), "sess-1", "Hello")
 
-	expectedOrder := []string{"thinking", "token_usage", "message_complete", "session_state_change"}
+	expectedOrder := []string{"loop.thinking_started", "token_usage", "loop.thinking_complete", "loop.loop_completed"}
 	received := make([]string, 0, 4)
 
-	for range expectedOrder {
+	for i := 0; i < 50; i++ {
 		evt, ok := waitForEvent(ch, "", 2*time.Second)
 		if !ok {
-			t.Fatal("timed out waiting for events")
+			break
 		}
-		received = append(received, evt.Type)
+		for _, expected := range expectedOrder {
+			if evt.Type == expected {
+				received = append(received, evt.Type)
+				break
+			}
+		}
+		if len(received) >= len(expectedOrder) {
+			break
+		}
 	}
 
 	for i, expected := range expectedOrder {

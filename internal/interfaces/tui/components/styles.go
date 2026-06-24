@@ -17,12 +17,12 @@ var (
 )
 
 var StateColors = map[string]lipgloss.Color{
-	"Idle":             ColorSuccess,
-	"Processing":       ColorInfo,
-	"AwaitingApproval": ColorWarning,
-	"Paused":           ColorMuted,
-	"Completed":        ColorSuccess,
-	"Archived":         ColorMuted,
+	"idle":              ColorSuccess,
+	"processing":        ColorInfo,
+	"awaiting_approval": ColorWarning,
+	"paused":            ColorMuted,
+	"completed":         ColorSuccess,
+	"archived":          ColorMuted,
 }
 
 var (

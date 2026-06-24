@@ -34,7 +34,7 @@ func TestCancel_FromProcessing(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["state"] != string(session.StateIdle) {
+	if result["state"] != string(session.StateIdle.ToSnakeCase()) {
 		t.Errorf("expected state Idle, got %q", result["state"])
 	}
 
@@ -69,7 +69,7 @@ func TestCancel_FromAwaitingApproval(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["state"] != string(session.StateIdle) {
+	if result["state"] != string(session.StateIdle.ToSnakeCase()) {
 		t.Errorf("expected state Idle, got %q", result["state"])
 	}
 
@@ -137,7 +137,7 @@ func TestPause_FromProcessing(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["state"] != string(session.StatePaused) {
+	if result["state"] != string(session.StatePaused.ToSnakeCase()) {
 		t.Errorf("expected state Paused, got %q", result["state"])
 	}
 
@@ -205,7 +205,7 @@ func TestResume_FromPaused(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["state"] != string(session.StateProcessing) {
+	if result["state"] != string(session.StateProcessing.ToSnakeCase()) {
 		t.Errorf("expected state Processing, got %q", result["state"])
 	}
 
@@ -273,7 +273,7 @@ func TestComplete_FromIdle(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["state"] != string(session.StateCompleted) {
+	if result["state"] != string(session.StateCompleted.ToSnakeCase()) {
 		t.Errorf("expected state Completed, got %q", result["state"])
 	}
 
@@ -308,7 +308,7 @@ func TestComplete_FromProcessing(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["state"] != string(session.StateCompleted) {
+	if result["state"] != string(session.StateCompleted.ToSnakeCase()) {
 		t.Errorf("expected state Completed, got %q", result["state"])
 	}
 
@@ -376,7 +376,7 @@ func TestArchive_FromCompleted(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["state"] != string(session.StateArchived) {
+	if result["state"] != session.StateArchived.ToSnakeCase() {
 		t.Errorf("expected state Archived, got %q", result["state"])
 	}
 
