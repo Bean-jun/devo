@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 
 	"devo/internal/core/session"
@@ -102,5 +103,6 @@ func (a *Assembler) buildBasePrompt(sess *session.Session) string {
 }
 
 func (a *Assembler) buildDynamicInfo(sess *session.Session) string {
-	return fmt.Sprintf("会话 ID: %s\n工作目录: %s", sess.ID, sess.WorkingDirectory)
+	return fmt.Sprintf("session ID: %s\nworking directory: %s\nplatform: %s/%s",
+		sess.ID, sess.WorkingDirectory, runtime.GOOS, runtime.GOARCH)
 }

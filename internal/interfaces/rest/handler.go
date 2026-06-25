@@ -9,6 +9,7 @@ import (
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
 	"devo/internal/core/skills"
+	"devo/internal/taskexec/mcp"
 )
 
 type Handler struct {
@@ -16,11 +17,16 @@ type Handler struct {
 	loop          *agentloop.Loop
 	memoryManager *memory.Manager
 	skillsManager *skills.Manager
+	mcpManager    *mcp.Manager
 	version       string
 }
 
 func NewHandler(store session.SessionStore, loop *agentloop.Loop, memoryManager *memory.Manager, version string) *Handler {
 	return &Handler{store: store, loop: loop, memoryManager: memoryManager, version: version}
+}
+
+func (h *Handler) SetMcpManager(mgr *mcp.Manager) {
+	h.mcpManager = mgr
 }
 
 func (h *Handler) SetSkillsManager(sm *skills.Manager) {
@@ -59,6 +65,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sessions/{id}/skills", h.SetSessionSkills)
 	mux.HandleFunc("POST /api/v1/skills/install", h.InstallSkill)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/solidify", h.SolidifySession)
+	mux.HandleFunc("GET /api/v1/mcp/tools", h.GetMcpTools)
 }
 
 func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {

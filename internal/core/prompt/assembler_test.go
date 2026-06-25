@@ -181,7 +181,7 @@ func TestAssembler_Assemble_Ordering(t *testing.T) {
 	baseIdx := strings.Index(result, "You are Devo")
 	overrideIdx := strings.Index(result, "OVERRIDE_TEXT")
 	agentsIdx := strings.Index(result, "AGENTS_MD_RULE")
-	dynamicIdx := strings.Index(result, "会话 ID")
+	dynamicIdx := strings.Index(result, "session ID")
 
 	if baseIdx < 0 || overrideIdx < 0 || agentsIdx < 0 || dynamicIdx < 0 {
 		t.Fatal("expected all sections to be present")

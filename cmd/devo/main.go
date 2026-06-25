@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -22,6 +23,7 @@ import (
 	"devo/internal/interfaces/tui"
 	"devo/internal/storage/sqlite"
 	"devo/internal/taskexec/llmclient/providers"
+	"devo/internal/taskexec/mcp"
 	"devo/internal/taskexec/pathsec"
 	"devo/internal/taskexec/tools"
 	webembed "devo/web"
@@ -110,6 +112,14 @@ func main() {
 
 	handler := rest.NewHandler(store, loop, memoryManager, Version)
 	handler.SetSkillsManager(skillsManager)
+
+	wd, _ := os.Getwd()
+	mcpManager := mcp.NewManager(wd)
+	if err := mcpManager.ConnectAll(context.Background()); err != nil {
+		log.Printf("[devo] MCP manager: some servers failed to connect: %v", err)
+	}
+	mcpManager.RegisterTools(toolRegistry)
+	handler.SetMcpManager(mcpManager)
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)

@@ -69,6 +69,13 @@ func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
+	var mcpCh chan session.Event
+	var mcpUnsubscribe func()
+	if h.mcpManager != nil {
+		mcpCh, mcpUnsubscribe = h.mcpManager.GlobalEventBus().Subscribe()
+		defer mcpUnsubscribe()
+	}
+
 	for {
 		select {
 		case <-r.Context().Done():
@@ -76,6 +83,12 @@ func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
 		case evt, ok := <-ch:
 			if !ok {
 				return
+			}
+			writeSSEEvent(w, flusher, evt)
+		case evt, ok := <-mcpCh:
+			if !ok {
+				mcpCh = nil
+				continue
 			}
 			writeSSEEvent(w, flusher, evt)
 		}
