@@ -34,7 +34,7 @@ type CompressResult struct {
 	SummaryText     string
 }
 
-func (c *Compressor) Compress(ctx context.Context, sessionID string, eventBus *session.EventBus) (*CompressResult, error) {
+func (c *Compressor) Compress(ctx context.Context, sessionID string, eventBus *session.EventBus, systemPromptTokens int) (*CompressResult, error) {
 	msgs, _, err := c.store.GetMessages(sessionID, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("get messages: %w", err)
@@ -50,7 +50,7 @@ func (c *Compressor) Compress(ctx context.Context, sessionID string, eventBus *s
 		maxContext = DefaultMaxContextTokens
 	}
 
-	estimatedTokens := EstimateContextTokens(msgs, sess.CompressionState)
+	estimatedTokens := EstimateContextTokens(msgs, sess.CompressionState) + systemPromptTokens
 	compressThreshold := int(float64(maxContext) * ContextCompressRatio)
 
 	if estimatedTokens <= compressThreshold {
@@ -222,6 +222,10 @@ func estimateTokens(msgs []session.Message) int {
 func EstimateContextTokens(msgs []session.Message, compressionState *session.CompressionState) int {
 	activeMsgs := FilterActiveMessages(msgs, compressionState)
 	return estimateTokens(activeMsgs)
+}
+
+func EstimateStringTokens(s string) int {
+	return len(s) / 4
 }
 
 func FilterActiveMessages(msgs []session.Message, compressionState *session.CompressionState) []session.Message {

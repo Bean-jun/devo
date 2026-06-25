@@ -34,6 +34,7 @@ type SessionModel struct {
 	MaxContextTokens          int    `gorm:"default:0"`
 	CurrentContextTokens      int    `gorm:"default:0"`
 	SystemPromptOverride      string `gorm:"type:text"`
+	ActiveSkillsJSON          string `gorm:"type:text"`
 }
 
 type MessageModel struct {
@@ -99,6 +100,13 @@ func (m *SessionModel) ToDomain() *session.Session {
 		}
 	}
 
+	if m.ActiveSkillsJSON != "" {
+		var skills []string
+		if err := json.Unmarshal([]byte(m.ActiveSkillsJSON), &skills); err == nil {
+			sess.ActiveSkills = skills
+		}
+	}
+
 	return sess
 }
 
@@ -138,6 +146,13 @@ func fromDomain(s *session.Session) *SessionModel {
 		data, err := json.Marshal(s.CompressionState)
 		if err == nil {
 			model.CompressionStateJSON = string(data)
+		}
+	}
+
+	if len(s.ActiveSkills) > 0 {
+		data, err := json.Marshal(s.ActiveSkills)
+		if err == nil {
+			model.ActiveSkillsJSON = string(data)
 		}
 	}
 

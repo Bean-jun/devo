@@ -1,7 +1,7 @@
 package prompt
 
 type SkillsProvider interface {
-	GetActiveSkillsPrompt() string
+	GetActiveSkillsPrompt(activeSkillNames []string) string
 }
 
 type MemoryProvider interface {

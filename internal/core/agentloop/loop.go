@@ -13,6 +13,7 @@ import (
 	"devo/internal/core/memory"
 	"devo/internal/core/prompt"
 	"devo/internal/core/session"
+	"devo/internal/core/skills"
 	"devo/internal/core/tokenmeter"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
@@ -43,6 +44,8 @@ type Loop struct {
 	pathLockManager  *concurrency.PathLockManager
 	archiveManager   *archive.ArchiveManager
 	memoryManager    *memory.Manager
+	skillsManager    *skills.Manager
+	solidifier       *skills.Solidifier
 	stateMachine     *StateMachine
 	activeLoops      sync.Map
 	mu               sync.Mutex
@@ -101,6 +104,8 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 
 	isContinuation := sess.LastLoopTerminationReason == session.LoopTerminationToolLimitReached
 
+	oldState := string(sess.State)
+
 	if sess.State == session.StatePaused {
 		sess.State = session.StateProcessing
 		sess.LastActiveAt = time.Now()
@@ -113,6 +118,14 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		if err := l.store.Update(sess); err != nil {
 			return fmt.Errorf("update session state to processing: %w", err)
 		}
+	}
+
+	if eventBus, err := l.store.GetEventBus(sessionID); err == nil {
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": session.State(oldState).ToSnakeCase(),
+			"new_state": session.StateProcessing.ToSnakeCase(),
+			"reason":    "user_message",
+		})
 	}
 
 	if isContinuation {
@@ -203,4 +216,26 @@ func (l *Loop) SetMemoryManager(mm *memory.Manager) {
 
 func (l *Loop) GetApprovalManager() *approval.Manager {
 	return l.approvalManager
+}
+
+func (l *Loop) SetSkillsManager(sm *skills.Manager) {
+	l.skillsManager = sm
+	if l.promptAssembler != nil {
+		l.promptAssembler.SetSkillsProvider(sm)
+	}
+}
+
+func (l *Loop) GetSkillsManager() *skills.Manager {
+	return l.skillsManager
+}
+
+func (l *Loop) SetSolidifier(sol *skills.Solidifier) {
+	l.solidifier = sol
+}
+
+func (l *Loop) SolidifySession(ctx context.Context, sessionID string) (*skills.SolidifyResult, error) {
+	if l.solidifier == nil {
+		return nil, fmt.Errorf("solidifier not configured")
+	}
+	return l.solidifier.SolidifySession(ctx, sessionID)
 }

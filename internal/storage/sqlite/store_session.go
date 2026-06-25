@@ -79,6 +79,11 @@ func (s *GormStore) Update(sess *session.Session) error {
 		updates["compression_state_json"] = string(data)
 	}
 
+	if sess.ActiveSkills != nil {
+		data, _ := json.Marshal(sess.ActiveSkills)
+		updates["active_skills_json"] = string(data)
+	}
+
 	if err := s.db.Model(&model).Updates(updates).Error; err != nil {
 		return err
 	}

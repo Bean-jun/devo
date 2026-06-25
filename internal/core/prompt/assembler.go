@@ -71,7 +71,7 @@ func (a *Assembler) Assemble(sess *session.Session) string {
 	parts = append(parts, a.buildBasePrompt(sess))
 
 	if a.skillsProvider != nil {
-		if skillsPrompt := a.skillsProvider.GetActiveSkillsPrompt(); skillsPrompt != "" {
+		if skillsPrompt := a.skillsProvider.GetActiveSkillsPrompt(sess.ActiveSkills); skillsPrompt != "" {
 			parts = append(parts, skillsPrompt)
 		}
 	}

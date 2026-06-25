@@ -36,11 +36,6 @@ func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if sess.State != session.StateAwaitingApproval {
-		writeError(w, http.StatusConflict, "session is not in AwaitingApproval state")
-		return
-	}
-
 	var req approveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -49,6 +44,50 @@ func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
 
 	if req.Decision != "approve" && req.Decision != "reject" {
 		writeError(w, http.StatusBadRequest, "decision must be 'approve' or 'reject'")
+		return
+	}
+
+	approvalManager := h.loop.GetApprovalManager()
+	approvalReq, exists := approvalManager.GetRequest(approvalID)
+	if !exists {
+		writeError(w, http.StatusNotFound, "approval request not found")
+		return
+	}
+
+	if approvalReq.OperationType == approval.OpSolidifySkill {
+		approved := req.Decision == "approve"
+		skill, err := h.SolidifyApprove(id, approvalID, approved)
+		if err != nil {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+
+		approvalManager.Resolve(approvalID, approval.StatusApproved)
+
+		eventBus, _ := h.store.GetEventBus(id)
+		if eventBus != nil {
+			eventBus.Publish("approval_resolved", map[string]any{
+				"approval_id":    approvalID,
+				"decision":       req.Decision,
+				"operation_type": string(approval.OpSolidifySkill),
+			})
+		}
+
+		response := map[string]interface{}{
+			"approval_id": approvalID,
+			"decision":    req.Decision,
+			"resolved_at": time.Now().Format(time.RFC3339),
+		}
+		if skill != nil {
+			response["skill_name"] = skill.Name
+			response["location"] = skill.Location
+		}
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+
+	if sess.State != session.StateAwaitingApproval {
+		writeError(w, http.StatusConflict, "session is not in AwaitingApproval state")
 		return
 	}
 

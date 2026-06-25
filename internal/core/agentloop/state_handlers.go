@@ -31,7 +31,15 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 		return LoopStateError, fmt.Errorf("get messages: %w", err)
 	}
 
-	if result, err := l.compressor.Compress(ctx, lc.SessionID, lc.EventBus); err != nil {
+	sess, err := l.store.Get(lc.SessionID)
+	if err != nil {
+		return LoopStateError, fmt.Errorf("get session: %w", err)
+	}
+
+	dynamicPrompt := l.promptAssembler.Assemble(sess)
+	systemPromptTokens := compressor.EstimateStringTokens(dynamicPrompt)
+
+	if result, err := l.compressor.Compress(ctx, lc.SessionID, lc.EventBus, systemPromptTokens); err != nil {
 		return LoopStateError, fmt.Errorf("compress: %w", err)
 	} else if result != nil && result.CompressedCount > 0 {
 		l.archiveManager.AppendSystemMessage(lc.SessionID, fmt.Sprintf("[上下文压缩摘要] %s", result.SummaryText))
@@ -42,21 +50,19 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 		return LoopStateError, fmt.Errorf("get messages after compress: %w", err)
 	}
 
-	sess, err := l.store.Get(lc.SessionID)
+	sess, err = l.store.Get(lc.SessionID)
 	if err != nil {
-		return LoopStateError, fmt.Errorf("get session: %w", err)
+		return LoopStateError, fmt.Errorf("get session after compress: %w", err)
 	}
 	activeMsgs := compressor.FilterActiveMessages(msgs, sess.CompressionState)
 
-	currentContextTokens := compressor.EstimateContextTokens(msgs, sess.CompressionState)
+	currentContextTokens := compressor.EstimateContextTokens(msgs, sess.CompressionState) + systemPromptTokens
 	if currentContextTokens != sess.CurrentContextTokens {
 		sess.CurrentContextTokens = currentContextTokens
 		if err := l.store.Update(sess); err != nil {
 			return LoopStateError, fmt.Errorf("update session context tokens: %w", err)
 		}
 	}
-
-	dynamicPrompt := l.promptAssembler.Assemble(sess)
 
 	lc.ActiveMsgs = activeMsgs
 	lc.DynamicPrompt = dynamicPrompt
@@ -336,6 +342,7 @@ func (l *Loop) executeSingleTool(ctx context.Context, lc *LoopContext, tc sessio
 			})
 		}
 	}
+	toolResult.ToolCallID = tc.ID
 	toolMsg := l.toolResultToMessage(toolResult)
 	if err := l.store.AddMessage(lc.SessionID, toolMsg); err != nil {
 		return LoopStateError, fmt.Errorf("add tool result message: %w", err)

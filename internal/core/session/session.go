@@ -123,6 +123,7 @@ type Session struct {
 	ArchivePath               string                `json:"archive_path,omitempty"`
 	SystemPromptOverride      string                `json:"system_prompt_override,omitempty"`
 	CurrentContextTokens      int                   `json:"current_context_tokens"`
+	ActiveSkills              []string              `json:"active_skills,omitempty"`
 	CachedDirectorySummary    *DirectorySummary     `json:"-"`
 }
 

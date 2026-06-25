@@ -15,16 +15,16 @@ func setupTestCompressor() (*Compressor, *session.InMemoryStore) {
 	return comp, store
 }
 
-func createTestSession(store *session.InMemoryStore, id string, threshold, keepRecent int) *session.Session {
+func createTestSession(store *session.InMemoryStore, id string, maxContextTokens, keepRecent int) *session.Session {
 	sess := &session.Session{
-		ID:                id,
-		Title:             "Test Session",
-		WorkingDirectory:  "/tmp/test",
-		State:             session.StateIdle,
-		CreatedAt:         time.Now(),
-		LastActiveAt:      time.Now(),
-		CompressThreshold: threshold,
-		KeepRecent:        keepRecent,
+		ID:               id,
+		Title:            "Test Session",
+		WorkingDirectory: "/tmp/test",
+		State:            session.StateIdle,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+		MaxContextTokens: maxContextTokens,
+		KeepRecent:       keepRecent,
 	}
 	store.Create(sess)
 	return sess
@@ -57,6 +57,28 @@ func addMixedMessages(store *session.InMemoryStore, sessionID string, count int)
 			ID:        session.GenerateID("msg"),
 			Role:      role,
 			Content:   "This is a mixed message for testing compression with various roles.",
+			CreatedAt: time.Now(),
+		}
+		store.AddMessage(sessionID, msg)
+	}
+}
+
+func addLongMessages(store *session.InMemoryStore, sessionID string, count int, role session.Role) {
+	longContent := "This is a very long message designed to consume a significant number of tokens. " +
+		"It contains detailed technical discussion about software architecture, design patterns, " +
+		"and implementation strategies. The conversation covers topics such as microservices, " +
+		"database optimization, API design, testing methodologies, and deployment pipelines. " +
+		"Each message is carefully crafted to simulate real-world development discussions that " +
+		"would naturally occur between a developer and an AI coding assistant during a complex " +
+		"software engineering task. The content includes code snippets, configuration examples, " +
+		"and detailed explanations of technical decisions. This approach ensures that the token " +
+		"count per message is high enough to trigger compression thresholds in test scenarios " +
+		"without requiring an excessive number of individual messages."
+	for i := 0; i < count; i++ {
+		msg := session.Message{
+			ID:        session.GenerateID("msg"),
+			Role:      role,
+			Content:   longContent,
 			CreatedAt: time.Now(),
 		}
 		store.AddMessage(sessionID, msg)
@@ -143,13 +165,13 @@ func TestSelectMessagesToCompressKeepAll(t *testing.T) {
 
 func TestCompressNoopBelowThreshold(t *testing.T) {
 	comp, store := setupTestCompressor()
-	createTestSession(store, "sess-1", 10, 5)
+	createTestSession(store, "sess-1", 500, 5)
 
 	addMessages(store, "sess-1", 5, session.RoleUser)
 
 	eventBus, _ := store.GetEventBus("sess-1")
 
-	result, err := comp.Compress(context.Background(), "sess-1", eventBus)
+	result, err := comp.Compress(context.Background(), "sess-1", eventBus, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -166,7 +188,7 @@ func TestCompressTriggersAboveThreshold(t *testing.T) {
 
 	eventBus, _ := store.GetEventBus("sess-1")
 
-	result, err := comp.Compress(context.Background(), "sess-1", eventBus)
+	result, err := comp.Compress(context.Background(), "sess-1", eventBus, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -189,7 +211,7 @@ func TestCompressUpdatesSessionState(t *testing.T) {
 
 	eventBus, _ := store.GetEventBus("sess-1")
 
-	_, err := comp.Compress(context.Background(), "sess-1", eventBus)
+	_, err := comp.Compress(context.Background(), "sess-1", eventBus, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -223,7 +245,7 @@ func TestCompressEmitsSSEEvent(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	_, err := comp.Compress(context.Background(), "sess-1", eventBus)
+	_, err := comp.Compress(context.Background(), "sess-1", eventBus, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -317,7 +339,7 @@ func TestCompressMultipleRounds(t *testing.T) {
 	addMessages(store, "sess-1", 5, session.RoleUser)
 	eventBus, _ := store.GetEventBus("sess-1")
 
-	result1, err := comp.Compress(context.Background(), "sess-1", eventBus)
+	result1, err := comp.Compress(context.Background(), "sess-1", eventBus, 0)
 	if err != nil {
 		t.Fatalf("first compress: %v", err)
 	}
@@ -327,7 +349,7 @@ func TestCompressMultipleRounds(t *testing.T) {
 
 	addMessages(store, "sess-1", 5, session.RoleUser)
 
-	result2, err := comp.Compress(context.Background(), "sess-1", eventBus)
+	result2, err := comp.Compress(context.Background(), "sess-1", eventBus, 0)
 	if err != nil {
 		t.Fatalf("second compress: %v", err)
 	}
@@ -350,7 +372,7 @@ func TestCompressEmptyMessages(t *testing.T) {
 
 	eventBus, _ := store.GetEventBus("sess-1")
 
-	result, err := comp.Compress(context.Background(), "sess-1", eventBus)
+	result, err := comp.Compress(context.Background(), "sess-1", eventBus, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -367,7 +389,7 @@ func TestCompressDefaultThresholds(t *testing.T) {
 
 	eventBus, _ := store.GetEventBus("sess-1")
 
-	result, err := comp.Compress(context.Background(), "sess-1", eventBus)
+	result, err := comp.Compress(context.Background(), "sess-1", eventBus, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -381,11 +403,11 @@ func TestCompressWithDefaultThresholdsTriggered(t *testing.T) {
 	comp, store := setupTestCompressor()
 	createTestSession(store, "sess-1", 0, 0)
 
-	addMessages(store, "sess-1", 65, session.RoleUser)
+	addLongMessages(store, "sess-1", 600, session.RoleUser)
 
 	eventBus, _ := store.GetEventBus("sess-1")
 
-	result, err := comp.Compress(context.Background(), "sess-1", eventBus)
+	result, err := comp.Compress(context.Background(), "sess-1", eventBus, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -410,7 +432,7 @@ func TestCompressSessionNotFound(t *testing.T) {
 	comp, _ := setupTestCompressor()
 	eventBus := session.NewEventBus(100)
 
-	_, err := comp.Compress(context.Background(), "nonexistent", eventBus)
+	_, err := comp.Compress(context.Background(), "nonexistent", eventBus, 0)
 	if err == nil {
 		t.Fatal("expected error for nonexistent session")
 	}
@@ -424,7 +446,7 @@ func TestCompressSummaryContainsContent(t *testing.T) {
 
 	eventBus, _ := store.GetEventBus("sess-1")
 
-	result, err := comp.Compress(context.Background(), "sess-1", eventBus)
+	result, err := comp.Compress(context.Background(), "sess-1", eventBus, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -454,7 +476,7 @@ func TestCompressNilEventBus(t *testing.T) {
 
 	addMessages(store, "sess-1", 10, session.RoleUser)
 
-	result, err := comp.Compress(context.Background(), "sess-1", nil)
+	result, err := comp.Compress(context.Background(), "sess-1", nil, 0)
 	if err != nil {
 		t.Fatalf("unexpected error with nil event bus: %v", err)
 	}

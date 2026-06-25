@@ -8,17 +8,23 @@ import (
 	"devo/internal/core/agentloop"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
+	"devo/internal/core/skills"
 )
 
 type Handler struct {
 	store         session.SessionStore
 	loop          *agentloop.Loop
 	memoryManager *memory.Manager
+	skillsManager *skills.Manager
 	version       string
 }
 
 func NewHandler(store session.SessionStore, loop *agentloop.Loop, memoryManager *memory.Manager, version string) *Handler {
 	return &Handler{store: store, loop: loop, memoryManager: memoryManager, version: version}
+}
+
+func (h *Handler) SetSkillsManager(sm *skills.Manager) {
+	h.skillsManager = sm
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
@@ -49,6 +55,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/sessions/{id}/memory", h.GetMemories)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/memory", h.UpsertMemory)
 	mux.HandleFunc("DELETE /api/v1/sessions/{id}/memory/{memory_id}", h.DeleteMemory)
+	mux.HandleFunc("GET /api/v1/skills", h.GetSkills)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/skills", h.SetSessionSkills)
+	mux.HandleFunc("POST /api/v1/skills/install", h.InstallSkill)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/solidify", h.SolidifySession)
 }
 
 func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {

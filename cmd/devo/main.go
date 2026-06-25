@@ -17,6 +17,7 @@ import (
 	"devo/internal/core/concurrency"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
+	"devo/internal/core/skills"
 	"devo/internal/interfaces/rest"
 	"devo/internal/interfaces/tui"
 	"devo/internal/storage/sqlite"
@@ -99,7 +100,16 @@ func main() {
 	memoryManager := memory.NewManager(memoryFileStore, pathLockManager, loop.GetApprovalManager())
 	loop.SetMemoryManager(memoryManager)
 
+	homeDir, _ := os.UserHomeDir()
+	globalSkillsDir := filepath.Join(homeDir, ".devo", "skills")
+	skillsManager := skills.NewManager(globalSkillsDir)
+	loop.SetSkillsManager(skillsManager)
+
+	solidifier := skills.NewSolidifier(llm, skillsManager, store)
+	loop.SetSolidifier(solidifier)
+
 	handler := rest.NewHandler(store, loop, memoryManager, Version)
+	handler.SetSkillsManager(skillsManager)
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
