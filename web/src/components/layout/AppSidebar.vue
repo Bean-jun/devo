@@ -3,6 +3,11 @@ import { computed, ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
+import { API_BASE } from '@/utils/constants'
+
+const props = defineProps<{
+  collapsed: boolean
+}>()
 
 const router = useRouter()
 const sessionStore = useSessionStore()
@@ -115,7 +120,40 @@ function cancelNewSession() {
 </script>
 
 <template>
-  <nav class="app-sidebar">
+  <nav class="app-sidebar" :class="{ collapsed: props.collapsed }">
+    <template v-if="props.collapsed">
+      <div class="collapsed-icons">
+        <button
+          v-for="ws in workspaces"
+          :key="ws.id"
+          class="collapsed-icon-btn"
+          :class="{ active: isActiveWorkspace(ws.id) }"
+          :title="ws.name + '\n' + ws.path"
+          @click="selectWorkspace(ws)"
+        >
+          📁
+        </button>
+        <div class="collapsed-separator"></div>
+        <button
+          v-for="sess in sessions"
+          :key="sess.id"
+          class="collapsed-icon-btn"
+          :class="{ active: currentSessionId === sess.id }"
+          :title="sess.title"
+          @click="selectSession(sess.id)"
+        >
+          💬
+        </button>
+        <button class="collapsed-icon-btn collapsed-add-btn" title="新建会话" @click="newSession">
+          +
+        </button>
+      </div>
+      <button class="sidebar-toggle-btn" @click="uiStore.toggleSidebar()" title="展开侧边栏">
+        ▶
+      </button>
+    </template>
+
+    <template v-else>
     <div class="sidebar-section">
       <div class="sidebar-section-title">工作区</div>
       <button
@@ -161,6 +199,10 @@ function cancelNewSession() {
         <span class="sidebar-item-label">新建会话</span>
       </button>
     </div>
+    <button class="sidebar-toggle-btn sidebar-toggle-expand" @click="uiStore.toggleSidebar()" title="折叠侧边栏">
+      ◀
+    </button>
+    </template>
   </nav>
 
   <Teleport to="body">
@@ -573,5 +615,90 @@ function cancelNewSession() {
 
 .new-session-input::placeholder {
   color: var(--color-text-tertiary);
+}
+
+.app-sidebar.collapsed {
+  align-items: center;
+  padding: 4px 0;
+}
+
+.collapsed-icons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.collapsed-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.collapsed-icon-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.collapsed-icon-btn.active {
+  background: var(--color-accent);
+  color: white;
+}
+
+.collapsed-separator {
+  width: 20px;
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
+}
+
+.collapsed-add-btn {
+  border: 1px dashed var(--color-border);
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+}
+
+.collapsed-add-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.sidebar-toggle-btn {
+  width: 100%;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-accent);
+}
+
+.sidebar-toggle-expand {
+  margin-top: auto;
 }
 </style>

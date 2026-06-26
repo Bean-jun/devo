@@ -9,6 +9,12 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
+  optimizeDeps: {
+    include: ['monaco-editor'],
+  },
+  worker: {
+    format: 'es',
+  },
   server: {
     port: 5173,
     proxy: {

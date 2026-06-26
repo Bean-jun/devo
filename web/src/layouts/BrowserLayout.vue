@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useUiStore } from '@/stores/ui'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import StatusBar from '@/components/layout/StatusBar.vue'
 import RightPanel from '@/components/layout/RightPanel.vue'
 import GlobalModals from '@/components/layout/GlobalModals.vue'
 
+const uiStore = useUiStore()
+
 const sidebarWidth = ref(240)
+const sidebarCollapsed = computed(() => uiStore.sidebarCollapsed)
+const collapsedWidth = 40
 const rightPanelWidth = ref(380)
 const resizing = ref<'left' | 'right' | null>(null)
 const leftWrapperRef = ref<HTMLElement | null>(null)
@@ -66,8 +71,8 @@ onUnmounted(() => {
 
 <template>
   <div class="browser-layout">
-    <div ref="leftWrapperRef" class="sidebar-wrapper" :style="{ width: sidebarWidth + 'px' }">
-      <AppSidebar />
+    <div ref="leftWrapperRef" class="sidebar-wrapper" :class="{ collapsed: sidebarCollapsed }" :style="{ width: (sidebarCollapsed ? collapsedWidth : sidebarWidth) + 'px' }">
+      <AppSidebar :collapsed="sidebarCollapsed" />
     </div>
     <div class="resize-handle" @mousedown="startResize('left')">
       <div class="handle-hit"></div>

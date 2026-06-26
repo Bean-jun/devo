@@ -1,4 +1,4 @@
-export type SSEEventType =
+﻿export type SSEEventType =
   | 'thinking'
   | 'streaming_token'
   | 'streaming_complete'
@@ -13,6 +13,9 @@ export type SSEEventType =
   | 'token_usage'
   | 'context_compressed'
   | 'file_state_warning'
+  | 'skill_solidified'
+  | 'memory_updated'
+  | 'mcp_tool_discovered'
   | 'error'
 
 export interface SSEEvent {

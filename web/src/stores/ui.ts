@@ -61,6 +61,19 @@ function saveActiveWorkspace(id: string | null): void {
   } catch {}
 }
 
+function loadSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem('devo-sidebar-collapsed') === 'true'
+  } catch {}
+  return false
+}
+
+function saveSidebarCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem('devo-sidebar-collapsed', String(collapsed))
+  } catch {}
+}
+
 export const useUiStore = defineStore('ui', () => {
   const toasts = ref<Toast[]>([])
   const activeModal = ref<ModalType>(null)
@@ -73,6 +86,7 @@ export const useUiStore = defineStore('ui', () => {
   const activeWorkspace = ref<string | null>(loadActiveWorkspace())
   const activeRightTab = ref<RightTabType>('files')
   const rightPanelVisible = ref(false)
+  const sidebarCollapsed = ref(loadSidebarCollapsed())
 
   const workspaceList = ref<WorkspaceEntry[]>([])
 
@@ -218,6 +232,11 @@ export const useUiStore = defineStore('ui', () => {
     rightPanelVisible.value = false
   }
 
+  function toggleSidebar(): void {
+    sidebarCollapsed.value = !sidebarCollapsed.value
+    saveSidebarCollapsed(sidebarCollapsed.value)
+  }
+
   return {
     toasts,
     activeModal,
@@ -229,6 +248,7 @@ export const useUiStore = defineStore('ui', () => {
     activeWorkspace,
     activeRightTab,
     rightPanelVisible,
+    sidebarCollapsed,
     workspaceList,
     fetchWorkspaceList,
     addWorkspace,
@@ -241,6 +261,7 @@ export const useUiStore = defineStore('ui', () => {
     setActiveRightTab,
     toggleRightPanel,
     closeRightPanel,
+    toggleSidebar,
     setPendingCommand,
     clearPendingCommand,
     requestFocusInput,
