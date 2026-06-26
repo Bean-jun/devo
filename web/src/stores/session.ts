@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Session, CreateSessionRequest } from '@/types/session'
 import { API_BASE } from '@/utils/constants'
+import { useUiStore } from '@/stores/ui'
 
 export const useSessionStore = defineStore('session', () => {
   const currentSession = ref<Session | null>(null)
@@ -60,6 +61,9 @@ export const useSessionStore = defineStore('session', () => {
       }
       currentSession.value = session
       sessions.value.unshift(session)
+      if (request?.workingDirectory) {
+        useUiStore().addWorkspace(request.workingDirectory)
+      }
       return session
     } finally {
       isLoading.value = false
@@ -68,10 +72,13 @@ export const useSessionStore = defineStore('session', () => {
 
   async function fetchWorkspace(): Promise<string> {
     try {
-      const res = await fetch(`${API_BASE}/workspace`)
+      const res = await fetch(`${API_BASE}/current-workspace`)
       if (!res.ok) return ''
       const data = await res.json()
       workingDirectory.value = data.working_directory || ''
+      if (workingDirectory.value) {
+        useUiStore().addWorkspace(workingDirectory.value)
+      }
       return workingDirectory.value
     } catch {
       return ''
@@ -159,6 +166,15 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  async function deleteSession(id: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/sessions/${id}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('删除失败')
+    if (currentSession.value?.id === id) {
+      currentSession.value = null
+    }
+    sessions.value = sessions.value.filter(s => s.id !== id)
+  }
+
   function updateSessionState(id: string, state: string): void {
     if (currentSession.value?.id === id) {
       currentSession.value = { ...currentSession.value, state: state as Session['state'] }
@@ -239,6 +255,7 @@ export const useSessionStore = defineStore('session', () => {
     switchSessionById,
     renameSession,
     archiveSession,
+    deleteSession,
     updateSessionState,
     updateTokenUsage,
   }

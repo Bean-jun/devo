@@ -125,3 +125,34 @@ func (s *GormStore) ListSessions(status, project string, limit, offset int) ([]s
 
 	return sessions, int(total), nil
 }
+
+func (s *GormStore) ListUniqueWorkspaces() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var dirs []string
+	if err := s.db.Model(&SessionModel{}).
+		Distinct("working_directory").
+		Where("working_directory != ''").
+		Pluck("working_directory", &dirs).Error; err != nil {
+		return nil, err
+	}
+	return dirs, nil
+}
+
+func (s *GormStore) DeleteByWorkspace(path string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := s.db.Where("working_directory = ?", path).Delete(&SessionModel{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return int(result.RowsAffected), nil
+}
+
+func (s *GormStore) DeleteSession(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.db.Where("id = ?", id).Delete(&SessionModel{}).Error
+}

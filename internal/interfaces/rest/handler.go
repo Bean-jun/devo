@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 
 	"devo/internal/core/agentloop"
 	"devo/internal/core/memory"
@@ -35,12 +36,16 @@ func (h *Handler) SetSkillsManager(sm *skills.Manager) {
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/version", h.GetVersion)
-	mux.HandleFunc("GET /api/v1/workspace", h.GetWorkspace)
+	mux.HandleFunc("GET /api/v1/current-workspace", h.GetCurrentWorkspace)
+	mux.HandleFunc("POST /api/v1/current-workspace", h.SetCurrentWorkspace)
+	mux.HandleFunc("GET /api/v1/workspace", h.GetWorkspaces)
+	mux.HandleFunc("DELETE /api/v1/workspace", h.DeleteWorkspace)
 	mux.HandleFunc("POST /api/v1/sessions", h.CreateSession)
 	mux.HandleFunc("GET /api/v1/sessions", h.ListSessions)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/files", h.GetFiles)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", h.GetSession)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}", h.RenameSession)
+	mux.HandleFunc("DELETE /api/v1/sessions/{id}", h.DeleteSession)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/config", h.UpdateConfig)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/messages", h.PostMessage)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/messages", h.GetMessages)
@@ -74,7 +79,7 @@ func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) GetWorkspace(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetCurrentWorkspace(w http.ResponseWriter, r *http.Request) {
 	wd, err := os.Getwd()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get working directory")
@@ -82,6 +87,78 @@ func (h *Handler) GetWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
 		"working_directory": wd,
+	})
+}
+
+func (h *Handler) SetCurrentWorkspace(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		WorkingDirectory string `json:"working_directory"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.WorkingDirectory == "" {
+		writeError(w, http.StatusBadRequest, "working_directory is required")
+		return
+	}
+	info, err := os.Stat(req.WorkingDirectory)
+	if err != nil || !info.IsDir() {
+		writeError(w, http.StatusBadRequest, "working_directory does not exist or is not accessible")
+		return
+	}
+	if err := os.Chdir(req.WorkingDirectory); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to switch working directory")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"working_directory": req.WorkingDirectory,
+	})
+}
+
+func (h *Handler) GetWorkspaces(w http.ResponseWriter, r *http.Request) {
+	dirs, err := h.store.ListUniqueWorkspaces()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list workspaces")
+		return
+	}
+
+	type workspaceEntry struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Path string `json:"path"`
+	}
+	workspaces := make([]workspaceEntry, 0, len(dirs))
+	for _, d := range dirs {
+		name := d
+		if idx := strings.LastIndexAny(name, "/\\"); idx >= 0 {
+			name = name[idx+1:]
+		}
+		workspaces = append(workspaces, workspaceEntry{
+			ID:   d,
+			Name: name,
+			Path: d,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"workspaces": workspaces,
+	})
+}
+
+func (h *Handler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		writeError(w, http.StatusBadRequest, "path is required")
+		return
+	}
+	n, err := h.store.DeleteByWorkspace(path)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete workspace")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"deleted": n,
 	})
 }
 

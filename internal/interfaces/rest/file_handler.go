@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"os"
@@ -21,6 +22,16 @@ type getFilesResponse struct {
 	Entries []fileEntry `json:"entries,omitempty"`
 	Content string      `json:"content,omitempty"`
 	Size    int64       `json:"size,omitempty"`
+	IsImage bool        `json:"is_image,omitempty"`
+}
+
+var imageExts = map[string]bool{
+	".png": true, ".jpg": true, ".jpeg": true, ".gif": true,
+	".svg": true, ".webp": true, ".bmp": true, ".ico": true,
+}
+
+func isImageFile(name string) bool {
+	return imageExts[strings.ToLower(filepath.Ext(name))]
 }
 
 func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
@@ -107,9 +118,16 @@ func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	img := isImageFile(info.Name())
+	content := string(data)
+	if img {
+		content = "data:image/" + strings.TrimPrefix(filepath.Ext(info.Name()), ".") + ";base64," + base64.StdEncoding.EncodeToString(data)
+	}
+
 	writeJSON(w, http.StatusOK, getFilesResponse{
 		Type:    "file",
-		Content: string(data),
+		Content: content,
 		Size:    info.Size(),
+		IsImage: img,
 	})
 }

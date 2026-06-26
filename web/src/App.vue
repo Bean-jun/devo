@@ -5,28 +5,30 @@ import { useChatStore } from '@/stores/chat'
 import { useUiStore } from '@/stores/ui'
 import { useCommandStore } from '@/stores/command'
 import { useApprovalStore } from '@/stores/approval'
+import { useSkillsStore } from '@/stores/skills'
+import { useMemoryStore } from '@/stores/memory'
+import { useMcpStore } from '@/stores/mcp'
 import { useSSE } from '@/composables/useSSE'
 import { useKeyboard } from '@/composables/useKeyboard'
 import { useCommand } from '@/composables/useCommand'
+import { usePlatform } from '@/composables/usePlatform'
 import { useThemeTransition } from '@/composables/useThemeTransition'
 import { API_BASE } from '@/utils/constants'
-import StatusBar from '@/components/layout/StatusBar.vue'
-import ToastContainer from '@/components/layout/ToastContainer.vue'
-import ChatPanel from '@/components/chat/ChatPanel.vue'
-import CommandPalette from '@/components/command/CommandPalette.vue'
-import ApprovalModal from '@/components/modal/ApprovalModal.vue'
-import SessionPicker from '@/components/modal/SessionPicker.vue'
-import RollbackPicker from '@/components/modal/RollbackPicker.vue'
-import HelpPanel from '@/components/modal/HelpPanel.vue'
+import VscodeLayout from '@/layouts/VscodeLayout.vue'
+import BrowserLayout from '@/layouts/BrowserLayout.vue'
 
 const sessionStore = useSessionStore()
 const chatStore = useChatStore()
 const uiStore = useUiStore()
 const commandStore = useCommandStore()
 const approvalStore = useApprovalStore()
+const skillsStore = useSkillsStore()
+const memoryStore = useMemoryStore()
+const mcpStore = useMcpStore()
+const { detectMode, isVscodeMode } = usePlatform()
 const { startTransition } = useThemeTransition()
 
-const statusBarRef = ref<InstanceType<typeof StatusBar>>()
+const initialized = ref(false)
 
 watch(
   () => uiStore.theme,
@@ -36,15 +38,6 @@ watch(
   { immediate: true }
 )
 
-async function handleToggleTheme(x: number, y: number) {
-  const newTheme = uiStore.theme === 'light' ? 'dark' : 'light'
-  const originX = newTheme === 'light' ? 0 : x
-  const originY = newTheme === 'light' ? window.innerHeight : y
-  await startTransition(originX, originY, () => {
-    uiStore.setTheme(newTheme)
-  })
-}
-
 const { connect, disconnect, onEvent, onStatusChange } = useSSE()
 const { openPalette } = useCommand()
 
@@ -53,8 +46,21 @@ onStatusChange((connected) => {
 })
 
 onMounted(async () => {
+  detectMode()
+
+  uiStore.registerThemeTransition((x, y, cb) => {
+    startTransition(x, y, cb)
+  })
+
   await sessionStore.fetchWorkspace()
-  await sessionStore.fetchSessions(sessionStore.workingDirectory)
+  await uiStore.fetchWorkspaceList()
+
+  const currentDir = sessionStore.workingDirectory
+  if (currentDir) {
+    uiStore.setActiveWorkspace(currentDir)
+  }
+
+  await sessionStore.fetchSessions(currentDir || uiStore.activeWorkspace || '')
 
   const params = new URLSearchParams(window.location.search)
   const sessionIdFromUrl = params.get('session')
@@ -65,6 +71,18 @@ onMounted(async () => {
     await sessionStore.switchSessionById(latest.id)
   } else {
     await sessionStore.createSession({ workingDirectory: sessionStore.workingDirectory })
+  }
+
+  initialized.value = true
+})
+
+watch(() => uiStore.activeWorkspace, async (ws) => {
+  if (!initialized.value || !ws) return
+  await sessionStore.fetchSessions(ws)
+  if (sessionStore.sessions.length > 0) {
+    await sessionStore.switchSessionById(sessionStore.sessions[0].id)
+  } else {
+    await sessionStore.createSession({ workingDirectory: ws })
   }
 })
 
@@ -231,6 +249,42 @@ function connectSSE(sessionId: string) {
     chatStore.appendSystemMessage(`文件状态警告：${data.message || '文件可能已被外部修改'}`)
   })
 
+  onEvent('skill_solidified', (data: any) => {
+    skillsStore.updateSkillFromEvent({
+      name: data.skill_name || '',
+      displayName: data.display_name || data.skill_name || '',
+      description: data.description || '',
+      icon: data.icon || '🔧',
+      scope: data.scope || 'global',
+      status: 'active',
+      version: data.version || '1.0.0',
+      source: 'custom',
+      installedAt: new Date().toISOString(),
+    })
+  })
+
+  onEvent('memory_updated', (data: any) => {
+    memoryStore.updateMemoryFromEvent({
+      id: data.memory_id || '',
+      key: data.key || '',
+      value: data.value || '',
+      scope: data.scope || 'global',
+      updatedAt: new Date().toISOString(),
+      createdAt: data.created_at || new Date().toISOString(),
+    })
+  })
+
+  onEvent('mcp_tool_discovered', (data: any) => {
+    const tools = Array.isArray(data.tools) ? data.tools : (data.tools ? [data.tools] : [])
+    mcpStore.updateToolsFromEvent(tools.map((t: any) => ({
+      name: t.name || '',
+      description: t.description || '',
+      parameters: t.parameters || {},
+      serverName: t.server_name || '',
+      enabled: t.enabled !== false,
+    })))
+  })
+
   onEvent('error', (data: any) => {
     uiStore.showToast('error', data.message || '发生错误')
   })
@@ -243,12 +297,6 @@ useKeyboard([
     handler: () => commandStore.isOpen ? commandStore.close() : openPalette((cmd) => {
       uiStore.setPendingCommand(cmd.name + ' ')
     }),
-  },
-  {
-    key: 'F2',
-    handler: () => {
-      statusBarRef.value?.startRename()
-    },
   },
   {
     key: 'Escape',
@@ -356,27 +404,6 @@ useKeyboard([
 </script>
 
 <template>
-  <div class="app-shell">
-    <StatusBar ref="statusBarRef" @toggle-theme="handleToggleTheme" />
-    <ChatPanel />
-    <Teleport to="body">
-      <ToastContainer />
-      <CommandPalette />
-      <ApprovalModal />
-      <SessionPicker />
-      <RollbackPicker />
-      <HelpPanel />
-    </Teleport>
-  </div>
+  <VscodeLayout v-if="isVscodeMode" />
+  <BrowserLayout v-else />
 </template>
-
-<style scoped>
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-  background: var(--color-bg-primary);
-}
-</style>

@@ -172,6 +172,43 @@ func (s *InMemoryStore) ListSessions(status, project string, limit, offset int) 
 	return result[offset:end], total, nil
 }
 
+func (s *InMemoryStore) ListUniqueWorkspaces() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	seen := make(map[string]bool)
+	var dirs []string
+	for _, sess := range s.sessions {
+		if sess.WorkingDirectory == "" || seen[sess.WorkingDirectory] {
+			continue
+		}
+		seen[sess.WorkingDirectory] = true
+		dirs = append(dirs, sess.WorkingDirectory)
+	}
+	return dirs, nil
+}
+
+func (s *InMemoryStore) DeleteByWorkspace(path string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	count := 0
+	for id, sess := range s.sessions {
+		if sess.WorkingDirectory == path {
+			delete(s.sessions, id)
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (s *InMemoryStore) DeleteSession(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.sessions, id)
+	return nil
+}
+
 func (s *InMemoryStore) AddEvent(sessionID string, event Event) error {
 	s.mu.RLock()
 	sess, ok := s.sessions[sessionID]

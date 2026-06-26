@@ -1,0 +1,25 @@
+<script setup lang="ts">
+</script>
+
+<template>
+  <div class="placeholder-view">
+    <h2>MCP 工具管理</h2>
+    <p class="placeholder-text">MCP 工具管理页将在 Phase 3 实现。</p>
+  </div>
+</template>
+
+<style scoped>
+.placeholder-view {
+  padding: 24px;
+}
+.placeholder-view h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+.placeholder-text {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+</style>

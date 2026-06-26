@@ -157,6 +157,9 @@ type SessionStore interface {
 	Get(id string) (*Session, error)
 	Update(s *Session) error
 	ListSessions(status, project string, limit, offset int) ([]Session, int, error)
+	ListUniqueWorkspaces() ([]string, error)
+	DeleteByWorkspace(path string) (int, error)
+	DeleteSession(id string) error
 	AddMessage(sessionID string, msg Message) error
 	GetMessages(sessionID string, limit, offset int) ([]Message, int, error)
 	GetEventBus(sessionID string) (*EventBus, error)

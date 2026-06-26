@@ -270,6 +270,30 @@ func (h *Handler) RenameSession(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) DeleteSession(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	sess, err := h.store.Get(id)
+	if err != nil {
+		if errors.Is(err, session.ErrSessionNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	if err := h.store.DeleteSession(sess.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete session")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"id":      sess.ID,
+		"deleted": "true",
+	})
+}
+
 type updateConfigRequest struct {
 	ToolCallLimit             *int `json:"tool_call_limit,omitempty"`
 	MaxConcurrentToolCalls    *int `json:"max_concurrent_tool_calls,omitempty"`

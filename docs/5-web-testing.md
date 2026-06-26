@@ -1,6 +1,9 @@
-# Devo Web 前端测试文档
+﻿# Devo Web 前端测试文档
 
-**版本**：1.0.0
+**版本**：1.2.0
+
+**变更**：v1.1.0 新增模式分流（VSCode/Browser 双布局）、Vue Router 路由、技能管理、记忆管理、MCP 工具管理、仪表盘、审批策略、会话列表/存档、项目设置等模块的测试用例。
+v1.2.0 从多路由页面模式改为三栏面板模式——聊天居中不可离开，右侧 Tab 面板承载 files/skills/memory/dashboard/settings/terminal；引入全局/工作区双模式 + scope 分层体系；左侧栏拆分为 workspace 选择器 + 会话列表。对应架构文档 WEB-23 ~ WEB-48。
 
 **定位**：本文档定义 Devo Web 前端（Vue 3 + Vite + TypeScript）的测试策略、测试架构和测试用例清单。测试分为两层：**Vitest** 负责单元测试和组件测试，**Playwright** 负责端到端（E2E）测试。
 
@@ -288,7 +291,12 @@ web/
 │   │   └── fixtures/
 │   │       ├── sessions.ts            # 会话测试数据
 │   │       ├── messages.ts            # 消息测试数据
-│   │       └── tools.ts               # 工具调用测试数据
+│   │       ├── tools.ts               # 工具调用测试数据
+│   │       ├── skills.ts             # 技能测试数据（v1.1.0 新增）
+│   │       ├── memory.ts             # 记忆测试数据（v1.1.0 新增）
+│   │       ├── mcp.ts                # MCP 工具测试数据（v1.1.0 新增）
+│   │       ├── dashboard.ts          # 仪表盘测试数据（v1.1.0 新增）
+│   │       └── workspaces.ts         # 工作区测试数据（v1.2.0 新增）
 │   │
 │   ├── utils/
 │   │   ├── markdown.test.ts           # Markdown 渲染工具测试
@@ -300,7 +308,12 @@ web/
 │   │   ├── chat.test.ts               # 聊天 Store 测试
 │   │   ├── approval.test.ts           # 审批 Store 测试
 │   │   ├── command.test.ts            # 命令 Store 测试
-│   │   └── ui.test.ts                 # UI Store 测试
+│   │   ├── ui.test.ts                 # UI Store 测试
+│   │   ├── skills.test.ts            # 技能 Store 测试（v1.1.0 新增）
+│   │   ├── memory.test.ts            # 记忆 Store 测试（v1.1.0 新增）
+│   │   ├── dashboard.test.ts         # 仪表盘 Store 测试（v1.1.0 新增）
+│   │   ├── settings.test.ts          # 设置 Store 测试（v1.1.0 新增）
+│   │   └── mcp.test.ts               # MCP Store 测试（v1.1.0 新增）
 │   │
 │   ├── composables/
 │   │   ├── useApi.test.ts             # API 封装测试
@@ -308,10 +321,20 @@ web/
 │   │   ├── useSession.test.ts         # 会话操作测试
 │   │   ├── useCommand.test.ts         # 命令面板逻辑测试
 │   │   ├── useKeyboard.test.ts        # 键盘快捷键测试
-│   │   └── useAutoScroll.test.ts      # 自动滚动测试
+│   │   ├── useAutoScroll.test.ts      # 自动滚动测试
+│   │   ├── usePlatform.test.ts       # 平台检测测试（v1.1.0 新增）
+│   │   ├── useSkills.test.ts         # 技能操作测试（v1.1.0 新增）
+│   │   ├── useMemory.test.ts         # 记忆操作测试（v1.1.0 新增）
+│   │   └── useMcp.test.ts            # MCP 工具操作测试（v1.1.0 新增）
 │   │
 │   └── components/
 │       ├── layout/
+│       │   ├── AppSidebar.test.ts     # 左侧栏（含 workspace 选择器 + 会话列表）（v1.2.0 更新）
+│       │   ├── AppHeader.test.ts      # 顶部栏
+│       │   ├── VscodeLayout.test.ts   # VSCode 布局（v1.2.0 更新）
+│       │   ├── BrowserLayout.test.ts  # 浏览器布局（三栏）（v1.2.0 更新）
+│       │   ├── RightPanel.test.ts     # 右侧面板 Tab 切换框架（v1.2.0 新增）
+│       │   ├── GlobalModals.test.ts   # 全局弹窗复用组件（v1.2.0 新增）
 │       │   ├── StatusBar.test.ts
 │       │   └── ToastContainer.test.ts
 │       ├── chat/
@@ -326,7 +349,34 @@ web/
 │       │   ├── ApprovalModal.test.ts
 │       │   ├── SessionPicker.test.ts
 │       │   ├── RollbackPicker.test.ts
-│       │   └── HelpPanel.test.ts
+│       │   ├── HelpPanel.test.ts
+│       │   ├── SkillInstallDialog.test.ts   # 技能安装弹窗（v1.1.0 新增）
+│       │   └── MemoryEditDialog.test.ts     # 记忆编辑弹窗（v1.1.0 新增）
+│       ├── panels/                              ← 【v1.2.0】替代原 views/，新增面板测试
+│       │   ├── files/
+│       │   │   └── FilesPanel.test.ts           # 文件树面板（v1.2.0 新增）
+│       │   ├── skills/
+│       │   │   ├── SkillsPanel.test.ts          # 技能管理面板（全局 + 项目两层）（v1.2.0 新增）
+│       │   │   ├── SkillDetailPanel.test.ts     # 技能详情面板（v1.2.0 新增）
+│       │   │   └── components/
+│       │   │       ├── SkillCard.test.ts        # 技能卡片
+│       │   │       ├── SkillInstallDialog.test.ts # 安装新技能弹窗
+│       │   │       └── SkillSolidifyPanel.test.ts # 固化审批面板（v1.2.0 新增）
+│       │   ├── memory/
+│       │   │   ├── MemoryPanel.test.ts          # 记忆管理面板（全局 + 项目两层）（v1.2.0 新增）
+│       │   │   └── components/
+│       │   │       ├── MemoryCard.test.ts       # 记忆卡片
+│       │   │       └── MemoryEditDialog.test.ts # 编辑记忆弹窗
+│       │   ├── dashboard/
+│       │   │   └── DashboardPanel.test.ts       # Token 用量仪表盘（v1.2.0 新增）
+│       │   ├── settings/
+│       │   │   ├── SettingsPanel.test.ts        # 设置面板（子 Tab：项目 / 全局）（v1.2.0 新增）
+│       │   │   ├── ApprovalPolicyPanel.test.ts  # 审批策略配置（v1.2.0 新增）
+│       │   │   └── McpSettingsPanel.test.ts     # MCP 工具管理（v1.2.0 新增）
+│       │   └── terminal/
+│       │       └── TerminalPanel.test.ts        # 终端面板（v1.2.0 新增）
+│       ├── views/
+│       │   └── ChatView.test.ts              # 聊天视图（v1.2.0 更新）
 │       └── shared/
 │           ├── DiffView.test.ts
 │           ├── CodeBlock.test.ts
@@ -344,7 +394,14 @@ web/
 │   ├── approval.spec.ts              # 审批流程 E2E
 │   ├── command-palette.spec.ts        # 命令面板 E2E
 │   ├── rollback.spec.ts              # 消息回滚 E2E
-│   └── keyboard.spec.ts              # 键盘快捷键 E2E
+│   ├── mode-routing.spec.ts          # 模式分流 E2E（v1.2.0 更新：改为面板切换测试）
+│   ├── skills.spec.ts                # 技能管理 E2E（v1.2.0 更新）
+│   ├── memory.spec.ts                # 记忆管理 E2E（v1.2.0 更新）
+│   ├── mcp-tools.spec.ts             # MCP 工具管理 E2E（v1.2.0 更新）
+│   ├── dashboard.spec.ts             # 仪表盘 E2E（v1.2.0 更新）
+│   ├── right-panel.spec.ts           # 右侧面板 Tab 切换 E2E（v1.2.0 新增）
+│   ├── workspace-scope.spec.ts       # 全局/工作区双模式 E2E（v1.2.0 新增）
+│   └── sidebar.spec.ts               # 左侧栏 workspace 选择 + 会话列表 E2E（v1.2.0 新增）
 │
 ├── vitest.config.ts
 ├── playwright.config.ts
@@ -1213,15 +1270,205 @@ export const mockToolCallRejected: ToolCall = {
 | E-19 | command-palette | should close on Escape |
 | E-20 | rollback | should rollback messages via /rollback command |
 
-**总计**：111 个测试用例（单元 43 + 组件 30 + E2E 20 + Utils 8 + Composables 18 = 111 个。不对，让我重新算一下...
+### 6.6 Phase 1 扩展 — Stores（UI Store 扩展）（5 个用例）
 
-- Utils: 8
-- Stores: 35
-- Composables: 18
-- 组件: 30
-- E2E: 20
+| 编号 | 模块 | 测试用例 |
+| :--- | :--- | :--- |
+| U-06 | ui | should detect VSCode mode from URL parameter `?mode=vscode` |
+| U-07 | ui | should detect browser mode by default |
+| U-08 | ui | should set activeWorkspace and switch between global/workspace mode |
+| U-09 | ui | should set activeRightTab and toggle rightPanelVisible |
+| U-10 | ui | should toggle sidebarCollapsed state |
 
-Total: 8 + 35 + 18 + 30 + 20 = 111 个测试用例
+### 6.7 Phase 2 — Stores（Skills）（11 个用例）
+
+| 编号 | 模块 | 测试用例 |
+| :--- | :--- | :--- |
+| SK-01 | skills | should fetch all skills |
+| SK-02 | skills | should filter by scope (global / workspace) |
+| SK-03 | skills | should return globalSkills via getter |
+| SK-04 | skills | should return workspaceSkills via getter |
+| SK-05 | skills | should enable skill |
+| SK-06 | skills | should disable skill |
+| SK-07 | skills | should get skill detail by name |
+| SK-08 | skills | should install new skill |
+| SK-09 | skills | should handle install error |
+| SK-10 | skills | should handle `skill_solidified` SSE event |
+| SK-11 | skills | should filter by selectedFilter (all/global/workspace) |
+
+### 6.8 Phase 3 — Stores（Memory + MCP）（13 个用例）
+
+| 编号 | 模块 | 测试用例 |
+| :--- | :--- | :--- |
+| ME-01 | memory | should fetch all memories |
+| ME-02 | memory | should filter by scope (global / workspace) |
+| ME-03 | memory | should return globalMemories via getter |
+| ME-04 | memory | should return workspaceMemories via getter |
+| ME-05 | memory | should add new memory |
+| ME-06 | memory | should update existing memory |
+| ME-07 | memory | should delete memory |
+| ME-08 | memory | should handle `memory_updated` SSE event |
+| ME-09 | memory | should handle API error on add |
+| MC-01 | mcp | should fetch all MCP tools |
+| MC-02 | mcp | should show server connection status |
+| MC-03 | mcp | should filter tools by server |
+| MC-04 | mcp | should handle `mcp_tool_discovered` SSE event |
+| MC-05 | mcp | should show `trust_note` for each tool |
+
+### 6.9 Phase 4 — Stores（Dashboard + Settings）（9 个用例）
+
+| 编号 | 模块 | 测试用例 |
+| :--- | :--- | :--- |
+| DB-01 | dashboard | should fetch token usage stats |
+| DB-02 | dashboard | should show today's usage |
+| DB-03 | dashboard | should show monthly usage |
+| DB-04 | dashboard | should show per-session breakdown |
+| DB-05 | dashboard | should show per-model breakdown |
+| ST-01 | settings | should fetch approval policy |
+| ST-02 | settings | should update approval policy for operation type |
+| ST-03 | settings | should set trust level |
+| ST-04 | settings | should fetch project settings |
+
+### 6.10 Phase 2~3 — Composables（11 个用例）
+
+| 编号 | 模块 | 测试用例 |
+| :--- | :--- | :--- |
+| CP-19 | usePlatform | should detect VSCode mode |
+| CP-20 | usePlatform | should detect browser mode |
+| CP-21 | usePlatform | should return correct layout component |
+| CP-22 | useSkills | should fetch and return skills |
+| CP-23 | useSkills | should toggle skill state |
+| CP-24 | useSkills | should install skill |
+| CP-25 | useMemory | should fetch memories |
+| CP-26 | useMemory | should add memory |
+| CP-27 | useMemory | should delete memory |
+| CP-28 | useMemory | should handle update conflict |
+| CP-29 | useMcp | should fetch MCP tools |
+| CP-30 | useMcp | should group tools by server |
+
+### 6.11 Phase 1 扩展 — 组件测试（Layouts）（14 个用例）
+
+| 编号 | 组件 | 测试用例 |
+| :--- | :--- | :--- |
+| CT-31 | VscodeLayout | should render ChatView |
+| CT-32 | VscodeLayout | should render GlobalModals |
+| CT-33 | VscodeLayout | should not render AppSidebar |
+| CT-34 | BrowserLayout | should render AppSidebar |
+| CT-35 | BrowserLayout | should render RightPanel |
+| CT-36 | BrowserLayout | should render `<router-view />` (ChatView) |
+| CT-37 | BrowserLayout | should render GlobalModals |
+| CT-38 | AppSidebar | should render global entry (non-selectable) |
+| CT-39 | AppSidebar | should render workspace list |
+| CT-40 | AppSidebar | should render session list for active workspace |
+| CT-41 | AppSidebar | should highlight active workspace |
+| CT-42 | AppSidebar | should emit workspace-select on click |
+| CT-43 | AppHeader | should render session title |
+| CT-44 | AppHeader | should render theme toggle button |
+
+### 6.12 Phase 2 — 组件测试（RightPanel + 技能管理面板）（14 个用例）
+
+| 编号 | 组件 | 测试用例 |
+| :--- | :--- | :--- |
+| CT-45 | RightPanel | should render Tab bar |
+| CT-46 | RightPanel | should switch active Tab on click |
+| CT-47 | RightPanel | should show correct Tabs in global mode (3 tabs) |
+| CT-48 | RightPanel | should show correct Tabs in workspace mode (6 tabs) |
+| CT-49 | RightPanel | should hide panel when rightPanelVisible is false |
+| CT-50 | RightPanel | should support drag-to-resize width |
+| CT-51 | ChatView | should render ChatPanel |
+| CT-52 | SkillsPanel | should render skill cards grouped by scope |
+| CT-53 | SkillsPanel | should filter by scope selector (all/global/workspace) |
+| CT-54 | SkillsPanel | should show empty state |
+| CT-55 | SkillsPanel | should show loading state |
+| CT-56 | SkillDetailPanel | should render skill details |
+| CT-57 | SkillDetailPanel | should render SKILL.md preview |
+| CT-58 | SkillDetailPanel | should handle not found |
+
+### 6.13 Phase 3 — 组件测试（记忆 + MCP + 文件面板）（18 个用例）
+
+| 编号 | 组件 | 测试用例 |
+| :--- | :--- | :--- |
+| CT-59 | MemoryPanel | should render memory list grouped by scope |
+| CT-60 | MemoryPanel | should filter by scope selector (all/global/workspace) |
+| CT-61 | MemoryPanel | should open edit dialog on add |
+| CT-62 | MemoryPanel | should show empty state |
+| CT-63 | MemoryCard | should render memory key and value |
+| CT-64 | MemoryCard | should emit edit on click |
+| CT-65 | MemoryCard | should emit delete on click |
+| CT-66 | MemoryEditDialog | should render form fields |
+| CT-67 | MemoryEditDialog | should emit save on confirm |
+| CT-68 | MemoryEditDialog | should emit close on cancel |
+| CT-69 | McpSettingsPanel | should render server list |
+| CT-70 | McpSettingsPanel | should show connection status indicator |
+| CT-71 | McpSettingsPanel | should render tool list |
+| CT-72 | McpSettingsPanel | should show trust_note |
+| CT-73 | FilesPanel | should render file tree |
+| CT-74 | FilesPanel | should expand/collapse folders |
+| CT-75 | FilesPanel | should show file content on click |
+| CT-76 | FilesPanel | should show empty state when no workspace |
+
+### 6.14 Phase 4~5 — 组件测试（仪表盘 + 设置 + 终端面板）（16 个用例）
+
+| 编号 | 组件 | 测试用例 |
+| :--- | :--- | :--- |
+| CT-77 | DashboardPanel | should render usage summary |
+| CT-78 | DashboardPanel | should render per-session chart |
+| CT-79 | DashboardPanel | should render per-model chart |
+| CT-80 | DashboardPanel | should show loading state |
+| CT-81 | SettingsPanel | should render sub-tabs (项目设置 / 全局设置) |
+| CT-82 | SettingsPanel | should switch between sub-tabs |
+| CT-83 | SettingsPanel | should show project settings form in workspace mode |
+| CT-84 | ApprovalPolicyPanel | should render policy list |
+| CT-85 | ApprovalPolicyPanel | should allow policy change |
+| CT-86 | ApprovalPolicyPanel | should show trust level selector |
+| CT-87 | SkillCard | should render skill name and scope badge |
+| CT-88 | SkillCard | should show toggle state |
+| CT-89 | SkillInstallDialog | should render install form |
+| CT-90 | SkillInstallDialog | should emit install on confirm |
+| CT-91 | SkillInstallDialog | should emit close on cancel |
+| CT-92 | TerminalPanel | should render terminal area (仅工作区模式) |
+
+### 6.15 Phase 1 扩展 ~ Phase 5 — E2E 测试（26 个用例）
+
+| 编号 | 测试文件 | 测试用例 |
+| :--- | :--- | :--- |
+| E-21 | mode-routing | should show browser layout on default URL |
+| E-22 | mode-routing | should show VSCode layout with `?mode=vscode` |
+| E-23 | mode-routing | should show chat as main content in both modes |
+| E-24 | right-panel | should show 3 tabs in global mode (无 workspace) |
+| E-25 | right-panel | should show 6 tabs in workspace mode (选中 workspace) |
+| E-26 | right-panel | should switch between tabs without leaving chat |
+| E-27 | right-panel | should maintain panel state across tab switches |
+| E-28 | right-panel | should support drag-to-resize right panel width |
+| E-29 | skills | should view skills list in SkillsPanel |
+| E-30 | skills | should filter skills by scope (global/workspace/all) |
+| E-31 | skills | should view skill detail in SkillDetailPanel |
+| E-32 | skills | should install new skill via dialog |
+| E-33 | memory | should view memory list in MemoryPanel |
+| E-34 | memory | should add new memory |
+| E-35 | memory | should edit existing memory |
+| E-36 | memory | should delete memory |
+| E-37 | mcp-tools | should view MCP tool list in McpSettingsPanel |
+| E-38 | mcp-tools | should show connection status per server |
+| E-39 | mcp-tools | should refresh on `mcp_tool_discovered` event |
+| E-40 | dashboard | should view token usage dashboard |
+| E-41 | dashboard | should show per-session breakdown |
+| E-42 | workspace-scope | should select workspace from sidebar |
+| E-43 | workspace-scope | should show session list for selected workspace |
+| E-44 | workspace-scope | should configure global settings without workspace |
+| E-45 | workspace-scope | should switch between global and workspace mode |
+| E-46 | sidebar | should display workspace list in left sidebar |
+
+**总计**：250 个测试用例
+
+| 分类 | Phase 1 已有 | Phase 1 扩展 ~ Phase 5 新增 | 合计 |
+| :--- | :--- | :--- | :--- |
+| Utils | 8 | — | 8 |
+| Stores | 35 | 39 | 74 |
+| Composables | 18 | 12 | 30 |
+| 组件测试 | 30 | 62 | 92 |
+| E2E | 20 | 26 | 46 |
+| **合计** | **111** | **139** | **250** |
 
 ---
 
@@ -1339,9 +1586,31 @@ npm run test:e2e:report
 | TEST-15 | E2E — 回滚 | rollback.spec.ts（1 个用例） | WEB-16 |
 | TEST-16 | CI/CD 配置 | GitHub Actions workflow 配置 | TEST-11~15 |
 
+### Phase 1 扩展 ~ Phase 5 新增任务（v1.2.0）
+
+| 编号 | 任务 | 内容 | 依赖 |
+| :--- | :--- | :--- | :--- |
+| TEST-17 | 新 Fixtures | 编写 skills、memory、mcp、dashboard、workspaces 测试数据 | WEB-30, WEB-35, WEB-39, WEB-42 |
+| TEST-18 | 新 Stores 测试 | skills、memory、dashboard、settings、mcp 共 5 个 Store（39 个用例，含 scope getter） | WEB-30, WEB-35, WEB-39, WEB-42 |
+| TEST-19 | 新 Composables 测试 | usePlatform、useSkills、useMemory、useMcp（12 个用例） | WEB-24, WEB-30, WEB-35, WEB-39 |
+| TEST-20 | 组件测试 — 布局 | VscodeLayout、BrowserLayout、AppSidebar、AppHeader、RightPanel、GlobalModals（14 个用例） | WEB-25~29 |
+| TEST-21 | 组件测试 — 技能面板 | SkillsPanel、SkillDetailPanel、SkillCard、SkillInstallDialog、SkillSolidifyPanel（14 个用例） | WEB-37 |
+| TEST-22 | 组件测试 — 记忆 + MCP + 文件面板 | MemoryPanel、MemoryCard、MemoryEditDialog、McpSettingsPanel、FilesPanel（18 个用例） | WEB-38, WEB-36, WEB-43 |
+| TEST-23 | 组件测试 — 仪表盘 + 设置 + 终端面板 | DashboardPanel、SettingsPanel、ApprovalPolicyPanel、TerminalPanel（16 个用例） | WEB-39~42 |
+| TEST-24 | E2E — 模式分流 | mode-routing.spec.ts（3 个用例） | WEB-32 |
+| TEST-25 | E2E — 右侧面板 | right-panel.spec.ts（5 个用例，含 Tab 切换、宽高拖拽、全局/工作区 Tab 差异） | WEB-29 |
+| TEST-26 | E2E — 技能管理 | skills.spec.ts（4 个用例，含 scope 筛选） | WEB-37 |
+| TEST-27 | E2E — 记忆管理 | memory.spec.ts（4 个用例，含 scope 筛选） | WEB-38 |
+| TEST-28 | E2E — MCP 工具 | mcp-tools.spec.ts（3 个用例） | WEB-43 |
+| TEST-29 | E2E — 仪表盘 | dashboard.spec.ts（2 个用例） | WEB-39 |
+| TEST-30 | E2E — 全局/工作区模式 | workspace-scope.spec.ts（4 个用例） | WEB-28, WEB-31 |
+| TEST-31 | E2E — 左侧栏 | sidebar.spec.ts（1 个用例） | WEB-28 |
+
 ---
 
 ## 9. 验收标准
+
+### Phase 1 验收（v1.0.0）✅ 已完成
 
 1. **`npm test` 全部通过**：所有 Vitest 测试用例（111 个）零失败
 2. **覆盖率达标**：行覆盖率 ≥ 80%，分支覆盖率 ≥ 70%，核心模块（stores、composables）≥ 90%
@@ -1351,3 +1620,17 @@ npm run test:e2e:report
 6. **CI 通过**：GitHub Actions 上 unit + e2e 两个 job 全部通过
 7. **测试隔离**：任意单独运行一个测试文件，结果与全量运行一致
 8. **Mock 完整**：单元测试和组件测试不依赖真实后端服务
+
+### Phase 1 扩展 ~ Phase 5 验收（v1.2.0）
+
+1. **`npm test` 全部通过**：所有 Vitest 测试用例（250 个）零失败
+2. **覆盖率达标**：行覆盖率 ≥ 80%，分支覆盖率 ≥ 70%，新增模块（skills、memory、mcp、dashboard、settings、panels）≥ 85%
+3. **`npm run test:e2e` 全部通过**：所有 Playwright 测试用例（46 个）在 Chromium 和 Firefox 上零失败
+4. **模式分流测试**：VSCode 模式与浏览器模式布局切换正确，功能无回归
+5. **三栏面板测试**：浏览器模式下右侧面板 Tab 切换不离开聊天上下文，全局模式显示 3 个 Tab，工作区模式显示 6 个 Tab
+6. **scope 分层测试**：Skills 和 Memory 面板支持 global/workspace/all 三种 scope 筛选
+7. **全局/工作区双模式**：无 workspace 时可配置全局设置，选择 workspace 后显示项目面板
+8. **左侧栏测试**：workspace 列表和会话列表正确显示，切换 workspace 更新会话列表
+9. **新 Store 完整**：skills、memory、dashboard、settings、mcp 五个 Store 的 API 调用、状态变更、SSE 事件处理、scope getter 均覆盖
+10. **测试速度**：`npm test` 在 60 秒内完成，`npm run test:e2e` 在 10 分钟内完成
+11. **Mock 完整**：新 API 端点均有 Mock 支持，不依赖真实后端服务

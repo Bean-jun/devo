@@ -20,10 +20,6 @@ const workingDir = computed(() => sessionStore.currentSession?.workingDirectory 
 const themeIcon = computed(() => uiStore.theme === 'dark' ? '☀️' : '🌙')
 const themeLabel = computed(() => uiStore.theme === 'dark' ? '浅色' : '深色')
 
-const emit = defineEmits<{
-  (e: 'toggle-theme', x: number, y: number): void
-}>()
-
 async function startRename() {
   if (!sessionStore.currentSession) return
   renameValue.value = sessionName.value
@@ -57,7 +53,7 @@ function toggleTheme(event: MouseEvent) {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
   const x = rect.left + rect.width / 2
   const y = rect.top + rect.height / 2
-  emit('toggle-theme', x, y)
+  uiStore.toggleThemeWithTransition(x, y)
 }
 
 const connectionStatusText = computed(() => {
