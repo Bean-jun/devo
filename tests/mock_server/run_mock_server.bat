@@ -6,4 +6,5 @@ echo   Requests saved to: requests\
 echo ============================================
 echo.
 go mod tidy
-go run main.go
+go build -o mock_server.exe
+.\mock_server.exe

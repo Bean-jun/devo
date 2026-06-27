@@ -1,9 +1,6 @@
 ﻿# Devo Web 前端测试文档
 
-**版本**：1.2.0
-
-**变更**：v1.1.0 新增模式分流（VSCode/Browser 双布局）、Vue Router 路由、技能管理、记忆管理、MCP 工具管理、仪表盘、审批策略、会话列表/存档、项目设置等模块的测试用例。
-v1.2.0 从多路由页面模式改为三栏面板模式——聊天居中不可离开，右侧 Tab 面板承载 files/skills/memory/dashboard/settings/terminal；引入全局/工作区双模式 + scope 分层体系；左侧栏拆分为 workspace 选择器 + 会话列表。对应架构文档 WEB-23 ~ WEB-48。
+**版本**：1.3.0
 
 **定位**：本文档定义 Devo Web 前端（Vue 3 + Vite + TypeScript）的测试策略、测试架构和测试用例清单。测试分为两层：**Vitest** 负责单元测试和组件测试，**Playwright** 负责端到端（E2E）测试。
 
@@ -206,12 +203,12 @@ export default defineConfig({
     timeout: 5_000,
   },
 
-  // 失败重试
-  retries: process.env.CI ? 2 : 0,
+  // 失败重试（本地开发不重试，保持快速反馈）
+  retries: 0,
 
   // 并行执行
   fullyParallel: true,
-  workers: process.env.CI ? 2 : undefined,
+  workers: 1,
 
   // 报告器
   reporter: [
@@ -254,7 +251,7 @@ export default defineConfig({
     command: 'cd .. && go run ./cmd/devo --web --port 8080',
     port: 8080,
     timeout: 15_000,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
   },
 })
 ```
@@ -944,6 +941,402 @@ test.describe('Approval Flow', () => {
 })
 ```
 
+### 4.7 侧边栏组件测试 — AppSidebar
+
+#### 4.7.1 工作区名称过长 — 文本截断
+
+```typescript
+// components/layout/AppSidebar.test.ts
+import { describe, it, expect, beforeEach } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import AppSidebar from '@/components/layout/AppSidebar.vue'
+
+describe('AppSidebar — 长文本截断', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  describe('工作区名称过长', () => {
+    it('should truncate workspace name with ellipsis when name is too long', () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const uiStore = useUiStore()
+      uiStore.workspaceList = [
+        {
+          id: '/home/user/projects/this-is-an-extremely-long-workspace-name-that-exceeds-sidebar',
+          name: 'this-is-an-extremely-long-workspace-name-that-exceeds-sidebar-width',
+          path: '/home/user/projects/this-is-an-extremely-long-workspace-name-that-exceeds-sidebar',
+        },
+      ]
+
+      const nameEl = wrapper.find('.workspace-name')
+      expect(nameEl.exists()).toBe(true)
+
+      const computedStyle = getComputedStyle(nameEl.element)
+      expect(computedStyle.overflow).toBe('hidden')
+      expect(computedStyle.textOverflow).toBe('ellipsis')
+      expect(computedStyle.whiteSpace).toBe('nowrap')
+    })
+
+    it('should still show full path in small text below workspace name', () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const uiStore = useUiStore()
+      const longPath = '/home/user/projects/very-very-long-workspace-directory-path'
+      uiStore.workspaceList = [
+        { id: longPath, name: 'long-project', path: longPath },
+      ]
+
+      const pathEl = wrapper.find('.workspace-path')
+      expect(pathEl.exists()).toBe(true)
+      expect(pathEl.text()).toBe(longPath)
+      // 路径也应有截断
+      const pathStyle = getComputedStyle(pathEl.element)
+      expect(pathStyle.textOverflow).toBe('ellipsis')
+    })
+
+    it('should display full workspace name in tooltip (title attribute)', () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const uiStore = useUiStore()
+      const longName = 'a-very-long-workspace-name-for-testing'
+      uiStore.workspaceList = [
+        { id: '/test', name: longName, path: '/test/project' },
+      ]
+
+      const item = wrapper.find('.workspace-item')
+      // 父容器或子元素应有 title 属性
+      const nameEl = item.find('.workspace-name')
+      expect(nameEl.attributes('title') || item.attributes('title')).toBeTruthy()
+    })
+  })
+
+  describe('会话名称过长', () => {
+    it('should truncate session title with ellipsis when title is too long', () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const sessionStore = useSessionStore()
+      sessionStore.sessions = [
+        {
+          id: 'sess-1',
+          title: '这是一个非常非常非常长的会话标题用来测试侧边栏截断效果是否正常显示省略号',
+          state: 'idle',
+          createdAt: '2026-01-01T00:00:00Z',
+          lastActiveAt: '2026-01-01T00:00:00Z',
+          messageCount: 0,
+          workingDirectory: '/test',
+        } as any,
+      ]
+
+      const titleEl = wrapper.find('.session-title')
+      expect(titleEl.exists()).toBe(true)
+
+      const style = getComputedStyle(titleEl.element)
+      expect(style.overflow).toBe('hidden')
+      expect(style.textOverflow).toBe('ellipsis')
+      expect(style.whiteSpace).toBe('nowrap')
+    })
+
+    it('should show full session title on hover via title attribute', () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const sessionStore = useSessionStore()
+      const longTitle = '修复用户登录页面在Safari浏览器下Cookie无法正确设置的Bug'
+      sessionStore.sessions = [
+        {
+          id: 'sess-1',
+          title: longTitle,
+          state: 'idle',
+          createdAt: '2026-01-01T00:00:00Z',
+          lastActiveAt: '2026-01-01T00:00:00Z',
+          messageCount: 0,
+          workingDirectory: '/test',
+        } as any,
+      ]
+
+      const item = wrapper.find('.session-item')
+      expect(item.attributes('title')).toBe(longTitle)
+    })
+
+    it('should handle empty session title gracefully', () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const sessionStore = useSessionStore()
+      sessionStore.sessions = [
+        {
+          id: 'sess-1',
+          title: '',
+          state: 'idle',
+          createdAt: '2026-01-01T00:00:00Z',
+          lastActiveAt: '2026-01-01T00:00:00Z',
+          messageCount: 0,
+          workingDirectory: '/test',
+        } as any,
+      ]
+
+      const titleEl = wrapper.find('.session-title')
+      expect(titleEl.exists()).toBe(true)
+      // 空标题不应崩溃，显示占位文本
+      expect(titleEl.text()).toBeDefined()
+    })
+  })
+})
+```
+
+#### 4.7.2 列表条目过多 — 滚动与定位
+
+```typescript
+describe('AppSidebar — 列表溢出滚动', () => {
+  function generateWorkspaces(count: number) {
+    const list = []
+    for (let i = 1; i <= count; i++) {
+      const name = `project-${String(i).padStart(3, '0')}`
+      list.push({
+        id: `/home/user/${name}`,
+        name,
+        path: `/home/user/projects/${name}`,
+      })
+    }
+    return list
+  }
+
+  function generateSessions(count: number) {
+    const list = []
+    for (let i = 1; i <= count; i++) {
+      list.push({
+        id: `sess-${String(i).padStart(3, '0')}`,
+        title: `会话 #${i} — 讨论关于项目架构和性能优化的问题`,
+        state: 'idle' as const,
+        createdAt: `2026-01-${String(i).padStart(2, '0')}T00:00:00Z`,
+        lastActiveAt: `2026-01-${String(i).padStart(2, '0')}T00:00:00Z`,
+        messageCount: i * 5,
+        workingDirectory: '/test',
+      })
+    }
+    return list
+  }
+
+  describe('工作区列表溢出', () => {
+    it('should make workspace list scrollable when items exceed viewport', () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const uiStore = useUiStore()
+      uiStore.workspaceList = generateWorkspaces(50)
+
+      const section = wrapper.find('.sidebar-section')
+      const sectionEl = section.element as HTMLElement
+
+      // 50 个工作区应该超出容器高度
+      expect(sectionEl.scrollHeight).toBeGreaterThan(sectionEl.clientHeight)
+    })
+
+    it('should scroll to a specific workspace when selected', async () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const uiStore = useUiStore()
+      const workspaces = generateWorkspaces(50)
+      uiStore.workspaceList = workspaces
+
+      // 选中第 45 个工作区
+      const target = workspaces[44]
+      uiStore.setActiveWorkspace(target.id)
+
+      await wrapper.vm.$nextTick()
+
+      const activeItem = wrapper.find('.workspace-item.active')
+      expect(activeItem.exists()).toBe(true)
+
+      // 验证 active 元素在可视区域内
+      const itemEl = activeItem.element as HTMLElement
+      const parentEl = itemEl.parentElement!
+      const itemTop = itemEl.offsetTop
+      const itemBottom = itemTop + itemEl.offsetHeight
+      const parentScrollTop = parentEl.scrollTop
+      const parentHeight = parentEl.clientHeight
+
+      // 选中项应在可视区域内
+      expect(itemBottom).toBeGreaterThan(parentScrollTop)
+      expect(itemTop).toBeLessThan(parentScrollTop + parentHeight)
+    })
+
+    it('should scroll to active workspace on mount', async () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const uiStore = useUiStore()
+      const workspaces = generateWorkspaces(50)
+      uiStore.workspaceList = workspaces
+      uiStore.setActiveWorkspace(workspaces[30].id)
+
+      await wrapper.vm.$nextTick()
+
+      const activeItem = wrapper.find('.workspace-item.active')
+      const itemEl = activeItem.element as HTMLElement
+      const parentEl = itemEl.parentElement!
+
+      // active 项应在可视区域内（scrollIntoView 已调用）
+      expect(itemEl.offsetTop).toBeGreaterThanOrEqual(parentEl.scrollTop)
+    })
+  })
+
+  describe('会话列表溢出', () => {
+    it('should make session list scrollable when many sessions exist', () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const sessionStore = useSessionStore()
+      sessionStore.sessions = generateSessions(100) as any
+
+      const sessionsList = wrapper.find('.sessions-list')
+      const listEl = sessionsList.element as HTMLElement
+
+      // 100 个会话应该超出容器高度
+      expect(listEl.scrollHeight).toBeGreaterThan(listEl.clientHeight)
+    })
+
+    it('should scroll to active session when selected', async () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const sessionStore = useSessionStore()
+      const sessions = generateSessions(80) as any
+      sessionStore.sessions = sessions
+      sessionStore.currentSession = sessions[60]
+
+      await wrapper.vm.$nextTick()
+
+      const activeItem = wrapper.find('.session-item.active')
+      expect(activeItem.exists()).toBe(true)
+
+      const itemEl = activeItem.element as HTMLElement
+      const parentEl = itemEl.parentElement!
+      const itemTop = itemEl.offsetTop
+      const parentScrollTop = parentEl.scrollTop
+      const parentHeight = parentEl.clientHeight
+
+      expect(itemTop).toBeGreaterThanOrEqual(parentScrollTop)
+      expect(itemTop).toBeLessThan(parentScrollTop + parentHeight)
+    })
+
+    it('should scroll to newly created session at bottom of list', async () => {
+      const wrapper = mount(AppSidebar, {
+        props: { collapsed: false },
+      })
+
+      const sessionStore = useSessionStore()
+      sessionStore.sessions = generateSessions(30) as any
+
+      const newSession = {
+        id: 'sess-new',
+        title: '新创建的会话',
+        state: 'idle' as const,
+        createdAt: '2026-01-31T00:00:00Z',
+        lastActiveAt: '2026-01-31T00:00:00Z',
+        messageCount: 0,
+        workingDirectory: '/test',
+      } as any
+      sessionStore.sessions = [...sessionStore.sessions, newSession]
+      sessionStore.currentSession = newSession
+
+      await wrapper.vm.$nextTick()
+
+      const activeItem = wrapper.find('.session-item.active')
+      const itemEl = activeItem.element as HTMLElement
+      const parentEl = itemEl.parentElement!
+
+      // 新会话应在可视区域底部
+      expect(itemEl.offsetTop).toBeGreaterThanOrEqual(parentEl.scrollTop)
+    })
+  })
+})
+```
+
+#### 4.7.3 折叠模式下图标列表溢出
+
+```typescript
+describe('AppSidebar — 折叠模式溢出', () => {
+  it('should make collapsed icon list scrollable with many workspaces', () => {
+    const wrapper = mount(AppSidebar, {
+      props: { collapsed: true },
+    })
+
+    const uiStore = useUiStore()
+    const workspaces = []
+    for (let i = 1; i <= 30; i++) {
+      workspaces.push({
+        id: `/home/user/project-${i}`,
+        name: `project-${i}`,
+        path: `/home/user/project-${i}`,
+      })
+    }
+    uiStore.workspaceList = workspaces
+    const sessionStore = useSessionStore()
+    const sessions = []
+    for (let i = 1; i <= 30; i++) {
+      sessions.push({
+        id: `sess-${i}`,
+        title: `会话 ${i}`,
+        state: 'idle',
+        createdAt: '2026-01-01T00:00:00Z',
+        lastActiveAt: '2026-01-01T00:00:00Z',
+        messageCount: 0,
+        workingDirectory: '/test',
+      } as any)
+    }
+    sessionStore.sessions = sessions
+
+    const iconsContainer = wrapper.find('.collapsed-icons')
+    const containerEl = iconsContainer.element as HTMLElement
+
+    // 60 个图标应超出容器高度，显示滚动条
+    expect(containerEl.scrollHeight).toBeGreaterThan(containerEl.clientHeight)
+  })
+
+  it('should show active workspace icon in collapsed mode', async () => {
+    const wrapper = mount(AppSidebar, {
+      props: { collapsed: true },
+    })
+
+    const uiStore = useUiStore()
+    const workspaces = []
+    for (let i = 1; i <= 20; i++) {
+      workspaces.push({
+        id: `/home/user/project-${i}`,
+        name: `project-${i}`,
+        path: `/home/user/project-${i}`,
+      })
+    }
+    uiStore.workspaceList = workspaces
+    uiStore.setActiveWorkspace('/home/user/project-15')
+
+    await wrapper.vm.$nextTick()
+
+    const activeIcon = wrapper.find('.collapsed-icon-btn.active')
+    expect(activeIcon.exists()).toBe(true)
+  })
+})
+```
+
 ---
 
 ## 5. 测试数据与 Mock 工厂
@@ -1472,100 +1865,7 @@ export const mockToolCallRejected: ToolCall = {
 
 ---
 
-## 7. CI/CD 集成
-
-### 7.1 GitHub Actions 配置
-
-```yaml
-# .github/workflows/web-test.yml
-name: Web Tests
-
-on:
-  push:
-    paths:
-      - 'web/**'
-  pull_request:
-    paths:
-      - 'web/**'
-
-jobs:
-  unit:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: npm ci
-      - run: npm run test -- --coverage
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage
-          path: web/coverage/
-
-  e2e:
-    runs-on: ubuntu-latest
-    needs: unit
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: web/playwright-report/
-```
-
-### 7.2 本地开发命令
-
-```bash
-# 运行所有单元测试
-npm test
-
-# 运行单元测试（监听模式）
-npm run test:watch
-
-# 运行单个测试文件
-npx vitest run src/stores/session.test.ts
-
-# 运行覆盖率报告
-npm run test:coverage
-
-# 运行 E2E 测试
-npm run test:e2e
-
-# 运行 E2E 测试（UI 模式，可视化调试）
-npm run test:e2e:ui
-
-# 运行单个 E2E 文件
-npx playwright test e2e/chat.spec.ts
-
-# 查看 E2E 报告
-npm run test:e2e:report
-```
-
----
-
-## 8. 实现计划
+## 7. 实现计划
 
 | 编号 | 任务 | 内容 | 依赖 |
 | :--- | :--- | :--- | :--- |

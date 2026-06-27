@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	projectconfig "devo/internal/core/config"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/tools"
 
@@ -29,6 +30,7 @@ type Manager struct {
 	reconnectCtx    context.Context
 	reconnectCancel context.CancelFunc
 	reconnectWG     sync.WaitGroup
+	toolRegistry    *tools.Registry
 }
 
 func NewManager(workingDir string) *Manager {
@@ -65,9 +67,21 @@ func (m *Manager) ConnectAll(ctx context.Context) error {
 	}
 	m.mu.Unlock()
 
+	mcpWhitelist, hasConfig := m.loadMCPWhitelist()
+
 	m.reconnectCtx, m.reconnectCancel = context.WithCancel(context.Background())
 
 	for _, cfg := range configs {
+		if hasConfig && !mcpWhitelist[cfg.ServerID] {
+			m.mu.Lock()
+			m.servers[cfg.ServerID] = &ServerInfo{
+				Config: cfg,
+				Status: StatusDisconnected,
+			}
+			m.mu.Unlock()
+			continue
+		}
+
 		if err := m.Connect(ctx, cfg.ServerID); err != nil {
 			m.mu.Lock()
 			if _, ok := m.servers[cfg.ServerID]; !ok {
@@ -83,6 +97,18 @@ func (m *Manager) ConnectAll(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (m *Manager) loadMCPWhitelist() (map[string]bool, bool) {
+	cfg, err := projectconfig.Load(m.workingDir)
+	if err != nil || cfg == nil {
+		return nil, false
+	}
+	whitelist := make(map[string]bool, len(cfg.MCP))
+	for _, id := range cfg.MCP {
+		whitelist[id] = true
+	}
+	return whitelist, true
 }
 
 func (m *Manager) Connect(ctx context.Context, serverID string) error {
@@ -201,6 +227,155 @@ func (m *Manager) GetAllServerInfos() []ServerInfo {
 		result = append(result, *info)
 	}
 	return result
+}
+
+func (m *Manager) GetAllServerConfigs() []McpServerConfig {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make([]McpServerConfig, 0, len(m.configs))
+	for _, cfg := range m.configs {
+		result = append(result, cfg)
+	}
+	return result
+}
+
+func (m *Manager) EnableServer(ctx context.Context, serverID string) error {
+	m.mu.Lock()
+
+	if m.workingDir == "" {
+		m.mu.Unlock()
+		return fmt.Errorf("no working directory set")
+	}
+
+	cfg, err := projectconfig.Load(m.workingDir)
+	if err != nil {
+		m.mu.Unlock()
+		return err
+	}
+	if cfg == nil {
+		cfg = &projectconfig.ProjectConfig{}
+	}
+
+	found := false
+	for _, id := range cfg.MCP {
+		if id == serverID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		cfg.MCP = append(cfg.MCP, serverID)
+	}
+
+	if err := projectconfig.Save(m.workingDir, cfg); err != nil {
+		m.mu.Unlock()
+		return err
+	}
+
+	m.mu.Unlock()
+
+	if err := m.Connect(ctx, serverID); err != nil {
+		return err
+	}
+
+	m.registerServerTools(serverID)
+	return nil
+}
+
+func (m *Manager) DisableServer(serverID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.workingDir == "" {
+		return fmt.Errorf("no working directory set")
+	}
+
+	cfg, err := projectconfig.Load(m.workingDir)
+	if err != nil {
+		return err
+	}
+	if cfg == nil {
+		cfg = &projectconfig.ProjectConfig{}
+	}
+
+	filtered := make([]string, 0, len(cfg.MCP))
+	for _, id := range cfg.MCP {
+		if id != serverID {
+			filtered = append(filtered, id)
+		}
+	}
+	cfg.MCP = filtered
+
+	if err := projectconfig.Save(m.workingDir, cfg); err != nil {
+		return err
+	}
+
+	if info, ok := m.servers[serverID]; ok {
+		for _, tool := range info.Tools {
+			if m.toolRegistry != nil {
+				m.toolRegistry.Unregister(tool.ToolName)
+			}
+		}
+		info.Status = StatusDisconnected
+		info.Tools = nil
+	}
+
+	if session, ok := m.sessions[serverID]; ok {
+		session.Close()
+		delete(m.sessions, serverID)
+	}
+	if _, ok := m.clients[serverID]; ok {
+		delete(m.clients, serverID)
+	}
+
+	return nil
+}
+
+func (m *Manager) registerServerTools(serverID string) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.toolRegistry == nil {
+		return
+	}
+
+	info, ok := m.servers[serverID]
+	if !ok || info.Status != StatusConnected {
+		return
+	}
+
+	for _, tool := range info.Tools {
+		adapter := &mcpToolAdapter{
+			manager:  m,
+			toolName: tool.ToolName,
+		}
+		m.toolRegistry.Register(adapter)
+	}
+}
+
+func (m *Manager) RemoveServer(serverID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if info, ok := m.servers[serverID]; ok {
+		for _, tool := range info.Tools {
+			if m.toolRegistry != nil {
+				m.toolRegistry.Unregister(tool.ToolName)
+			}
+		}
+	}
+
+	delete(m.configs, serverID)
+	delete(m.servers, serverID)
+
+	if session, ok := m.sessions[serverID]; ok {
+		session.Close()
+		delete(m.sessions, serverID)
+	}
+	if _, ok := m.clients[serverID]; ok {
+		delete(m.clients, serverID)
+	}
 }
 
 func (m *Manager) GetAllTools() []McpTool {
@@ -336,8 +511,10 @@ func (m *Manager) DiscoverTools(ctx context.Context, serverID string) ([]McpTool
 }
 
 func (m *Manager) RegisterTools(registry *tools.Registry) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.toolRegistry = registry
 
 	for _, info := range m.servers {
 		if info.Status != StatusConnected {
@@ -419,6 +596,7 @@ func (m *Manager) startReconnect(serverID string) {
 			}
 			cancel()
 			log.Printf("[mcp] reconnect succeeded for %s", serverID)
+			m.registerServerTools(serverID)
 			return
 		}
 	}()

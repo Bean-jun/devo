@@ -94,7 +94,7 @@ func TestManager_GetActiveSkillsPrompt(t *testing.T) {
 		t.Fatalf("SetProjectDir: %v", err)
 	}
 
-	prompt := mgr.GetActiveSkillsPrompt(nil)
+	prompt := mgr.GetActiveSkillsPrompt()
 	if prompt == "" {
 		t.Error("expected non-empty prompt")
 	}
@@ -127,7 +127,11 @@ func TestManager_GetActiveSkillsPrompt_Filtered(t *testing.T) {
 		t.Fatalf("SetProjectDir: %v", err)
 	}
 
-	prompt := mgr.GetActiveSkillsPrompt([]string{"Python Expert"})
+	if err := mgr.DisableSkill("Go Expert"); err != nil {
+		t.Fatalf("DisableSkill: %v", err)
+	}
+
+	prompt := mgr.GetActiveSkillsPrompt()
 	if prompt == "" {
 		t.Error("expected non-empty prompt")
 	}
@@ -137,14 +141,14 @@ func TestManager_GetActiveSkillsPrompt_Filtered(t *testing.T) {
 	if !strings.Contains(prompt, "Python Expert") {
 		t.Error("expected 'Python Expert' in prompt")
 	}
-	if !strings.Contains(prompt, "Go Expert") {
-		t.Error("expected 'Go Expert' in available skills catalog")
+	if strings.Contains(prompt, "Go Expert") {
+		t.Error("did not expect 'Go Expert' when disabled")
 	}
 	if !strings.Contains(prompt, "Use type hints") {
 		t.Error("expected active skill instructions for 'Python Expert'")
 	}
 	if strings.Contains(prompt, "Use tab indentation") {
-		t.Error("did not expect 'Go Expert' instructions in active skills")
+		t.Error("did not expect 'Go Expert' instructions when disabled")
 	}
 }
 
@@ -157,7 +161,7 @@ func TestManager_GetActiveSkillsPrompt_Empty(t *testing.T) {
 		t.Fatalf("SetProjectDir: %v", err)
 	}
 
-	prompt := mgr.GetActiveSkillsPrompt(nil)
+	prompt := mgr.GetActiveSkillsPrompt()
 	if prompt != "" {
 		t.Errorf("expected empty prompt, got '%s'", prompt)
 	}
@@ -184,8 +188,8 @@ func TestManager_InstallSkill(t *testing.T) {
 	if skill.Description != "Test skill description" {
 		t.Errorf("expected description 'Test skill description', got '%s'", skill.Description)
 	}
-	if skill.Source != SourceCommunity {
-		t.Errorf("expected source 'community', got '%s'", skill.Source)
+	if skill.Source != SourceGlobal {
+		t.Errorf("expected source 'global', got '%s'", skill.Source)
 	}
 
 	destFile := filepath.Join(globalDir, "Test Skill", "SKILL.md")
@@ -408,17 +412,14 @@ func TestManager_MultipleSkillsWithActiveFilter(t *testing.T) {
 		t.Fatalf("expected 3 skills, got %d", len(skills))
 	}
 
-	prompt := mgr.GetActiveSkillsPrompt([]string{"Python Expert", "Code Review"})
+	prompt := mgr.GetActiveSkillsPrompt()
 	if !strings.Contains(prompt, "Use type hints") {
 		t.Error("expected 'Python Expert' instructions in active skills")
 	}
 	if !strings.Contains(prompt, "Check for bugs") {
 		t.Error("expected 'Code Review' instructions in active skills")
 	}
-	if strings.Contains(prompt, "Use tabs") {
-		t.Error("did not expect 'Go Expert' instructions in active skills")
-	}
-	if !strings.Contains(prompt, "Go Expert") {
-		t.Error("expected 'Go Expert' in available skills catalog")
+	if !strings.Contains(prompt, "Use tabs") {
+		t.Error("expected 'Go Expert' instructions in active skills")
 	}
 }

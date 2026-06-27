@@ -1,26 +1,25 @@
-import type { Scope } from './workspace'
-
-export type SkillStatus = 'active' | 'inactive'
+export type SkillSource = 'project' | 'global'
 
 export interface Skill {
   name: string
-  displayName: string
-  description: string
-  icon: string
-  scope: Scope
-  status: SkillStatus
-  version: string
-  source: string
+  source: SkillSource
+  priority: number
+  enabled: boolean
+  location: string
   installedAt: string
 }
 
 export interface SkillInstallRequest {
   source: string
-  scope: Scope
+  value: string
 }
 
 export interface SkillToggleRequest {
   name: string
-  scope: Scope
   enabled: boolean
+}
+
+export interface SetSessionSkillsRequest {
+  enable: string[]
+  disable: string[]
 }

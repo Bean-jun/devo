@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"devo/internal/core/config"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,9 +19,7 @@ type Manager struct {
 	globalSkillsDir  string
 	projectSkillsDir string
 
-	globalSkills    map[string]*Skill
-	communitySkills map[string]*Skill
-
+	globalSkills  map[string]*Skill
 	projectSkills map[string]*Skill
 	projectDir    string
 }
@@ -29,7 +28,6 @@ func NewManager(globalSkillsDir string) *Manager {
 	return &Manager{
 		globalSkillsDir: globalSkillsDir,
 		globalSkills:    make(map[string]*Skill),
-		communitySkills: make(map[string]*Skill),
 		projectSkills:   make(map[string]*Skill),
 	}
 }
@@ -47,6 +45,28 @@ func (m *Manager) SetProjectDir(workingDir string) error {
 	}
 	if err := m.scanProject(); err != nil {
 		return fmt.Errorf("scan project skills: %w", err)
+	}
+
+	if err := m.applyConfig(); err != nil {
+		return fmt.Errorf("apply project config: %w", err)
+	}
+
+	return nil
+}
+
+func (m *Manager) ReloadSkills() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if err := m.scanGlobal(); err != nil {
+		return fmt.Errorf("reload global skills: %w", err)
+	}
+	if err := m.scanProject(); err != nil {
+		return fmt.Errorf("reload project skills: %w", err)
+	}
+
+	if err := m.applyConfig(); err != nil {
+		return fmt.Errorf("reapply config: %w", err)
 	}
 
 	return nil
@@ -188,7 +208,10 @@ func (m *Manager) GetAllSkills() []*Skill {
 	}
 
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].Priority > result[j].Priority
+		if result[i].Enabled != result[j].Enabled {
+			return result[i].Enabled
+		}
+		return strings.ToLower(result[i].Name) < strings.ToLower(result[j].Name)
 	})
 
 	return result
@@ -197,9 +220,6 @@ func (m *Manager) GetAllSkills() []*Skill {
 func (m *Manager) mergeSkills() map[string]*Skill {
 	merged := make(map[string]*Skill)
 
-	for name, s := range m.communitySkills {
-		merged[name] = s
-	}
 	for name, s := range m.globalSkills {
 		merged[name] = s
 	}
@@ -210,28 +230,154 @@ func (m *Manager) mergeSkills() map[string]*Skill {
 	return merged
 }
 
-func (m *Manager) GetActiveSkillsPrompt(activeSkillNames []string) string {
+func (m *Manager) applyConfig() error {
+	if m.projectDir == "" {
+		return nil
+	}
+
+	cfg, err := config.Load(m.projectDir)
+	if err != nil {
+		return err
+	}
+
+	if cfg == nil {
+		for _, s := range m.globalSkills {
+			s.Enabled = true
+		}
+		for _, s := range m.projectSkills {
+			s.Enabled = true
+		}
+		return nil
+	}
+
+	enabledSet := make(map[string]bool, len(cfg.Skills))
+	for _, name := range cfg.Skills {
+		enabledSet[name] = true
+	}
+
+	for _, s := range m.globalSkills {
+		s.Enabled = enabledSet[s.Name]
+	}
+	for _, s := range m.projectSkills {
+		s.Enabled = enabledSet[s.Name]
+	}
+
+	return nil
+}
+
+func (m *Manager) EnableSkill(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.projectDir == "" {
+		return fmt.Errorf("no project directory set")
+	}
+
+	cfg, err := config.Load(m.projectDir)
+	if err != nil {
+		return err
+	}
+	if cfg == nil {
+		cfg = &config.ProjectConfig{}
+	}
+
+	found := false
+	for _, n := range cfg.Skills {
+		if n == name {
+			found = true
+			break
+		}
+	}
+	if !found {
+		cfg.Skills = append(cfg.Skills, name)
+	}
+
+	if err := config.Save(m.projectDir, cfg); err != nil {
+		return err
+	}
+
+	if s, ok := m.globalSkills[name]; ok {
+		s.Enabled = true
+	}
+	if s, ok := m.projectSkills[name]; ok {
+		s.Enabled = true
+	}
+
+	return nil
+}
+
+func (m *Manager) DisableSkill(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.projectDir == "" {
+		return fmt.Errorf("no project directory set")
+	}
+
+	cfg, err := config.Load(m.projectDir)
+	if err != nil {
+		return err
+	}
+	if cfg == nil {
+		cfg = &config.ProjectConfig{}
+	}
+
+	filtered := make([]string, 0, len(cfg.Skills))
+	for _, n := range cfg.Skills {
+		if n != name {
+			filtered = append(filtered, n)
+		}
+	}
+	cfg.Skills = filtered
+
+	if err := config.Save(m.projectDir, cfg); err != nil {
+		return err
+	}
+
+	if s, ok := m.globalSkills[name]; ok {
+		s.Enabled = false
+	}
+	if s, ok := m.projectSkills[name]; ok {
+		s.Enabled = false
+	}
+
+	return nil
+}
+
+func (m *Manager) GetEnabledSkills() []*Skill {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	merged := m.mergeSkills()
+	result := make([]*Skill, 0, len(merged))
+	for _, s := range merged {
+		if s.Enabled {
+			result = append(result, s)
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return strings.ToLower(result[i].Name) < strings.ToLower(result[j].Name)
+	})
+
+	return result
+}
+
+func (m *Manager) GetActiveSkillsPrompt() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	merged := m.mergeSkills()
 
-	activeSet := make(map[string]bool)
-	for _, name := range activeSkillNames {
-		activeSet[name] = true
-	}
-
-	var catalogParts []string
 	var activeParts []string
+	var catalogParts []string
 
-	for name, skill := range merged {
+	for _, skill := range merged {
 		if !skill.Enabled {
 			continue
 		}
 
-		isActive := len(activeSkillNames) == 0 || activeSet[name]
-
-		if isActive && skill.Instructions != "" {
+		if skill.Instructions != "" {
 			activeParts = append(activeParts, fmt.Sprintf("### %s\n%s\n\n%s", skill.Name, skill.Description, skill.Instructions))
 		}
 
@@ -255,10 +401,6 @@ func (m *Manager) GetActiveSkillsPrompt(activeSkillNames []string) string {
 	}
 
 	return result
-}
-
-func (m *Manager) GetActiveSkillsPromptAll() string {
-	return m.GetActiveSkillsPrompt(nil)
 }
 
 func (m *Manager) InstallSkill(sourcePath string) (*Skill, error) {
@@ -299,15 +441,15 @@ func (m *Manager) InstallSkill(sourcePath string) (*Skill, error) {
 	skill := &Skill{
 		Name:         skillName,
 		Description:  description,
-		Source:       SourceCommunity,
-		Priority:     sourcePriority(SourceCommunity),
+		Source:       SourceGlobal,
+		Priority:     sourcePriority(SourceGlobal),
 		Location:     destDir,
 		Instructions: content,
 		Enabled:      true,
 		InstalledAt:  time.Now(),
 	}
 
-	m.communitySkills[skillName] = skill
+	m.globalSkills[skillName] = skill
 	return skill, nil
 }
 
@@ -352,16 +494,42 @@ func (m *Manager) DeleteSkill(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	skillDir := filepath.Join(m.globalSkillsDir, name)
-	if err := os.RemoveAll(skillDir); err != nil {
-		if os.IsNotExist(err) {
-			return ErrSkillNotFound
-		}
-		return fmt.Errorf("delete skill dir: %w", err)
+	skill, ok := m.projectSkills[name]
+	if !ok {
+		skill, ok = m.globalSkills[name]
+	}
+	if !ok {
+		return ErrSkillNotFound
 	}
 
+	if skill.Location != "" {
+		if err := os.RemoveAll(skill.Location); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("delete skill dir: %w", err)
+		}
+	}
+
+	delete(m.projectSkills, name)
 	delete(m.globalSkills, name)
-	delete(m.communitySkills, name)
+
+	if m.projectDir != "" {
+		cfg, err := config.Load(m.projectDir)
+		if err != nil {
+			return err
+		}
+		if cfg != nil {
+			filtered := make([]string, 0, len(cfg.Skills))
+			for _, n := range cfg.Skills {
+				if n != name {
+					filtered = append(filtered, n)
+				}
+			}
+			cfg.Skills = filtered
+			if err := config.Save(m.projectDir, cfg); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -373,9 +541,6 @@ func (m *Manager) GetSkill(name string) (*Skill, error) {
 		return s, nil
 	}
 	if s, ok := m.globalSkills[name]; ok {
-		return s, nil
-	}
-	if s, ok := m.communitySkills[name]; ok {
 		return s, nil
 	}
 	return nil, ErrSkillNotFound
@@ -391,6 +556,25 @@ func (m *Manager) Rescan() error {
 	if err := m.scanProject(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (m *Manager) RescanWithConfig(cfg *config.ProjectConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	enabledSet := make(map[string]bool, len(cfg.Skills))
+	for _, name := range cfg.Skills {
+		enabledSet[name] = true
+	}
+
+	for _, s := range m.globalSkills {
+		s.Enabled = enabledSet[s.Name]
+	}
+	for _, s := range m.projectSkills {
+		s.Enabled = enabledSet[s.Name]
+	}
+
 	return nil
 }
 

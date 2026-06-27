@@ -8,9 +8,8 @@ import (
 type SkillSource string
 
 const (
-	SourceProject   SkillSource = "project"
-	SourceGlobal    SkillSource = "global"
-	SourceCommunity SkillSource = "community"
+	SourceProject SkillSource = "project"
+	SourceGlobal  SkillSource = "global"
 )
 
 type Skill struct {
@@ -36,8 +35,6 @@ func sourcePriority(source SkillSource) int {
 		return 100
 	case SourceGlobal:
 		return 50
-	case SourceCommunity:
-		return 10
 	}
 	return 0
 }

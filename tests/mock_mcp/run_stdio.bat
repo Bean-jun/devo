@@ -6,4 +6,5 @@ echo.
 echo This mode is meant to be invoked by an MCP client (e.g., Devo) as a subprocess.
 echo To test manually, pipe JSON-RPC requests to stdin and read responses from stdout.
 echo.
-go run main.go --mode stdio
+go build -o mock_mcp_server_stdio.exe main.go
+.\mock_mcp_server_stdio.exe --mode stdio

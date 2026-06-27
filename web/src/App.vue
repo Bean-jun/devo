@@ -252,13 +252,10 @@ function connectSSE(sessionId: string) {
   onEvent('skill_solidified', (data: any) => {
     skillsStore.updateSkillFromEvent({
       name: data.skill_name || '',
-      displayName: data.display_name || data.skill_name || '',
-      description: data.description || '',
-      icon: data.icon || '🔧',
-      scope: data.scope || 'global',
-      status: 'active',
-      version: data.version || '1.0.0',
-      source: 'custom',
+      source: 'project',
+      priority: data.priority || 0,
+      enabled: true,
+      location: data.location || '',
       installedAt: new Date().toISOString(),
     })
   })
@@ -266,9 +263,10 @@ function connectSSE(sessionId: string) {
   onEvent('memory_updated', (data: any) => {
     memoryStore.updateMemoryFromEvent({
       id: data.memory_id || '',
+      type: data.type || 'user',
       key: data.key || '',
-      value: data.value || '',
-      scope: data.scope || 'global',
+      content: data.value || '',
+      source: data.source || 'user',
       updatedAt: new Date().toISOString(),
       createdAt: data.created_at || new Date().toISOString(),
     })
@@ -277,11 +275,10 @@ function connectSSE(sessionId: string) {
   onEvent('mcp_tool_discovered', (data: any) => {
     const tools = Array.isArray(data.tools) ? data.tools : (data.tools ? [data.tools] : [])
     mcpStore.updateToolsFromEvent(tools.map((t: any) => ({
-      name: t.name || '',
+      tool_name: t.tool_name || t.name || '',
+      server_id: t.server_id || t.server_name || '',
       description: t.description || '',
-      parameters: t.parameters || {},
-      serverName: t.server_name || '',
-      enabled: t.enabled !== false,
+      input_schema: t.input_schema || t.parameters || {},
     })))
   })
 

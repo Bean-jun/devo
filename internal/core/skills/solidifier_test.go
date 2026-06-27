@@ -179,3 +179,15 @@ func (m *mockSessionStore) GetFileModifications(sessionID string) ([]session.Fil
 func (m *mockSessionStore) DeleteFileModificationsAfter(sessionID string, afterTime time.Time) error {
 	return nil
 }
+
+func (m *mockSessionStore) ListUniqueWorkspaces() ([]string, error) {
+	return nil, nil
+}
+
+func (m *mockSessionStore) DeleteByWorkspace(path string) (int, error) {
+	return 0, nil
+}
+
+func (m *mockSessionStore) DeleteSession(id string) error {
+	return nil
+}

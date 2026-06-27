@@ -225,7 +225,7 @@ type mockSkillsProvider struct {
 	prompt string
 }
 
-func (m *mockSkillsProvider) GetActiveSkillsPrompt(activeSkillNames []string) string {
+func (m *mockSkillsProvider) GetActiveSkillsPrompt() string {
 	return m.prompt
 }
 

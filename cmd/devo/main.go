@@ -16,6 +16,7 @@ import (
 	"devo/internal/config"
 	"devo/internal/core/agentloop"
 	"devo/internal/core/concurrency"
+	projectconfig "devo/internal/core/config"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
 	"devo/internal/core/skills"
@@ -105,6 +106,11 @@ func main() {
 	homeDir, _ := os.UserHomeDir()
 	globalSkillsDir := filepath.Join(homeDir, ".devo", "skills")
 	skillsManager := skills.NewManager(globalSkillsDir)
+	if wd, err := os.Getwd(); err == nil {
+		if err := skillsManager.SetProjectDir(wd); err != nil {
+			log.Printf("[devo] Skills scan warning: %v", err)
+		}
+	}
 	loop.SetSkillsManager(skillsManager)
 
 	solidifier := skills.NewSolidifier(llm, skillsManager, store)
@@ -120,6 +126,12 @@ func main() {
 	}
 	mcpManager.RegisterTools(toolRegistry)
 	handler.SetMcpManager(mcpManager)
+
+	if err := ensureProjectConfig(wd, skillsManager, mcpManager); err != nil {
+		log.Printf("[devo] Project config init warning: %v", err)
+	}
+
+	handler.SetProjectDir(wd)
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
@@ -172,6 +184,36 @@ func defaultDBPath() string {
 		log.Fatalf("[devo] Failed to create .devo directory: %v", err)
 	}
 	return filepath.Join(devoDir, "devo.db")
+}
+
+func ensureProjectConfig(workingDir string, sm *skills.Manager, mcpMgr *mcp.Manager) error {
+	cfg, err := projectconfig.Load(workingDir)
+	if err != nil {
+		return err
+	}
+	if cfg != nil {
+		return nil
+	}
+
+	allSkills := sm.GetAllSkills()
+	skillNames := make([]string, 0, len(allSkills))
+	for _, s := range allSkills {
+		skillNames = append(skillNames, s.Name)
+	}
+
+	allMcpConfigs := mcpMgr.GetAllServerConfigs()
+	mcpIDs := make([]string, 0, len(allMcpConfigs))
+	for _, cfg := range allMcpConfigs {
+		mcpIDs = append(mcpIDs, cfg.ServerID)
+	}
+
+	_, err = projectconfig.CreateDefault(workingDir, skillNames, mcpIDs)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[devo] Created default project config at %s/.devo/config.json", workingDir)
+	return nil
 }
 
 func serveWebUI(mux *http.ServeMux) {

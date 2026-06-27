@@ -26,7 +26,7 @@ function resetAddForm() {
   addError.value = null
 }
 
-function toggleExpand(serverId: string) {
+function toggleServerExpand(serverId: string) {
   if (expandedServers.value.has(serverId)) {
     expandedServers.value.delete(serverId)
   } else {
@@ -34,7 +34,7 @@ function toggleExpand(serverId: string) {
   }
 }
 
-async function handleToggle(server: McpServer) {
+async function handleToggleServer(server: McpServer) {
   try {
     const isConnected = server.status === 'connected'
     await mcpStore.toggleServer(server.server_id, !isConnected)
@@ -95,6 +95,10 @@ function statusLabel(status: string): string {
   }
 }
 
+function statusClass(status: string): string {
+  return `status-${status}`
+}
+
 function sourceLabel(source: string): string {
   return source === 'global' ? '全局' : '项目'
 }
@@ -109,37 +113,32 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mcp-settings-view">
-    <div class="page-header">
-      <div>
-        <h2>MCP 服务器管理</h2>
-        <p class="subtitle">管理项目中的 MCP 服务器，启用后将向大模型注入对应工具</p>
-      </div>
+  <div class="mcp-panel">
+    <div class="mcp-header">
+      <h3 class="mcp-title">MCP 服务器</h3>
       <button class="add-btn" @click="showAddForm = !showAddForm">
         {{ showAddForm ? '取消' : '添加' }}
       </button>
     </div>
 
     <div v-if="showAddForm" class="add-form">
-      <div class="form-row">
-        <div class="form-field">
-          <label>服务器 ID</label>
-          <input
-            v-model="addForm.server_id"
-            type="text"
-            placeholder="my-mcp-server"
-            class="form-input"
-          />
-        </div>
-        <div class="form-field">
-          <label>端点地址</label>
-          <input
-            v-model="addForm.endpoint"
-            type="text"
-            placeholder="http://localhost:8080"
-            class="form-input"
-          />
-        </div>
+      <div class="form-field">
+        <label>服务器 ID</label>
+        <input
+          v-model="addForm.server_id"
+          type="text"
+          placeholder="my-mcp-server"
+          class="form-input"
+        />
+      </div>
+      <div class="form-field">
+        <label>端点地址</label>
+        <input
+          v-model="addForm.endpoint"
+          type="text"
+          placeholder="http://localhost:8080"
+          class="form-input"
+        />
       </div>
       <div class="form-row">
         <div class="form-field">
@@ -163,104 +162,100 @@ onMounted(async () => {
       </button>
     </div>
 
-    <div v-if="error" class="error-banner">{{ error }}</div>
-    <div v-else-if="mcpStore.isLoading" class="loading">加载中...</div>
-    <div v-else-if="mcpStore.servers.length === 0" class="empty-state">
+    <div v-if="error" class="mcp-error">{{ error }}</div>
+    <div v-else-if="mcpStore.isLoading" class="mcp-loading">加载中...</div>
+    <div v-else-if="mcpStore.servers.length === 0" class="mcp-empty">
       <p>暂无 MCP 服务器</p>
-      <p class="hint">点击"添加"按钮添加 MCP 服务器</p>
+      <p class="mcp-hint">点击"添加"按钮添加 MCP 服务器</p>
     </div>
 
-    <div v-else class="server-grid">
+    <div v-else class="mcp-server-list">
       <div
         v-for="server in mcpStore.servers"
         :key="server.server_id"
-        class="server-card"
+        class="mcp-server-card"
       >
-        <div class="card-header" @click="toggleExpand(server.server_id)">
-          <div class="server-meta">
-            <h3 class="server-name">{{ server.server_id }}</h3>
-            <div class="server-tags">
-              <span class="tag source-tag" :class="'source-' + server.source">{{ sourceLabel(server.source) }}</span>
-              <span class="tag transport-tag">{{ server.transport }}</span>
-              <span class="tag" :class="'status-' + server.status">
-                {{ statusLabel(server.status) }}
-              </span>
-            </div>
+        <div class="server-header" @click="toggleServerExpand(server.server_id)">
+          <div class="server-info">
+            <span class="server-name">{{ server.server_id }}</span>
           </div>
-          <div class="card-actions">
-            <span class="tool-badge">{{ server.tool_count }} 工具</span>
+          <div class="server-actions">
+            <span class="source-tag" :class="'source-' + server.source">{{ sourceLabel(server.source) }}</span>
+            <span class="tool-count">{{ server.tool_count }} 工具</span>
+            <span class="server-status" :class="statusClass(server.status)">
+              {{ statusLabel(server.status) }}
+            </span>
             <button
-              class="toggle-btn"
+              class="server-toggle"
               :class="{ active: server.status === 'connected' }"
-              @click.stop="handleToggle(server)"
+              @click.stop="handleToggleServer(server)"
             >
-              {{ server.status === 'connected' ? '禁用' : '启用' }}
+              {{ server.status === 'connected' ? 'ON' : 'OFF' }}
             </button>
             <button
-              class="remove-btn"
+              class="server-remove"
               :disabled="mcpStore.removingServerId === server.server_id"
               @click.stop="handleRemoveServer(server)"
               :title="mcpStore.removingServerId === server.server_id ? '删除中...' : '删除服务器'"
-            >{{ mcpStore.removingServerId === server.server_id ? '删除中...' : '删除' }}</button>
+            >{{ mcpStore.removingServerId === server.server_id ? '...' : '✕' }}</button>
           </div>
         </div>
 
-        <div v-if="server.error_msg" class="error-msg">
+        <div v-if="server.error_msg" class="server-error">
           <span class="error-icon">!</span>
           {{ server.error_msg }}
         </div>
 
-        <div v-if="expandedServers.has(server.server_id)" class="card-body">
-          <div class="endpoint-info">
-            <span class="label">端点:</span>
-            <code>{{ server.endpoint }}</code>
+        <div v-if="expandedServers.has(server.server_id)" class="server-tools">
+          <div class="server-meta-row">
+            <span class="meta-label">端点:</span>
+            <code class="meta-value">{{ server.endpoint }}</code>
           </div>
-          <div v-if="server.tools.length > 0" class="tools-section">
-            <div class="tools-title">工具列表</div>
-            <div v-for="tool in server.tools" :key="tool.tool_name" class="tool-card">
-              <div class="tool-name">{{ tool.tool_name }}</div>
-              <div class="tool-desc">{{ tool.description }}</div>
-            </div>
+          <div
+            v-for="tool in server.tools"
+            :key="tool.tool_name"
+            class="tool-item"
+          >
+            <div class="tool-name">{{ tool.tool_name }}</div>
+            <div class="tool-desc">{{ tool.description }}</div>
           </div>
-          <div v-else class="no-tools">此服务器暂无工具</div>
+          <div v-if="server.tools.length === 0" class="tool-empty">
+            暂无工具
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <ConfirmDeleteDialog
-    :visible="showDeleteDialog"
-    :server-name="deletingServer?.server_id ?? ''"
-    :deleting="mcpStore.removingServerId === deletingServer?.server_id"
-    @confirm="confirmDelete"
-    @cancel="cancelDelete"
-  />
+    <ConfirmDeleteDialog
+      :visible="showDeleteDialog"
+      :server-name="deletingServer?.server_id ?? ''"
+      :deleting="mcpStore.removingServerId === deletingServer?.server_id"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
 </template>
 
 <style scoped>
-.mcp-settings-view {
-  padding: 24px;
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.page-header {
+.mcp-panel {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 20px;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
-.page-header h2 {
-  font-size: 20px;
+.mcp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mcp-title {
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-text-primary);
-  margin: 0 0 4px;
-}
-
-.subtitle {
-  font-size: 13px;
-  color: var(--color-text-tertiary);
   margin: 0;
 }
 
@@ -274,7 +269,6 @@ onMounted(async () => {
   cursor: pointer;
   font-size: 11px;
   transition: all var(--transition-fast);
-  flex-shrink: 0;
 }
 
 .add-btn:hover {
@@ -284,42 +278,34 @@ onMounted(async () => {
 }
 
 .add-form {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.form-row {
-  display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .form-field {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .form-field label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .form-input,
 .form-select {
-  padding: 7px 10px;
+  padding: 5px 8px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: 12px;
   font-family: var(--font-mono);
 }
 
@@ -330,19 +316,28 @@ onMounted(async () => {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 
+.form-row {
+  display: flex;
+  gap: 8px;
+}
+
+.form-row .form-field {
+  flex: 1;
+}
+
 .form-error {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-error);
 }
 
 .submit-btn {
-  padding: 8px 0;
+  padding: 6px 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--color-accent);
   color: white;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   transition: opacity var(--transition-fast);
 }
@@ -356,93 +351,81 @@ onMounted(async () => {
   opacity: 0.9;
 }
 
-.error-banner {
-  padding: 12px 16px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 6px;
+.mcp-error {
+  padding: 16px;
   color: var(--color-error);
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-
-.loading {
-  text-align: center;
-  padding: 40px;
-  color: var(--color-text-tertiary);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--color-text-tertiary);
-}
-
-.empty-state .hint {
   font-size: 12px;
+}
+
+.mcp-loading {
+  padding: 16px;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.mcp-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+
+.mcp-hint {
   margin-top: 8px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  opacity: 0.7;
 }
 
-.server-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.mcp-server-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
 }
 
-.server-card {
+.mcp-server-card {
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 6px;
+  margin-bottom: 6px;
   overflow: hidden;
   transition: border-color var(--transition-fast);
 }
 
-.server-card:hover {
+.mcp-server-card:hover {
   border-color: var(--color-accent);
 }
 
-.card-header {
+.server-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: 8px 10px;
   cursor: pointer;
   user-select: none;
 }
 
-.server-meta {
+.server-info {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .server-name {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--color-text-primary);
-  margin: 0;
-}
-
-.server-tags {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.tag {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-tertiary);
-  border: 1px solid var(--color-border);
 }
 
 .source-tag {
   font-size: 10px;
-  padding: 1px 6px;
-  background: rgba(139, 92, 246, 0.1);
-  border-color: rgba(139, 92, 246, 0.2);
-  color: #a78bfa;
+  padding: 0 5px;
+  border-radius: 3px;
+  border: 1px solid;
+  font-weight: 500;
+  flex-shrink: 0;
+  line-height: 1.6;
 }
 
 .source-project {
@@ -457,14 +440,30 @@ onMounted(async () => {
   color: #a78bfa;
 }
 
-.transport-tag {
-  font-family: var(--font-mono);
+.server-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tool-count {
   font-size: 10px;
+  color: var(--color-text-tertiary);
+  padding: 2px 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: 3px;
+}
+
+.server-status {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
 }
 
 .status-connected {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.15);
   color: #22c55e;
 }
 
@@ -474,151 +473,122 @@ onMounted(async () => {
 }
 
 .status-error {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
 }
 
-.card-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.server-toggle {
+  width: 36px;
+  height: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  transition: all var(--transition-fast);
   flex-shrink: 0;
 }
 
-.tool-badge {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-}
-
-.toggle-btn {
-  padding: 6px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all var(--transition-fast);
-}
-
-.toggle-btn.active {
+.server-toggle.active {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: white;
 }
 
-.toggle-btn:hover {
-  border-color: var(--color-accent);
-}
-
-.remove-btn {
-  padding: 6px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-bg-primary);
+.server-remove {
+  background: none;
+  border: none;
   color: var(--color-text-tertiary);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 500;
+  padding: 2px 4px;
+  border-radius: 4px;
   transition: all var(--transition-fast);
 }
 
-.remove-btn:hover {
+.server-remove:hover {
   color: var(--color-error);
-  border-color: var(--color-error);
-  background: rgba(239, 68, 68, 0.06);
+  background: var(--color-bg-hover);
 }
 
-.remove-btn:disabled {
+.server-remove:disabled {
+  color: var(--color-text-tertiary);
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.error-msg {
+.server-error {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  background: rgba(239, 68, 68, 0.06);
+  padding: 6px 10px;
+  background: rgba(239, 68, 68, 0.08);
   color: var(--color-error);
-  font-size: 12px;
+  font-size: 11px;
   border-top: 1px solid var(--color-border);
 }
 
 .error-icon {
   font-weight: 700;
+  font-size: 12px;
 }
 
-.card-body {
+.server-tools {
   border-top: 1px solid var(--color-border);
-  padding: 14px 16px;
+  padding: 6px 10px;
   background: var(--color-bg-secondary);
 }
 
-.endpoint-info {
+.server-meta-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
 }
 
-.endpoint-info .label {
+.meta-label {
   color: var(--color-text-tertiary);
 }
 
-.endpoint-info code {
+.meta-value {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-secondary);
   background: var(--color-bg-tertiary);
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 3px;
 }
 
-.tools-section {
-  margin-top: 12px;
+.tool-item {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.tools-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  margin-bottom: 8px;
-}
-
-.tool-card {
-  padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  margin-bottom: 6px;
-  background: var(--color-bg-primary);
-}
-
-.tool-card:last-child {
-  margin-bottom: 0;
+.tool-item:last-child {
+  border-bottom: none;
 }
 
 .tool-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--color-text-primary);
   font-family: var(--font-mono);
 }
 
 .tool-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-tertiary);
-  margin-top: 4px;
+  margin-top: 2px;
   line-height: 1.4;
 }
 
-.no-tools {
-  font-size: 12px;
+.tool-empty {
+  font-size: 11px;
   color: var(--color-text-tertiary);
   text-align: center;
-  padding: 12px;
+  padding: 8px 0;
 }
 </style>

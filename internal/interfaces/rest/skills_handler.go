@@ -58,6 +58,63 @@ func (h *Handler) GetSkills(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, getSkillsResponse{Skills: items})
 }
 
+func (h *Handler) ReloadSkills(w http.ResponseWriter, r *http.Request) {
+	if h.skillsManager == nil {
+		writeError(w, http.StatusInternalServerError, "skills manager not available")
+		return
+	}
+
+	if err := h.skillsManager.ReloadSkills(); err != nil {
+		writeError(w, http.StatusInternalServerError, "reload skills failed: "+err.Error())
+		return
+	}
+
+	allSkills := h.skillsManager.GetAllSkills()
+	items := make([]skillItem, 0, len(allSkills))
+	for _, s := range allSkills {
+		installedAt := ""
+		if !s.InstalledAt.IsZero() {
+			installedAt = s.InstalledAt.Format(time.RFC3339)
+		}
+		items = append(items, skillItem{
+			Name:        s.Name,
+			Source:      string(s.Source),
+			Priority:    s.Priority,
+			Enabled:     s.Enabled,
+			Location:    s.Location,
+			InstalledAt: installedAt,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"skills":  items,
+		"message": "skills reloaded",
+	})
+}
+
+func (h *Handler) DeleteSkillByName(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "skill name is required")
+		return
+	}
+
+	if h.skillsManager == nil {
+		writeError(w, http.StatusInternalServerError, "skills manager not available")
+		return
+	}
+
+	if err := h.skillsManager.DeleteSkill(name); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"name":   name,
+		"status": "removed",
+	})
+}
+
 type setSkillsRequest struct {
 	Enable  []string `json:"enable"`
 	Disable []string `json:"disable"`
@@ -68,15 +125,10 @@ type setSkillsResponse struct {
 }
 
 func (h *Handler) SetSessionSkills(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	_ = r.PathValue("id")
 
-	sess, err := h.store.Get(id)
-	if err != nil {
-		if errors.Is(err, session.ErrSessionNotFound) {
-			writeError(w, http.StatusNotFound, "session not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "internal error")
+	if h.skillsManager == nil {
+		writeError(w, http.StatusInternalServerError, "skills manager not available")
 		return
 	}
 
@@ -86,30 +138,26 @@ func (h *Handler) SetSessionSkills(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	activeSet := make(map[string]bool)
-	for _, name := range sess.ActiveSkills {
-		activeSet[name] = true
-	}
-
 	for _, name := range req.Enable {
-		activeSet[name] = true
+		if err := h.skillsManager.EnableSkill(name); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to enable skill: "+err.Error())
+			return
+		}
 	}
 	for _, name := range req.Disable {
-		delete(activeSet, name)
+		if err := h.skillsManager.DisableSkill(name); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to disable skill: "+err.Error())
+			return
+		}
 	}
 
-	var newActive []string
-	for name := range activeSet {
-		newActive = append(newActive, name)
-	}
-	sess.ActiveSkills = newActive
-
-	if err := h.store.Update(sess); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update session skills")
-		return
+	enabledSkills := h.skillsManager.GetEnabledSkills()
+	activeSkillNames := make([]string, 0, len(enabledSkills))
+	for _, s := range enabledSkills {
+		activeSkillNames = append(activeSkillNames, s.Name)
 	}
 
-	writeJSON(w, http.StatusOK, setSkillsResponse{ActiveSkills: sess.ActiveSkills})
+	writeJSON(w, http.StatusOK, setSkillsResponse{ActiveSkills: activeSkillNames})
 }
 
 type installSkillRequest struct {

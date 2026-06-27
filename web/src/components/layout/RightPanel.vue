@@ -6,6 +6,7 @@ const uiStore = useUiStore()
 
 const FilesPanel = defineAsyncComponent(() => import('@/panels/files/FilesPanel.vue'))
 const SkillsPanel = defineAsyncComponent(() => import('@/panels/skills/SkillsPanel.vue'))
+const McpPanel = defineAsyncComponent(() => import('@/panels/mcp/McpPanel.vue'))
 const MemoryPanel = defineAsyncComponent(() => import('@/panels/memory/MemoryPanel.vue'))
 const DashboardPanel = defineAsyncComponent(() => import('@/panels/dashboard/DashboardPanel.vue'))
 const SettingsPanel = defineAsyncComponent(() => import('@/panels/settings/SettingsPanel.vue'))
@@ -20,6 +21,7 @@ interface TabDef {
 const allTabs: TabDef[] = [
   { key: 'files', label: 'Files', icon: '📁' },
   { key: 'skills', label: 'Skills', icon: '⚡' },
+  { key: 'mcp', label: 'MCP', icon: '🔌' },
   { key: 'memory', label: 'Memory', icon: '🧠' },
   { key: 'dashboard', label: 'Dashboard', icon: '📊' },
   { key: 'settings', label: 'Settings', icon: '⚙' },
@@ -49,6 +51,7 @@ function selectTab(tab: TabDef) {
     <div class="right-panel-body">
       <FilesPanel v-if="uiStore.activeRightTab === 'files'" />
       <SkillsPanel v-else-if="uiStore.activeRightTab === 'skills'" />
+      <McpPanel v-else-if="uiStore.activeRightTab === 'mcp'" />
       <MemoryPanel v-else-if="uiStore.activeRightTab === 'memory'" />
       <DashboardPanel v-else-if="uiStore.activeRightTab === 'dashboard'" />
       <SettingsPanel v-else-if="uiStore.activeRightTab === 'settings'" />

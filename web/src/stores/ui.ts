@@ -18,6 +18,7 @@ export type ModalType = 'approval' | 'session-picker' | 'rollback-picker' | 'hel
 export type RightTabType =
   | 'files'
   | 'skills'
+  | 'mcp'
   | 'memory'
   | 'dashboard'
   | 'settings'

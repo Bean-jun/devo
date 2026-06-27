@@ -310,8 +310,8 @@ onUnmounted(() => {
   <div ref="panelRef" class="files-panel">
     <div class="files-toolbar">
       <span class="files-title">Files</span>
-      <button class="refresh-btn" @click="fetchRoot" :disabled="isLoading" title="刷新">
-        {{ isLoading ? '⏳' : '🔄' }}
+      <button class="reload-btn" :class="{ spinning: isLoading }" :disabled="isLoading" @click="fetchRoot" title="刷新">
+        ↻
       </button>
     </div>
 
@@ -380,8 +380,15 @@ onUnmounted(() => {
 .files-panel { display: flex; flex-direction: column; height: 100%; }
 .files-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; border-bottom: 1px solid var(--color-border); }
 .files-title { font-size: 11px; font-weight: 600; color: var(--color-text-secondary); }
-.refresh-btn { background: none; border: none; cursor: pointer; font-size: 13px; padding: 1px 3px; border-radius: 4px; }
-.refresh-btn:hover { background: var(--color-bg-hover); }
+.reload-btn { width: 28px; height: 28px; border: 1px solid var(--color-border); border-radius: 4px; background: transparent; color: var(--color-text-secondary); cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all var(--transition-fast); flex-shrink: 0; }
+.reload-btn:hover:not(:disabled) { background: var(--color-bg-hover); color: var(--color-accent); border-color: var(--color-accent); }
+.reload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.reload-btn.spinning { animation: spin 0.8s linear infinite; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
 .files-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .files-tree { flex: 1; overflow-y: auto; padding: 2px 0; }

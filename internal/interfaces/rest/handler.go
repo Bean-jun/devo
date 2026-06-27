@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -20,6 +21,7 @@ type Handler struct {
 	skillsManager *skills.Manager
 	mcpManager    *mcp.Manager
 	version       string
+	projectDir    string
 }
 
 func NewHandler(store session.SessionStore, loop *agentloop.Loop, memoryManager *memory.Manager, version string) *Handler {
@@ -34,43 +36,66 @@ func (h *Handler) SetSkillsManager(sm *skills.Manager) {
 	h.skillsManager = sm
 }
 
+func (h *Handler) SetProjectDir(dir string) {
+	h.projectDir = dir
+}
+
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/version", h.GetVersion)
+
 	mux.HandleFunc("GET /api/v1/current-workspace", h.GetCurrentWorkspace)
 	mux.HandleFunc("POST /api/v1/current-workspace", h.SetCurrentWorkspace)
 	mux.HandleFunc("GET /api/v1/workspace", h.GetWorkspaces)
 	mux.HandleFunc("DELETE /api/v1/workspace", h.DeleteWorkspace)
-	mux.HandleFunc("POST /api/v1/sessions", h.CreateSession)
+
 	mux.HandleFunc("GET /api/v1/sessions", h.ListSessions)
-	mux.HandleFunc("GET /api/v1/sessions/{id}/files", h.GetFiles)
+	mux.HandleFunc("POST /api/v1/sessions", h.CreateSession)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", h.GetSession)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}", h.RenameSession)
 	mux.HandleFunc("DELETE /api/v1/sessions/{id}", h.DeleteSession)
+
+	mux.HandleFunc("GET /api/v1/sessions/{id}/files", h.GetFiles)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/config", h.UpdateConfig)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/messages", h.PostMessage)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/messages", h.GetMessages)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/events", h.SSEEvents)
+
 	mux.HandleFunc("POST /api/v1/sessions/{id}/approve/{approval_id}", h.Approve)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/trust", h.SetTrustLevel)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/approval-policy", h.SetApprovalPolicy)
+
 	mux.HandleFunc("POST /api/v1/sessions/{id}/cancel", h.Cancel)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/pause", h.Pause)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/resume", h.Resume)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/rollback", h.Rollback)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/complete", h.Complete)
+
+	mux.HandleFunc("GET /api/v1/sessions/{id}/archive", h.GetArchive)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/archive", h.Archive)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/sync-archive", h.SyncArchive)
+
 	mux.HandleFunc("GET /api/v1/sessions/{id}/usage", h.GetSessionUsage)
 	mux.HandleFunc("GET /api/v1/usage/stats", h.GetUsageStats)
-	mux.HandleFunc("POST /api/v1/sessions/{id}/rollback", h.Rollback)
-	mux.HandleFunc("GET /api/v1/sessions/{id}/archive", h.GetArchive)
-	mux.HandleFunc("POST /api/v1/sessions/{id}/sync-archive", h.SyncArchive)
+
 	mux.HandleFunc("GET /api/v1/sessions/{id}/memory", h.GetMemories)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/memory", h.UpsertMemory)
 	mux.HandleFunc("DELETE /api/v1/sessions/{id}/memory/{memory_id}", h.DeleteMemory)
-	mux.HandleFunc("GET /api/v1/skills", h.GetSkills)
+
 	mux.HandleFunc("POST /api/v1/sessions/{id}/skills", h.SetSessionSkills)
+	mux.HandleFunc("GET /api/v1/skills", h.GetSkills)
+	mux.HandleFunc("POST /api/v1/skills/reload", h.ReloadSkills)
 	mux.HandleFunc("POST /api/v1/skills/install", h.InstallSkill)
+	mux.HandleFunc("DELETE /api/v1/skills/{name}", h.DeleteSkillByName)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/solidify", h.SolidifySession)
+
 	mux.HandleFunc("GET /api/v1/mcp/tools", h.GetMcpTools)
+	mux.HandleFunc("GET /api/v1/mcp/servers", h.GetMcpServers)
+	mux.HandleFunc("POST /api/v1/mcp/servers", h.AddMcpServer)
+	mux.HandleFunc("POST /api/v1/mcp/servers/{id}/toggle", h.ToggleMcpServer)
+	mux.HandleFunc("DELETE /api/v1/mcp/servers/{id}", h.RemoveMcpServer)
+
+	mux.HandleFunc("GET /api/v1/project/config", h.GetProjectConfig)
+	mux.HandleFunc("PUT /api/v1/project/config", h.SetProjectConfig)
 }
 
 func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +136,21 @@ func (h *Handler) SetCurrentWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to switch working directory")
 		return
 	}
+
+	if h.skillsManager != nil {
+		if err := h.skillsManager.SetProjectDir(req.WorkingDirectory); err != nil {
+			log.Printf("[devo] Skills scan warning after workspace switch: %v", err)
+		}
+	}
+
+	if h.mcpManager != nil {
+		if err := h.mcpManager.ConnectAll(r.Context()); err != nil {
+			log.Printf("[devo] MCP reconnect warning after workspace switch: %v", err)
+		}
+	}
+
+	h.projectDir = req.WorkingDirectory
+
 	writeJSON(w, http.StatusOK, map[string]string{
 		"working_directory": req.WorkingDirectory,
 	})

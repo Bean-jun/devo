@@ -14,4 +14,5 @@ echo ============================================
 echo.
 
 cd ..\..\
-.\build\devo.exe -web
+go build -o build\devo.exe cmd\devo\main.go
+.\build\devo.exe -port=8081
