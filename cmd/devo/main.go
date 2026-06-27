@@ -52,7 +52,10 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("[devo] Config error: %v", err)
+		log.Printf("[devo] Config warning: %v", err)
+	}
+	if cfg == nil {
+		cfg = &config.Config{}
 	}
 
 	port := *portFlag
@@ -118,6 +121,7 @@ func main() {
 
 	handler := rest.NewHandler(store, loop, memoryManager, Version)
 	handler.SetSkillsManager(skillsManager)
+	handler.SetLLMConfigured(cfg.LLM.APIKey != "")
 
 	wd, _ := os.Getwd()
 	mcpManager := mcp.NewManager(wd)

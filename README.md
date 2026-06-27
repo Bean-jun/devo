@@ -13,14 +13,15 @@
 - **审批门控** — 按操作风险分级（高/中/低），文件编辑带 diff 对比，命令执行需确认
 - **精确编辑** — 支持基于 diff 的精确文件编辑，修改范围一目了然
 - **长期记忆** — 记住你的偏好和项目经验，跨会话积累（全局 + 项目两层级）
-- **技能进化** — Skills 管理器，自动从完成的任务中提炼最佳实践
+- **技能进化** — 从完成的对话中提炼经验，固化到 Skill 指令集，跨会话复用
+- **技能管理** — 安装、删除、启用/禁用 Skill，一键刷新；支持项目级和全局级两层级
 - **上下文压缩** — 长对话自动压缩摘要，突破上下文窗口限制
 - **会话存档** — 每次会话自动生成 Markdown 存档，可版本管理、可分享
 - **消息回滚** — 回滚到历史任意位置重来，不影响文件系统
 - **工具调用上限** — 防止失控循环消耗 Token，预算可控
 - **崩溃恢复** — 异常中断后自动清理，不遗留僵尸进程
 - **并发会话隔离** — 多个任务独立运行，互不干扰
-- **MCP 扩展** — 支持 MCP 协议动态接入外部工具
+- **MCP 扩展** — 支持 MCP 协议动态接入外部工具，添加/删除/启停服务器
 - **双模式** — 浏览器完整控制中心 + VSCode Webview 极简聊天窗口，同一份代码
 - **跨平台** — 支持 Linux、macOS、Windows
 
@@ -231,9 +232,11 @@ curl -X POST http://localhost:8080/api/v1/sessions/{id}/messages \
 
 | 方法 | 路径 | 说明 |
 | :--- | :--- | :--- |
-| `GET` | `/api/v1/skills` | 获取技能列表 |
-| `POST` | `/api/v1/sessions/{id}/skills` | 设置会话技能 |
-| `POST` | `/api/v1/skills/install` | 安装技能 |
+| `GET` | `/api/v1/skills` | 获取技能列表（支持 `?source=project\|global` 过滤） |
+| `POST` | `/api/v1/skills/install` | 安装技能（从本地目录） |
+| `DELETE` | `/api/v1/skills/{name}` | 删除技能（弹窗确认） |
+| `POST` | `/api/v1/skills/reload` | 重新扫描技能目录（手动放文件后刷新） |
+| `POST` | `/api/v1/sessions/{id}/skills` | 设置会话启用的技能 |
 | `POST` | `/api/v1/sessions/{id}/solidify` | 经验固化 |
 
 ### MCP
@@ -241,6 +244,10 @@ curl -X POST http://localhost:8080/api/v1/sessions/{id}/messages \
 | 方法 | 路径 | 说明 |
 | :--- | :--- | :--- |
 | `GET` | `/api/v1/mcp/tools` | 获取 MCP 工具列表 |
+| `GET` | `/api/v1/mcp/servers` | 获取 MCP 服务器列表 |
+| `POST` | `/api/v1/mcp/servers` | 添加 MCP 服务器 |
+| `DELETE` | `/api/v1/mcp/servers/{id}` | 删除 MCP 服务器 |
+| `PUT` | `/api/v1/mcp/servers/{id}/status` | 启用/禁用 MCP 服务器
 
 ### 用量统计
 

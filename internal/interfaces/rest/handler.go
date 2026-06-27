@@ -22,6 +22,7 @@ type Handler struct {
 	mcpManager    *mcp.Manager
 	version       string
 	projectDir    string
+	llmConfigured bool
 }
 
 func NewHandler(store session.SessionStore, loop *agentloop.Loop, memoryManager *memory.Manager, version string) *Handler {
@@ -38,6 +39,10 @@ func (h *Handler) SetSkillsManager(sm *skills.Manager) {
 
 func (h *Handler) SetProjectDir(dir string) {
 	h.projectDir = dir
+}
+
+func (h *Handler) SetLLMConfigured(configured bool) {
+	h.llmConfigured = configured
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
@@ -96,11 +101,19 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/project/config", h.GetProjectConfig)
 	mux.HandleFunc("PUT /api/v1/project/config", h.SetProjectConfig)
+
+	mux.HandleFunc("GET /api/v1/config/status", h.GetConfigStatus)
 }
 
 func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"version": h.version,
+	})
+}
+
+func (h *Handler) GetConfigStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]bool{
+		"llm_configured": h.llmConfigured,
 	})
 }
 

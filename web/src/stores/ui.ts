@@ -13,7 +13,7 @@ export interface Toast {
 }
 
 export type ThemeType = 'light' | 'dark'
-export type ModalType = 'approval' | 'session-picker' | 'rollback-picker' | 'help' | null
+export type ModalType = 'approval' | 'session-picker' | 'rollback-picker' | 'help' | 'config-warning' | null
 
 export type RightTabType =
   | 'files'

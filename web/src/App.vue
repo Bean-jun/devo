@@ -74,6 +74,16 @@ onMounted(async () => {
   }
 
   initialized.value = true
+
+  try {
+    const res = await fetch(`${API_BASE}/config/status`)
+    const status = await res.json()
+    if (!status.llm_configured) {
+      uiStore.setActiveModal('config-warning')
+    }
+  } catch {
+    // 配置检查失败，可能服务未启动，忽略
+  }
 })
 
 watch(() => uiStore.activeWorkspace, async (ws) => {
