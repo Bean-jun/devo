@@ -177,22 +177,24 @@ function cancelNewSession() {
 
     <div class="sidebar-section sidebar-sessions">
       <div class="sidebar-section-title">会话</div>
-      <div class="sessions-list" v-if="sessions.length > 0">
-        <button
-          v-for="sess in sessions"
-          :key="sess.id"
-          class="sidebar-item session-item"
-          :class="{ active: currentSessionId === sess.id }"
-          :title="sess.title"
-          @click="selectSession(sess.id)"
-        >
-          <span class="sidebar-item-icon">💬</span>
-          <span class="sidebar-item-label session-title">{{ sess.title }}</span>
-          <span class="session-delete" @click.stop="openSessionDeleteConfirm(sess)" title="删除">✕</span>
-        </button>
-      </div>
-      <div v-else class="sidebar-empty">
-        暂无会话
+      <div class="sessions-body">
+        <div class="sessions-list" v-if="sessions.length > 0">
+          <button
+            v-for="sess in sessions"
+            :key="sess.id"
+            class="sidebar-item session-item"
+            :class="{ active: currentSessionId === sess.id }"
+            :title="sess.title"
+            @click="selectSession(sess.id)"
+          >
+            <span class="sidebar-item-icon">💬</span>
+            <span class="sidebar-item-label session-title">{{ sess.title }}</span>
+            <span class="session-delete" @click.stop="openSessionDeleteConfirm(sess)" title="删除">✕</span>
+          </button>
+        </div>
+        <div v-else class="sidebar-empty">
+          暂无会话
+        </div>
       </div>
       <button class="sidebar-item sidebar-add-btn" @click="newSession">
         <span class="sidebar-item-icon">+</span>
@@ -420,9 +422,13 @@ function cancelNewSession() {
   overflow: hidden;
 }
 
-.sessions-list {
+.sessions-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+}
+
+.sessions-list {
   min-height: 0;
 }
 

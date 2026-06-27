@@ -53,13 +53,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/workspace", h.GetWorkspaces)
 	mux.HandleFunc("DELETE /api/v1/workspace", h.DeleteWorkspace)
 
+	mux.HandleFunc("GET /api/v1/files", h.GetWorkspaceFiles)
+
 	mux.HandleFunc("GET /api/v1/sessions", h.ListSessions)
 	mux.HandleFunc("POST /api/v1/sessions", h.CreateSession)
 	mux.HandleFunc("GET /api/v1/sessions/{id}", h.GetSession)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}", h.RenameSession)
 	mux.HandleFunc("DELETE /api/v1/sessions/{id}", h.DeleteSession)
 
-	mux.HandleFunc("GET /api/v1/sessions/{id}/files", h.GetFiles)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/config", h.UpdateConfig)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/messages", h.PostMessage)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/messages", h.GetMessages)

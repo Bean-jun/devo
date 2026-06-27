@@ -76,7 +76,7 @@ const serverPort = computed(() => window.location.port)
 </script>
 
 <template>
-  <header class="statusbar">
+  <header v-if="sessionStore.currentSession" class="statusbar">
     <div class="statusbar-left">
       <input
         v-if="isRenaming"

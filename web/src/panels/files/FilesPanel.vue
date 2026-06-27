@@ -73,7 +73,7 @@ function closePreview() {
   previewHeight.value = 200
 }
 
-const hasSession = computed(() => !!sessionStore.currentSession?.id)
+const hasWorkspace = computed(() => !!sessionStore.workingDirectory)
 
 const MAX_PREVIEW_SIZE = 10 * 1024 * 1024
 const MAX_TEXT_FALLBACK_SIZE = 1 * 1024 * 1024
@@ -194,10 +194,7 @@ function flattenTree(nodes: TreeNode[], depth: number): TreeNode[] {
 const flatNodes = computed<TreeNode[]>(() => flattenTree(rootNodes.value, 0))
 
 async function fetchDir(path: string, parent: TreeNode[]): Promise<void> {
-  const sessionId = sessionStore.currentSession?.id
-  if (!sessionId) return
-
-  const url = `${API_BASE}/sessions/${sessionId}/files?path=${encodeURIComponent(path)}`
+  const url = `${API_BASE}/files?path=${encodeURIComponent(path)}`
   const res = await fetch(url)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data = await res.json()
@@ -267,9 +264,7 @@ async function handleNodeClick(node: TreeNode) {
     }
     isLoadingContent.value = true
     try {
-      const sessionId = sessionStore.currentSession?.id
-      if (!sessionId) return
-      const url = `${API_BASE}/sessions/${sessionId}/files?path=${encodeURIComponent(node.path)}`
+      const url = `${API_BASE}/files?path=${encodeURIComponent(node.path)}`
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
@@ -283,8 +278,8 @@ async function handleNodeClick(node: TreeNode) {
   }
 }
 
-watch(() => sessionStore.currentSession?.id, () => {
-  if (sessionStore.currentSession?.id) {
+watch(() => sessionStore.workingDirectory, () => {
+  if (sessionStore.workingDirectory) {
     expandedPaths.value = new Set()
     selectedPath.value = null
     selectedContent.value = null
@@ -293,7 +288,7 @@ watch(() => sessionStore.currentSession?.id, () => {
 })
 
 onMounted(() => {
-  if (hasSession.value) {
+  if (hasWorkspace.value) {
     fetchRoot()
   }
   document.addEventListener('mousemove', onPreviewMouseMove)
@@ -315,7 +310,7 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <div v-if="!hasSession" class="files-empty">请先创建或选择一个会话</div>
+    <div v-if="!hasWorkspace" class="files-empty">请先选择一个工作区</div>
     <div v-else-if="error" class="files-error">{{ error }}</div>
     <div v-else class="files-body">
       <div class="files-tree">

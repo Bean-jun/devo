@@ -194,7 +194,7 @@ async function handleExecuteCommand(text: string) {
 </script>
 
 <template>
-  <div class="chat-panel" data-test="chat-panel">
+  <div v-if="sessionStore.currentSession" class="chat-panel" data-test="chat-panel">
     <div
       ref="containerRef"
       class="message-area"
@@ -222,6 +222,11 @@ async function handleExecuteCommand(text: string) {
       @execute-command="handleExecuteCommand"
     />
   </div>
+  <div v-else class="chat-empty">
+    <div class="chat-empty-icon">💬</div>
+    <div class="chat-empty-title">请选择或新建一个会话</div>
+    <div class="chat-empty-desc">在左侧选择一个已有会话，或点击 + 新建会话开始对话</div>
+  </div>
 </template>
 
 <style scoped>
@@ -231,6 +236,32 @@ async function handleExecuteCommand(text: string) {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+
+.chat-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-tertiary);
+  user-select: none;
+}
+
+.chat-empty-icon {
+  font-size: 48px;
+  opacity: 0.3;
+}
+
+.chat-empty-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.chat-empty-desc {
+  font-size: 13px;
 }
 
 .message-area {

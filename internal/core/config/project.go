@@ -39,7 +39,24 @@ func Save(projectDir string, cfg *ProjectConfig) error {
 	}
 
 	configPath := filepath.Join(configDir, configFileName)
-	data, err := json.MarshalIndent(cfg, "", "  ")
+
+	existing := make(map[string]json.RawMessage)
+	if data, err := os.ReadFile(configPath); err == nil {
+		_ = json.Unmarshal(data, &existing)
+	}
+
+	skillsData, err := json.Marshal(cfg.Skills)
+	if err != nil {
+		return fmt.Errorf("marshal skills: %w", err)
+	}
+	mcpData, err := json.Marshal(cfg.MCP)
+	if err != nil {
+		return fmt.Errorf("marshal mcp: %w", err)
+	}
+	existing["skills"] = skillsData
+	existing["mcp"] = mcpData
+
+	data, err := json.MarshalIndent(existing, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}

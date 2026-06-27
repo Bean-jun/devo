@@ -2,13 +2,10 @@ package rest
 
 import (
 	"encoding/base64"
-	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"devo/internal/core/session"
 )
 
 type fileEntry struct {
@@ -34,25 +31,13 @@ func isImageFile(name string) bool {
 	return imageExts[strings.ToLower(filepath.Ext(name))]
 }
 
-func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-
-	sess, err := h.store.Get(id)
-	if err != nil {
-		if errors.Is(err, session.ErrSessionNotFound) {
-			writeError(w, http.StatusNotFound, "session not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) serveFiles(w http.ResponseWriter, r *http.Request, workDir string) {
 	requestedPath := r.URL.Query().Get("path")
 	if requestedPath == "" {
 		requestedPath = "."
 	}
 
-	absWorkDir, err := filepath.Abs(sess.WorkingDirectory)
+	absWorkDir, err := filepath.Abs(workDir)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -130,4 +115,12 @@ func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
 		Size:    info.Size(),
 		IsImage: img,
 	})
+}
+
+func (h *Handler) GetWorkspaceFiles(w http.ResponseWriter, r *http.Request) {
+	if h.projectDir == "" {
+		writeError(w, http.StatusBadRequest, "no workspace set")
+		return
+	}
+	h.serveFiles(w, r, h.projectDir)
 }
