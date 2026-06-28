@@ -8,30 +8,42 @@ import (
 )
 
 const (
-	SourceProject = "project"
-	SourceGlobal  = "global"
+	SourceProject  = "project"
+	SourceGlobal   = "global"
+	configFileName = "mcp_servers.json"
 )
+
+func DefaultGlobalConfigPath() string {
+	homeDir, _ := os.UserHomeDir()
+	return filepath.Join(homeDir, ".devo", configFileName)
+}
+
+func DefaultProjectConfigPath(workingDir string) string {
+	return filepath.Join(workingDir, ".devo", configFileName)
+}
+
+func ConfigPathForScope(workingDir, scope string) string {
+	if scope == SourceGlobal {
+		return DefaultGlobalConfigPath()
+	}
+	return DefaultProjectConfigPath(workingDir)
+}
 
 func LoadConfig(workingDir string) ([]McpServerConfig, error) {
 	var allConfigs []McpServerConfig
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		homeDir = ""
-	}
 
 	configPaths := []struct {
 		path   string
 		source string
 	}{
-		{filepath.Join(workingDir, ".devo", "mcp_servers.json"), SourceProject},
+		{DefaultProjectConfigPath(workingDir), SourceProject},
 	}
 
-	if homeDir != "" {
+	if _, err := os.UserHomeDir(); err == nil {
 		configPaths = append(configPaths, struct {
 			path   string
 			source string
-		}{filepath.Join(homeDir, ".devo", "mcp_servers.json"), SourceGlobal})
+		}{DefaultGlobalConfigPath(), SourceGlobal})
 	}
 
 	seenIDs := make(map[string]bool)
@@ -94,16 +106,7 @@ func AddServerConfig(workingDir, scope, serverID, endpoint, transport string) er
 		transport = "sse"
 	}
 
-	var configPath string
-	if scope == SourceGlobal {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("get home dir: %w", err)
-		}
-		configPath = filepath.Join(homeDir, ".devo", "mcp_servers.json")
-	} else {
-		configPath = filepath.Join(workingDir, ".devo", "mcp_servers.json")
-	}
+	configPath := ConfigPathForScope(workingDir, scope)
 
 	var configs []struct {
 		ServerID  string `json:"server_id"`
@@ -150,16 +153,7 @@ func AddServerConfig(workingDir, scope, serverID, endpoint, transport string) er
 }
 
 func RemoveServerConfig(workingDir, scope, serverID string) error {
-	var configPath string
-	if scope == SourceGlobal {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("get home dir: %w", err)
-		}
-		configPath = filepath.Join(homeDir, ".devo", "mcp_servers.json")
-	} else {
-		configPath = filepath.Join(workingDir, ".devo", "mcp_servers.json")
-	}
+	configPath := ConfigPathForScope(workingDir, scope)
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 	"devo/internal/core/session"
 	"devo/internal/core/tokenmeter"
 	"devo/internal/taskexec/llmclient"
+	"devo/internal/taskexec/tools"
 )
 
 type Config struct {
@@ -26,10 +27,10 @@ type Config struct {
 type Client struct {
 	config     Config
 	httpClient *http.Client
-	tools      []llmclient.ToolDefinition
+	registry   *tools.Registry
 }
 
-func New(config Config) *Client {
+func New(config Config, registry *tools.Registry) *Client {
 	if config.BaseURL == "" {
 		config.BaseURL = "https://api.openai.com/v1"
 	}
@@ -41,11 +42,8 @@ func New(config Config) *Client {
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
+		registry: registry,
 	}
-}
-
-func (c *Client) SetTools(tools []llmclient.ToolDefinition) {
-	c.tools = tools
 }
 
 func (c *Client) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
@@ -142,9 +140,12 @@ func (c *Client) buildChatRequest(messages []session.Message, systemPrompt strin
 		}
 	}
 
-	if len(c.tools) > 0 {
-		reqBody.Tools = buildToolDefs(c.tools)
-		reqBody.ToolChoice = "auto"
+	if c.registry != nil {
+		toolList := c.registry.ListTools()
+		if len(toolList) > 0 {
+			reqBody.Tools = buildToolDefs(toolList)
+			reqBody.ToolChoice = "auto"
+		}
 	}
 
 	return reqBody
@@ -192,15 +193,15 @@ func convertMessages(messages []session.Message, systemPrompt string) []openaiMe
 	return openaiMsgs
 }
 
-func buildToolDefs(toolDefs []llmclient.ToolDefinition) []openaiToolDef {
-	result := make([]openaiToolDef, len(toolDefs))
-	for i, t := range toolDefs {
+func buildToolDefs(toolList []tools.Tool) []openaiToolDef {
+	result := make([]openaiToolDef, len(toolList))
+	for i, t := range toolList {
 		result[i] = openaiToolDef{
 			Type: "function",
 			Function: openaiFunctionDef{
-				Name:        t.Name,
-				Description: t.Description,
-				Parameters:  t.Params,
+				Name:        t.Name(),
+				Description: t.Description(),
+				Parameters:  t.ParamsSchema(),
 			},
 		}
 	}

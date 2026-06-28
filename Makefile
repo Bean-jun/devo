@@ -1,7 +1,7 @@
 .PHONY: all build build-web build-go dev dev-web run-web run-tui test test-web test-e2e clean lint vsix
 
 APP_NAME := devo
-GO_ENTRY := cmd/devo/main.go
+GO_ENTRY := cmd/devo/
 WEB_DIR  := web
 BUILD_DIR := build
 VSIX_DIR := vscode-extension

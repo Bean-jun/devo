@@ -101,8 +101,8 @@ func TestManager_GetActiveSkillsPrompt(t *testing.T) {
 	if !strings.Contains(prompt, "## Available Skills") {
 		t.Error("expected '## Available Skills' section in prompt")
 	}
-	if !strings.Contains(prompt, "## Active Skills") {
-		t.Error("expected '## Active Skills' section in prompt")
+	if !strings.Contains(prompt, "use_skill") {
+		t.Error("expected 'use_skill' hint in prompt")
 	}
 	if !strings.Contains(prompt, "Python Expert") {
 		t.Error("expected 'Python Expert' in prompt")
@@ -112,6 +112,12 @@ func TestManager_GetActiveSkillsPrompt(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "Python coding best practices") {
 		t.Error("expected description in catalog section")
+	}
+	if strings.Contains(prompt, "## Active Skills") {
+		t.Error("should not contain '## Active Skills' section (instructions loaded via use_skill)")
+	}
+	if strings.Contains(prompt, "Use type hints") {
+		t.Error("should not contain full instructions in catalog")
 	}
 }
 
@@ -144,11 +150,8 @@ func TestManager_GetActiveSkillsPrompt_Filtered(t *testing.T) {
 	if strings.Contains(prompt, "Go Expert") {
 		t.Error("did not expect 'Go Expert' when disabled")
 	}
-	if !strings.Contains(prompt, "Use type hints") {
-		t.Error("expected active skill instructions for 'Python Expert'")
-	}
 	if strings.Contains(prompt, "Use tab indentation") {
-		t.Error("did not expect 'Go Expert' instructions when disabled")
+		t.Error("did not expect 'Go Expert' description when disabled")
 	}
 }
 
@@ -394,6 +397,69 @@ func TestExtractSkillName(t *testing.T) {
 	}
 }
 
+func TestManager_ListSkillResources(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillDir := filepath.Join(tmpDir, "my-skill")
+
+	scriptsDir := filepath.Join(skillDir, "scripts")
+	refsDir := filepath.Join(skillDir, "references")
+	assetsDir := filepath.Join(skillDir, "assets")
+
+	os.MkdirAll(scriptsDir, 0755)
+	os.MkdirAll(refsDir, 0755)
+	os.MkdirAll(assetsDir, 0755)
+
+	os.WriteFile(filepath.Join(scriptsDir, "helper.py"), []byte("print('hello')"), 0644)
+	os.WriteFile(filepath.Join(refsDir, "guide.md"), []byte("# Guide"), 0644)
+	os.WriteFile(filepath.Join(assetsDir, "template.py"), []byte("def main(): pass"), 0644)
+
+	mgr := NewManager(tmpDir)
+	scripts, refs, assets := mgr.ListSkillResources(skillDir)
+
+	if len(scripts) != 1 || scripts[0] != "scripts/helper.py" {
+		t.Errorf("expected scripts to contain 'scripts/helper.py', got %v", scripts)
+	}
+	if len(refs) != 1 || refs[0] != "references/guide.md" {
+		t.Errorf("expected references to contain 'references/guide.md', got %v", refs)
+	}
+	if len(assets) != 1 || assets[0] != "assets/template.py" {
+		t.Errorf("expected assets to contain 'assets/template.py', got %v", assets)
+	}
+}
+
+func TestManager_ListSkillResources_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillDir := filepath.Join(tmpDir, "empty-skill")
+	os.MkdirAll(skillDir, 0755)
+
+	mgr := NewManager(tmpDir)
+	scripts, refs, assets := mgr.ListSkillResources(skillDir)
+
+	if len(scripts) != 0 || len(refs) != 0 || len(assets) != 0 {
+		t.Error("expected empty resources for skill with no subdirectories")
+	}
+}
+
+func TestManager_ListSkillResources_IgnoresHidden(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillDir := filepath.Join(tmpDir, "my-skill")
+
+	hiddenDir := filepath.Join(skillDir, ".git")
+	os.MkdirAll(hiddenDir, 0755)
+	os.WriteFile(filepath.Join(hiddenDir, "config"), []byte("ignored"), 0644)
+
+	dotDir := filepath.Join(skillDir, ".hidden")
+	os.MkdirAll(dotDir, 0755)
+	os.WriteFile(filepath.Join(dotDir, "secret.txt"), []byte("ignored"), 0644)
+
+	mgr := NewManager(tmpDir)
+	scripts, refs, assets := mgr.ListSkillResources(skillDir)
+
+	if len(scripts) != 0 || len(refs) != 0 || len(assets) != 0 {
+		t.Error("expected hidden/dot directories to be ignored")
+	}
+}
+
 func TestManager_MultipleSkillsWithActiveFilter(t *testing.T) {
 	tmpDir := t.TempDir()
 	globalDir := filepath.Join(tmpDir, "global-skills")
@@ -413,13 +479,16 @@ func TestManager_MultipleSkillsWithActiveFilter(t *testing.T) {
 	}
 
 	prompt := mgr.GetActiveSkillsPrompt()
-	if !strings.Contains(prompt, "Use type hints") {
-		t.Error("expected 'Python Expert' instructions in active skills")
+	if !strings.Contains(prompt, "Python coding") {
+		t.Error("expected 'Python Expert' description in catalog")
 	}
-	if !strings.Contains(prompt, "Check for bugs") {
-		t.Error("expected 'Code Review' instructions in active skills")
+	if !strings.Contains(prompt, "Security review") {
+		t.Error("expected 'Code Review' description in catalog")
 	}
-	if !strings.Contains(prompt, "Use tabs") {
-		t.Error("expected 'Go Expert' instructions in active skills")
+	if !strings.Contains(prompt, "Go coding") {
+		t.Error("expected 'Go Expert' description in catalog")
+	}
+	if strings.Contains(prompt, "Use type hints") {
+		t.Error("should not contain full instructions in catalog")
 	}
 }

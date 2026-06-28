@@ -20,23 +20,8 @@ func NewClient(cfg *config.Config, registry *tools.Registry) llmclient.Client {
 		APIKey:  cfg.LLM.APIKey,
 		Model:   cfg.LLM.Model,
 		Headers: cfg.LLM.ExtraHeaders,
-	})
-
-	client.SetTools(buildToolDefinitions(registry))
+	}, registry)
 
 	log.Printf("[devo] Using LLM: base_url=%s, model=%s", cfg.LLM.BaseURL, cfg.LLM.Model)
 	return client
-}
-
-func buildToolDefinitions(registry *tools.Registry) []llmclient.ToolDefinition {
-	toolList := registry.ListTools()
-	defs := make([]llmclient.ToolDefinition, 0, len(toolList))
-	for _, t := range toolList {
-		defs = append(defs, llmclient.ToolDefinition{
-			Name:        t.Name(),
-			Description: t.Description(),
-			Params:      t.ParamsSchema(),
-		})
-	}
-	return defs
 }

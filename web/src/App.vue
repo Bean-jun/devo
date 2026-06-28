@@ -237,9 +237,7 @@ function connectSSE(sessionId: string) {
     if (sessionStore.currentSession) {
       const newState = data.new_state || 'idle'
       sessionStore.updateSessionState(sessionStore.currentSession.id, newState)
-      if (data.reason === 'completed') {
-        chatStore.appendSystemMessage('任务完成')
-      } else if (data.reason === 'cancelled') {
+      if (data.reason === 'cancelled') {
         chatStore.appendSystemMessage('操作已取消')
       } else if (data.reason === 'tool_limit_reached') {
         chatStore.appendSystemMessage('已达到工具调用上限，输入新消息继续')

@@ -16,5 +16,5 @@ echo.
 cd ..\..\
 
 taskkill /f /im devo.exe
-go build -o build\devo.exe cmd\devo\main.go
+go build -o build\devo.exe ./cmd/devo/
 .\build\devo.exe -port=8081

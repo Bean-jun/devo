@@ -230,6 +230,7 @@ func TestManager_ConnectAndDiscoverTools(t *testing.T) {
 	defer mock.close()
 
 	tmpDir := t.TempDir()
+	setHomeDir(t, t.TempDir())
 	writeMCPConfig(t, tmpDir, mock.addr, "mock-server")
 
 	ctx := context.Background()
@@ -384,6 +385,7 @@ func TestManager_Disconnect(t *testing.T) {
 	defer mock.close()
 
 	tmpDir := t.TempDir()
+	setHomeDir(t, t.TempDir())
 	writeMCPConfig(t, tmpDir, mock.addr, "mock-server")
 
 	ctx := context.Background()
@@ -424,9 +426,7 @@ func TestManager_ProjectPriorityOverGlobal(t *testing.T) {
 	writeMCPConfigWithPath(t, filepath.Join(tmpDir, ".devo", "mcp_servers.json"), mock1.addr, "shared-server")
 	writeMCPConfigWithPath(t, filepath.Join(homeDir, ".devo", "mcp_servers.json"), mock2.addr, "shared-server")
 
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", homeDir)
-	defer os.Setenv("HOME", origHome)
+	setHomeDir(t, homeDir)
 
 	ctx := context.Background()
 	mgr := NewManager(tmpDir)
@@ -452,6 +452,7 @@ func TestManager_GetAllServerInfos(t *testing.T) {
 	defer mock.close()
 
 	tmpDir := t.TempDir()
+	setHomeDir(t, t.TempDir())
 	writeMCPConfig(t, tmpDir, mock.addr, "mock-server")
 
 	ctx := context.Background()
@@ -536,13 +537,15 @@ func TestMcpToolAdapter_ImplementsTool(t *testing.T) {
 
 	adapter := &mcpToolAdapter{
 		manager:  mgr,
+		serverID: "mock-server",
 		toolName: "mock_search",
 	}
 
 	var _ tools.Tool = adapter
 
-	if adapter.Name() != "mock_search" {
-		t.Errorf("expected name 'mock_search', got %s", adapter.Name())
+	expectedName := "mcp_mock-server_mock_search"
+	if adapter.Name() != expectedName {
+		t.Errorf("expected name '%s', got '%s'", expectedName, adapter.Name())
 	}
 	if adapter.Description() != "Search mock data" {
 		t.Errorf("expected description 'Search mock data', got %s", adapter.Description())
@@ -594,6 +597,7 @@ func TestManager_CallTool_UnknownTool(t *testing.T) {
 func TestLoadConfig(t *testing.T) {
 	t.Run("project_config_only", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		setHomeDir(t, t.TempDir())
 		writeMCPConfig(t, tmpDir, "http://localhost:8080", "test-server")
 
 		configs, err := LoadConfig(tmpDir)
@@ -613,6 +617,7 @@ func TestLoadConfig(t *testing.T) {
 
 	t.Run("no_config_file", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		setHomeDir(t, t.TempDir())
 		configs, err := LoadConfig(tmpDir)
 		if err != nil {
 			t.Fatalf("LoadConfig failed: %v", err)
@@ -624,6 +629,7 @@ func TestLoadConfig(t *testing.T) {
 
 	t.Run("default_transport", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		setHomeDir(t, t.TempDir())
 
 		configPath := filepath.Join(tmpDir, ".devo", "mcp_servers.json")
 		os.MkdirAll(filepath.Dir(configPath), 0755)
@@ -701,6 +707,36 @@ func writeMCPConfig(t *testing.T, tmpDir, addr, serverID string) {
 	writeMCPConfigWithPath(t, filepath.Join(tmpDir, ".devo", "mcp_servers.json"), addr, serverID)
 }
 
+func writeMCPConfigs(t *testing.T, tmpDir string, servers ...struct {
+	addr     string
+	serverID string
+}) {
+	t.Helper()
+	configs := make([]map[string]interface{}, 0, len(servers))
+	for _, s := range servers {
+		configs = append(configs, map[string]interface{}{
+			"server_id": s.serverID,
+			"endpoint":  s.addr,
+			"transport": "sse",
+		})
+	}
+	data, err := json.Marshal(configs)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	configPath := filepath.Join(tmpDir, ".devo", "mcp_servers.json")
+	os.MkdirAll(filepath.Dir(configPath), 0755)
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+}
+
+func setHomeDir(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
+}
+
 func writeMCPConfigWithPath(t *testing.T, configPath, addr, serverID string) {
 	t.Helper()
 
@@ -719,5 +755,262 @@ func writeMCPConfigWithPath(t *testing.T, configPath, addr, serverID string) {
 	}
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		t.Fatalf("write config: %v", err)
+	}
+}
+
+func TestMcpToolName(t *testing.T) {
+	result := mcpToolName("filesystem", "read")
+	expected := "mcp_filesystem_read"
+	if result != expected {
+		t.Errorf("expected '%s', got '%s'", expected, result)
+	}
+}
+
+func TestGetToolByServer(t *testing.T) {
+	mock := newMockMCPServer(t)
+	defer mock.close()
+
+	tmpDir := t.TempDir()
+	setHomeDir(t, t.TempDir())
+	writeMCPConfig(t, tmpDir, mock.addr, "mock-server")
+
+	ctx := context.Background()
+	mgr := NewManager(tmpDir)
+	err := mgr.ConnectAll(ctx)
+	if err != nil {
+		t.Fatalf("ConnectAll failed: %v", err)
+	}
+	defer mgr.Shutdown(ctx)
+
+	tool, ok := mgr.GetToolByServer("mock-server", "mock_search")
+	if !ok {
+		t.Fatal("expected to find mock_search tool")
+	}
+	if tool.ServerID != "mock-server" {
+		t.Errorf("expected server_id mock-server, got %s", tool.ServerID)
+	}
+	if tool.Description != "Search mock data" {
+		t.Errorf("expected description 'Search mock data', got %s", tool.Description)
+	}
+
+	_, ok = mgr.GetToolByServer("mock-server", "nonexistent")
+	if ok {
+		t.Error("expected not to find nonexistent tool")
+	}
+
+	_, ok = mgr.GetToolByServer("nonexistent-server", "mock_search")
+	if ok {
+		t.Error("expected not to find tool on nonexistent server")
+	}
+}
+
+func TestCallToolByServer(t *testing.T) {
+	mock := newMockMCPServer(t)
+	defer mock.close()
+
+	tmpDir := t.TempDir()
+	setHomeDir(t, t.TempDir())
+	writeMCPConfig(t, tmpDir, mock.addr, "mock-server")
+
+	ctx := context.Background()
+	mgr := NewManager(tmpDir)
+	err := mgr.ConnectAll(ctx)
+	if err != nil {
+		t.Fatalf("ConnectAll failed: %v", err)
+	}
+	defer mgr.Shutdown(ctx)
+
+	result, err := mgr.CallToolByServer(ctx, "mock-server", "mock_search", map[string]interface{}{
+		"query": "test-query",
+	})
+	if err != nil {
+		t.Fatalf("CallToolByServer failed: %v", err)
+	}
+	if !strings.Contains(result, "mock_search") {
+		t.Errorf("expected result to contain tool name, got: %s", result)
+	}
+	if !strings.Contains(result, "test-query") {
+		t.Errorf("expected result to contain query, got: %s", result)
+	}
+
+	_, err = mgr.CallToolByServer(ctx, "mock-server", "nonexistent", nil)
+	if err == nil {
+		t.Error("expected error for nonexistent tool")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' in error, got: %v", err)
+	}
+
+	_, err = mgr.CallToolByServer(ctx, "nonexistent-server", "mock_search", nil)
+	if err == nil {
+		t.Error("expected error for nonexistent server")
+	}
+}
+
+func TestMcpToolAdapter_NameUniqueness(t *testing.T) {
+	mock1 := newMockMCPServer(t)
+	defer mock1.close()
+	mock2 := newMockMCPServer(t)
+	defer mock2.close()
+
+	tmpDir := t.TempDir()
+	setHomeDir(t, t.TempDir())
+	writeMCPConfigs(t, tmpDir,
+		struct {
+			addr     string
+			serverID string
+		}{mock1.addr, "server-a"},
+		struct {
+			addr     string
+			serverID string
+		}{mock2.addr, "server-b"},
+	)
+
+	ctx := context.Background()
+	mgr := NewManager(tmpDir)
+	err := mgr.ConnectAll(ctx)
+	if err != nil {
+		t.Fatalf("ConnectAll failed: %v", err)
+	}
+	defer mgr.Shutdown(ctx)
+
+	registry := tools.NewRegistry()
+	mgr.RegisterTools(registry)
+
+	tools := registry.ListTools()
+	if len(tools) != 4 {
+		t.Fatalf("expected 4 tools (2 from each server), got %d", len(tools))
+	}
+
+	toolNames := make(map[string]bool)
+	for _, tool := range tools {
+		name := tool.Name()
+		if toolNames[name] {
+			t.Errorf("duplicate tool name: %s", name)
+		}
+		toolNames[name] = true
+	}
+
+	adapterA := &mcpToolAdapter{
+		manager:  mgr,
+		serverID: "server-a",
+		toolName: "mock_search",
+	}
+	adapterB := &mcpToolAdapter{
+		manager:  mgr,
+		serverID: "server-b",
+		toolName: "mock_search",
+	}
+
+	nameA := adapterA.Name()
+	nameB := adapterB.Name()
+
+	if nameA == nameB {
+		t.Errorf("tool names should be different: %s == %s", nameA, nameB)
+	}
+
+	expectedA := "mcp_server-a_mock_search"
+	expectedB := "mcp_server-b_mock_search"
+	if nameA != expectedA {
+		t.Errorf("expected name '%s', got '%s'", expectedA, nameA)
+	}
+	if nameB != expectedB {
+		t.Errorf("expected name '%s', got '%s'", expectedB, nameB)
+	}
+}
+
+func TestMcpToolAdapter_ExecuteUsesServerRouting(t *testing.T) {
+	mock1 := newMockMCPServer(t)
+	defer mock1.close()
+	mock2 := newMockMCPServer(t)
+	defer mock2.close()
+
+	tmpDir := t.TempDir()
+	setHomeDir(t, t.TempDir())
+	writeMCPConfigs(t, tmpDir,
+		struct {
+			addr     string
+			serverID string
+		}{mock1.addr, "server-a"},
+		struct {
+			addr     string
+			serverID string
+		}{mock2.addr, "server-b"},
+	)
+
+	ctx := context.Background()
+	mgr := NewManager(tmpDir)
+	err := mgr.ConnectAll(ctx)
+	if err != nil {
+		t.Fatalf("ConnectAll failed: %v", err)
+	}
+	defer mgr.Shutdown(ctx)
+
+	adapterA := &mcpToolAdapter{
+		manager:  mgr,
+		serverID: "server-a",
+		toolName: "mock_search",
+	}
+	adapterB := &mcpToolAdapter{
+		manager:  mgr,
+		serverID: "server-b",
+		toolName: "mock_search",
+	}
+
+	resultA, err := adapterA.Execute(tmpDir, map[string]interface{}{
+		"query": "from-server-a",
+	})
+	if err != nil {
+		t.Fatalf("adapterA.Execute failed: %v", err)
+	}
+
+	resultB, err := adapterB.Execute(tmpDir, map[string]interface{}{
+		"query": "from-server-b",
+	})
+	if err != nil {
+		t.Fatalf("adapterB.Execute failed: %v", err)
+	}
+
+	if !strings.Contains(resultA, "from-server-a") {
+		t.Errorf("resultA should contain 'from-server-a', got: %s", resultA)
+	}
+	if !strings.Contains(resultB, "from-server-b") {
+		t.Errorf("resultB should contain 'from-server-b', got: %s", resultB)
+	}
+}
+
+func TestRegisterTools_PrefixedNames(t *testing.T) {
+	mock := newMockMCPServer(t)
+	defer mock.close()
+
+	tmpDir := t.TempDir()
+	setHomeDir(t, t.TempDir())
+	writeMCPConfig(t, tmpDir, mock.addr, "mock-server")
+
+	ctx := context.Background()
+	mgr := NewManager(tmpDir)
+	err := mgr.ConnectAll(ctx)
+	if err != nil {
+		t.Fatalf("ConnectAll failed: %v", err)
+	}
+	defer mgr.Shutdown(ctx)
+
+	registry := tools.NewRegistry()
+	mgr.RegisterTools(registry)
+
+	tools := registry.ListTools()
+	if len(tools) != 2 {
+		t.Fatalf("expected 2 tools, got %d", len(tools))
+	}
+
+	expectedNames := map[string]bool{
+		"mcp_mock-server_mock_search": true,
+		"mcp_mock-server_mock_fetch":  true,
+	}
+	for _, tool := range tools {
+		name := tool.Name()
+		if !expectedNames[name] {
+			t.Errorf("unexpected tool name: %s", name)
+		}
 	}
 }

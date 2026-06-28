@@ -314,7 +314,7 @@ func (m *Manager) DisableServer(serverID string) error {
 	if info, ok := m.servers[serverID]; ok {
 		for _, tool := range info.Tools {
 			if m.toolRegistry != nil {
-				m.toolRegistry.Unregister(tool.ToolName)
+				m.toolRegistry.Unregister(mcpToolName(serverID, tool.ToolName))
 			}
 		}
 		info.Status = StatusDisconnected
@@ -348,6 +348,7 @@ func (m *Manager) registerServerTools(serverID string) {
 	for _, tool := range info.Tools {
 		adapter := &mcpToolAdapter{
 			manager:  m,
+			serverID: serverID,
 			toolName: tool.ToolName,
 		}
 		m.toolRegistry.Register(adapter)
@@ -361,7 +362,7 @@ func (m *Manager) RemoveServer(serverID string) {
 	if info, ok := m.servers[serverID]; ok {
 		for _, tool := range info.Tools {
 			if m.toolRegistry != nil {
-				m.toolRegistry.Unregister(tool.ToolName)
+				m.toolRegistry.Unregister(mcpToolName(serverID, tool.ToolName))
 			}
 		}
 	}
@@ -406,6 +407,69 @@ func (m *Manager) GetTool(toolName string) (*McpTool, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (m *Manager) GetToolByServer(serverID, toolName string) (*McpTool, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	info, ok := m.servers[serverID]
+	if !ok || info.Status != StatusConnected {
+		return nil, false
+	}
+	for _, t := range info.Tools {
+		if t.ToolName == toolName {
+			return &t, true
+		}
+	}
+	return nil, false
+}
+
+func (m *Manager) CallToolByServer(ctx context.Context, serverID, toolName string, args map[string]interface{}) (string, error) {
+	_, ok := m.GetToolByServer(serverID, toolName)
+	if !ok {
+		return "", fmt.Errorf("MCP tool not found: %s on server %s", toolName, serverID)
+	}
+
+	m.mu.RLock()
+	session, exists := m.sessions[serverID]
+	m.mu.RUnlock()
+
+	if !exists {
+		return "", fmt.Errorf("server %s not connected", serverID)
+	}
+
+	result, err := session.CallTool(ctx, &sdkmcp.CallToolParams{
+		Name:      toolName,
+		Arguments: args,
+	})
+	if err != nil {
+		m.markServerError(serverID, err.Error())
+		m.startReconnect(serverID)
+		return "", fmt.Errorf("call tool %s on server %s: %w", toolName, serverID, err)
+	}
+
+	if result.IsError {
+		var errText string
+		for _, c := range result.Content {
+			if tc, ok := c.(*sdkmcp.TextContent); ok {
+				errText += tc.Text
+			}
+		}
+		if errText == "" {
+			errText = "MCP tool returned an error"
+		}
+		return errText, nil
+	}
+
+	var textContent string
+	for _, c := range result.Content {
+		if tc, ok := c.(*sdkmcp.TextContent); ok {
+			textContent += tc.Text
+		}
+	}
+
+	return textContent, nil
 }
 
 func (m *Manager) CallTool(ctx context.Context, toolName string, args map[string]interface{}) (string, error) {
@@ -523,6 +587,7 @@ func (m *Manager) RegisterTools(registry *tools.Registry) {
 		for _, tool := range info.Tools {
 			adapter := &mcpToolAdapter{
 				manager:  m,
+				serverID: info.Config.ServerID,
 				toolName: tool.ToolName,
 			}
 			registry.Register(adapter)
@@ -639,15 +704,20 @@ var _ tools.Tool = (*mcpToolAdapter)(nil)
 
 type mcpToolAdapter struct {
 	manager  *Manager
+	serverID string
 	toolName string
 }
 
+func mcpToolName(serverID, toolName string) string {
+	return "mcp_" + serverID + "_" + toolName
+}
+
 func (a *mcpToolAdapter) Name() string {
-	return a.toolName
+	return mcpToolName(a.serverID, a.toolName)
 }
 
 func (a *mcpToolAdapter) Description() string {
-	t, ok := a.manager.GetTool(a.toolName)
+	t, ok := a.manager.GetToolByServer(a.serverID, a.toolName)
 	if !ok {
 		return ""
 	}
@@ -659,7 +729,7 @@ func (a *mcpToolAdapter) RiskLevel() tools.RiskLevel {
 }
 
 func (a *mcpToolAdapter) ParamsSchema() map[string]interface{} {
-	t, ok := a.manager.GetTool(a.toolName)
+	t, ok := a.manager.GetToolByServer(a.serverID, a.toolName)
 	if !ok {
 		return nil
 	}
@@ -671,5 +741,5 @@ func (a *mcpToolAdapter) ParamsSchema() map[string]interface{} {
 
 func (a *mcpToolAdapter) Execute(workingDir string, params map[string]interface{}) (string, error) {
 	ctx := context.Background()
-	return a.manager.CallTool(ctx, a.toolName, params)
+	return a.manager.CallToolByServer(ctx, a.serverID, a.toolName, params)
 }

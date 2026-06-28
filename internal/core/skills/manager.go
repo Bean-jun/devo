@@ -13,6 +13,15 @@ import (
 
 const skillFileName = "SKILL.md"
 
+func DefaultGlobalSkillsDir() string {
+	homeDir, _ := os.UserHomeDir()
+	return filepath.Join(homeDir, ".devo", "skills")
+}
+
+func DefaultProjectSkillsDir(workingDir string) string {
+	return filepath.Join(workingDir, ".devo", "skills")
+}
+
 type Manager struct {
 	mu sync.RWMutex
 
@@ -38,7 +47,7 @@ func (m *Manager) SetProjectDir(workingDir string) error {
 
 	m.projectDir = workingDir
 	m.projectSkills = make(map[string]*Skill)
-	m.projectSkillsDir = filepath.Join(workingDir, ".devo", "skills")
+	m.projectSkillsDir = DefaultProjectSkillsDir(workingDir)
 
 	if err := m.scanGlobal(); err != nil {
 		return fmt.Errorf("scan global skills: %w", err)
@@ -369,16 +378,11 @@ func (m *Manager) GetActiveSkillsPrompt() string {
 
 	merged := m.mergeSkills()
 
-	var activeParts []string
 	var catalogParts []string
 
 	for _, skill := range merged {
 		if !skill.Enabled {
 			continue
-		}
-
-		if skill.Instructions != "" {
-			activeParts = append(activeParts, fmt.Sprintf("### %s\n%s\n\n%s", skill.Name, skill.Description, skill.Instructions))
 		}
 
 		desc := skill.Description
@@ -388,17 +392,12 @@ func (m *Manager) GetActiveSkillsPrompt() string {
 		catalogParts = append(catalogParts, fmt.Sprintf("- **%s**: %s", skill.Name, desc))
 	}
 
-	if len(activeParts) == 0 && len(catalogParts) == 0 {
+	if len(catalogParts) == 0 {
 		return ""
 	}
 
-	var result string
-	if len(catalogParts) > 0 {
-		result = "## Available Skills\n\n" + strings.Join(catalogParts, "\n") + "\n"
-	}
-	if len(activeParts) > 0 {
-		result += "\n## Active Skills\n\n" + strings.Join(activeParts, "\n\n")
-	}
+	result := "## Available Skills\nYou have access to the following skills. Use the `use_skill` tool to load full instructions for any skill.\n\n" +
+		strings.Join(catalogParts, "\n") + "\n"
 
 	return result
 }
@@ -531,6 +530,42 @@ func (m *Manager) DeleteSkill(name string) error {
 	}
 
 	return nil
+}
+
+func (m *Manager) ListSkillResources(location string) (scripts, references, assets []string) {
+	entries, err := os.ReadDir(location)
+	if err != nil {
+		return nil, nil, nil
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() || entry.Name() == ".git" || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
+		subEntries, err := os.ReadDir(filepath.Join(location, entry.Name()))
+		if err != nil {
+			continue
+		}
+
+		var files []string
+		for _, f := range subEntries {
+			if !f.IsDir() {
+				files = append(files, entry.Name()+"/"+f.Name())
+			}
+		}
+
+		switch entry.Name() {
+		case "scripts":
+			scripts = files
+		case "references":
+			references = files
+		case "assets":
+			assets = files
+		}
+	}
+
+	return
 }
 
 func (m *Manager) GetSkill(name string) (*Skill, error) {
