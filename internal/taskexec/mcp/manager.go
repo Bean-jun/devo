@@ -51,6 +51,44 @@ func (m *Manager) SetToolDiscoveredCallback(cb ToolDiscoveredCallback) {
 	m.discoveryCB = cb
 }
 
+func (m *Manager) SetProjectDir(workingDir string) error {
+	m.mu.Lock()
+
+	if m.reconnectCancel != nil {
+		m.reconnectCancel()
+	}
+	m.reconnectWG.Wait()
+
+	projectServerIDs := make([]string, 0)
+	for serverID, cfg := range m.configs {
+		if cfg.Source == SourceProject {
+			projectServerIDs = append(projectServerIDs, serverID)
+		}
+	}
+
+	for _, serverID := range projectServerIDs {
+		if info, ok := m.servers[serverID]; ok {
+			for _, tool := range info.Tools {
+				if m.toolRegistry != nil {
+					m.toolRegistry.Unregister(mcpToolName(serverID, tool.ToolName))
+				}
+			}
+		}
+		if session, ok := m.sessions[serverID]; ok {
+			session.Close()
+			delete(m.sessions, serverID)
+		}
+		delete(m.clients, serverID)
+		delete(m.servers, serverID)
+		delete(m.configs, serverID)
+	}
+
+	m.workingDir = workingDir
+	m.mu.Unlock()
+
+	return m.ConnectAll(context.Background())
+}
+
 func (m *Manager) GlobalEventBus() *session.EventBus {
 	return m.globalEventBus
 }

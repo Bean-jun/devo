@@ -158,7 +158,7 @@ func (h *Handler) SetCurrentWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.mcpManager != nil {
-		if err := h.mcpManager.ConnectAll(r.Context()); err != nil {
+		if err := h.mcpManager.SetProjectDir(req.WorkingDirectory); err != nil {
 			log.Printf("[devo] MCP reconnect warning after workspace switch: %v", err)
 		}
 	}

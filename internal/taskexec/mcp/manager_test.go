@@ -1014,3 +1014,74 @@ func TestRegisterTools_PrefixedNames(t *testing.T) {
 		}
 	}
 }
+
+func TestSetProjectDir_WorkspaceIsolation(t *testing.T) {
+	mockA := newMockMCPServer(t)
+	defer mockA.close()
+	mockB := newMockMCPServer(t)
+	defer mockB.close()
+
+	workdirA := t.TempDir()
+	workdirB := t.TempDir()
+	homeDir := t.TempDir()
+	setHomeDir(t, homeDir)
+
+	writeMCPConfig(t, workdirA, mockA.addr, "server-a")
+	writeMCPConfig(t, workdirB, mockB.addr, "server-b")
+
+	globalConfigPath := filepath.Join(homeDir, ".devo", "mcp_servers.json")
+	os.MkdirAll(filepath.Dir(globalConfigPath), 0755)
+	globalData := []map[string]interface{}{
+		{
+			"server_id": "global-server",
+			"endpoint":  mockA.addr,
+			"transport": "streamable",
+		},
+	}
+	globalBytes, _ := json.Marshal(globalData)
+	os.WriteFile(globalConfigPath, globalBytes, 0644)
+
+	ctx := context.Background()
+
+	mgr := NewManager(workdirA)
+	err := mgr.ConnectAll(ctx)
+	if err != nil {
+		t.Fatalf("ConnectAll for workdirA failed: %v", err)
+	}
+	defer mgr.Shutdown(ctx)
+
+	servers := mgr.GetAllServerInfos()
+	serverIDs := make(map[string]bool)
+	for _, s := range servers {
+		serverIDs[s.Config.ServerID] = true
+	}
+	if !serverIDs["server-a"] {
+		t.Error("expected server-a from workdirA")
+	}
+	if !serverIDs["global-server"] {
+		t.Error("expected global-server")
+	}
+	if serverIDs["server-b"] {
+		t.Error("should NOT have server-b from workdirB yet")
+	}
+
+	err = mgr.SetProjectDir(workdirB)
+	if err != nil {
+		t.Fatalf("SetProjectDir to workdirB failed: %v", err)
+	}
+
+	servers = mgr.GetAllServerInfos()
+	serverIDs = make(map[string]bool)
+	for _, s := range servers {
+		serverIDs[s.Config.ServerID] = true
+	}
+	if serverIDs["server-a"] {
+		t.Error("server-a should be gone after switching from workdirA")
+	}
+	if !serverIDs["server-b"] {
+		t.Error("expected server-b from workdirB")
+	}
+	if !serverIDs["global-server"] {
+		t.Error("expected global-server to persist across workspace switch")
+	}
+}
