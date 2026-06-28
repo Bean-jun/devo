@@ -80,7 +80,11 @@ function selectWorkspace(ws: { id: string; name: string; path: string }) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ working_directory: ws.path }),
-  }).catch(() => {})
+  })
+    .then(() => {
+      sessionStore.workingDirectory = ws.path
+    })
+    .catch(() => {})
 }
 
 function selectSession(sessionId: string) {
@@ -127,11 +131,15 @@ function cancelNewSession() {
           v-for="ws in workspaces"
           :key="ws.id"
           class="collapsed-icon-btn"
-          :class="{ active: isActiveWorkspace(ws.id) }"
-          :title="ws.name + '\n' + ws.path"
-          @click="selectWorkspace(ws)"
+          :class="{
+            active: isActiveWorkspace(ws.id),
+            removed: !ws.exists,
+          }"
+          :disabled="!ws.exists"
+          :title="ws.exists ? (ws.name + '\n' + ws.path) : (ws.name + '\n已移除')"
+          @click="ws.exists && selectWorkspace(ws)"
         >
-          📁
+          {{ ws.exists ? '📁' : '🗑' }}
         </button>
         <div class="collapsed-separator"></div>
         <button
@@ -160,13 +168,17 @@ function cancelNewSession() {
         v-for="ws in workspaces"
         :key="ws.id"
         class="sidebar-item workspace-item"
-        :class="{ active: isActiveWorkspace(ws.id) }"
-        @click="selectWorkspace(ws)"
+        :class="{
+          active: isActiveWorkspace(ws.id),
+          removed: !ws.exists,
+        }"
+        :disabled="!ws.exists"
+        @click="ws.exists && selectWorkspace(ws)"
       >
-        <span class="sidebar-item-icon">📁</span>
+        <span class="sidebar-item-icon">{{ ws.exists ? '📁' : '🗑' }}</span>
         <div class="workspace-info">
           <span class="workspace-name">{{ ws.name }}</span>
-          <span class="workspace-path">{{ ws.path }}</span>
+          <span class="workspace-path">{{ ws.exists ? ws.path : '已移除' }}</span>
         </div>
         <span class="workspace-delete" @click.stop="openDeleteConfirm(ws)" title="移除">✕</span>
       </button>
@@ -406,6 +418,15 @@ function cancelNewSession() {
 
 .sidebar-item.active .workspace-path {
   color: rgba(255, 255, 255, 0.6);
+}
+
+.workspace-item.removed {
+  opacity: 0.5;
+}
+
+.workspace-item.removed .workspace-path {
+  color: var(--color-error);
+  font-style: italic;
 }
 
 .sidebar-item-label {
@@ -663,6 +684,10 @@ function cancelNewSession() {
 .collapsed-icon-btn.active {
   background: var(--color-accent);
   color: white;
+}
+
+.collapsed-icon-btn.removed {
+  opacity: 0.4;
 }
 
 .collapsed-separator {

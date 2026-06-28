@@ -28,6 +28,7 @@ export interface WorkspaceEntry {
   id: string
   name: string
   path: string
+  exists: boolean
 }
 
 function loadTheme(): ThemeType {
@@ -117,7 +118,7 @@ export const useUiStore = defineStore('ui', () => {
       return
     }
     const name = path.split('/').pop() || path.split('\\').pop() || path
-    const entry: WorkspaceEntry = { id: path, name, path }
+    const entry: WorkspaceEntry = { id: path, name, path, exists: true }
     workspaceList.value = [entry, ...workspaceList.value]
     if (!activeWorkspace.value) {
       activeWorkspace.value = entry.id

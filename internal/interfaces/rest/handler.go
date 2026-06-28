@@ -178,9 +178,10 @@ func (h *Handler) GetWorkspaces(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type workspaceEntry struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-		Path string `json:"path"`
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Path   string `json:"path"`
+		Exists bool   `json:"exists"`
 	}
 	workspaces := make([]workspaceEntry, 0, len(dirs))
 	for _, d := range dirs {
@@ -188,10 +189,12 @@ func (h *Handler) GetWorkspaces(w http.ResponseWriter, r *http.Request) {
 		if idx := strings.LastIndexAny(name, "/\\"); idx >= 0 {
 			name = name[idx+1:]
 		}
+		_, statErr := os.Stat(d)
 		workspaces = append(workspaces, workspaceEntry{
-			ID:   d,
-			Name: name,
-			Path: d,
+			ID:     d,
+			Name:   name,
+			Path:   d,
+			Exists: statErr == nil,
 		})
 	}
 

@@ -28,6 +28,7 @@ const selectedPath = ref<string | null>(null)
 const selectedContent = ref<string | null>(null)
 const selectedIsImage = ref(false)
 const isLoadingContent = ref(false)
+let rootAbortController: AbortController | null = null
 const previewHeight = ref(200)
 const isResizingPreview = ref(false)
 const panelRef = ref<HTMLElement | null>(null)
@@ -193,9 +194,9 @@ function flattenTree(nodes: TreeNode[], depth: number): TreeNode[] {
 
 const flatNodes = computed<TreeNode[]>(() => flattenTree(rootNodes.value, 0))
 
-async function fetchDir(path: string, parent: TreeNode[]): Promise<void> {
+async function fetchDir(path: string, parent: TreeNode[], signal?: AbortSignal): Promise<void> {
   const url = `${API_BASE}/files?path=${encodeURIComponent(path)}`
-  const res = await fetch(url)
+  const res = await fetch(url, { signal })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data = await res.json()
 
@@ -223,11 +224,18 @@ async function fetchDir(path: string, parent: TreeNode[]): Promise<void> {
 }
 
 async function fetchRoot() {
+  if (rootAbortController) {
+    rootAbortController.abort()
+  }
+  rootAbortController = new AbortController()
+  const signal = rootAbortController.signal
+
   isLoading.value = true
   error.value = null
   try {
-    await fetchDir('.', rootNodes.value)
+    await fetchDir('.', rootNodes.value, signal)
   } catch (e: any) {
+    if (e.name === 'AbortError') return
     error.value = e.message || '加载文件列表失败'
   } finally {
     isLoading.value = false
