@@ -1,8 +1,6 @@
 package sqlite
 
 import (
-	"fmt"
-
 	"devo/internal/core/session"
 )
 
@@ -135,13 +133,11 @@ func (s *GormStore) GetUsageStats(groupBy, dateRange, project string) (*session.
 	}
 
 	for _, gr := range groupResults {
-		cost := float64(gr.TotalTokens) / 1000.0 * 0.01
 		result.Groups = append(result.Groups, session.UsageGroup{
-			Key:           gr.Key,
-			InputTokens:   gr.InputTokens,
-			OutputTokens:  gr.OutputTokens,
-			TotalTokens:   gr.TotalTokens,
-			EstimatedCost: fmt.Sprintf("$%.4f", cost),
+			Key:          gr.Key,
+			InputTokens:  gr.InputTokens,
+			OutputTokens: gr.OutputTokens,
+			TotalTokens:  gr.TotalTokens,
 		})
 		result.Summary.Input += gr.InputTokens
 		result.Summary.Output += gr.OutputTokens

@@ -1,7 +1,6 @@
 package session
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -313,13 +312,11 @@ func (s *InMemoryStore) GetUsageStats(groupBy, dateRange, project string) (*Usag
 
 	for _, k := range keys {
 		u := groupMap[k]
-		cost := float64(u.Total) / 1000.0 * 0.01
 		result.Groups = append(result.Groups, UsageGroup{
-			Key:           k,
-			InputTokens:   u.Input,
-			OutputTokens:  u.Output,
-			TotalTokens:   u.Total,
-			EstimatedCost: fmt.Sprintf("$%.4f", cost),
+			Key:          k,
+			InputTokens:  u.Input,
+			OutputTokens: u.Output,
+			TotalTokens:  u.Total,
 		})
 		result.Summary.Input += u.Input
 		result.Summary.Output += u.Output

@@ -82,6 +82,14 @@ async function confirmDelete() {
   }
 }
 
+async function handleRefresh() {
+  try {
+    await mcpStore.fetchServers()
+  } catch (e: any) {
+    error.value = e.message || '刷新失败'
+  }
+}
+
 function cancelDelete() {
   showDeleteDialog.value = false
   deletingServer.value = null
@@ -116,9 +124,14 @@ onMounted(async () => {
   <div class="mcp-panel">
     <div class="mcp-header">
       <h3 class="mcp-title">MCP 服务器</h3>
-      <button class="add-btn" @click="showAddForm = !showAddForm">
-        {{ showAddForm ? '取消' : '添加' }}
-      </button>
+      <div class="header-actions">
+        <button class="reload-btn" :class="{ spinning: mcpStore.isLoading }" :disabled="mcpStore.isLoading" @click="handleRefresh" title="刷新服务器列表">
+          ↻
+        </button>
+        <button class="add-btn" @click="showAddForm = !showAddForm">
+          {{ showAddForm ? '取消' : '添加' }}
+        </button>
+      </div>
     </div>
 
     <div v-if="showAddForm" class="add-form">
@@ -275,6 +288,48 @@ onMounted(async () => {
   background: var(--color-bg-hover);
   color: var(--color-accent);
   border-color: var(--color-accent);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reload-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.reload-btn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.reload-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.reload-btn.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .add-form {
