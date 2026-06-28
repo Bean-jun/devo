@@ -1,7 +1,7 @@
-.PHONY: all build build-web build-go dev dev-web run-web run-tui test test-web test-e2e clean lint vsix
+.PHONY: all build build-web build-go dev dev-web run-web run-tui test test-web test-e2e clean lint vsix desktop
 
 APP_NAME := devo
-GO_ENTRY := cmd/devo/
+GO_ENTRY := ./cmd/devo/
 WEB_DIR  := web
 BUILD_DIR := build
 VSIX_DIR := vscode-extension
@@ -17,6 +17,9 @@ else
   DIRTY_SUFFIX :=
 endif
 FULL_VERSION := $(VERSION)-$(GIT_HASH)$(DIRTY_SUFFIX)
+
+ELECTRON_DIR := electron
+DESKTOP_BIN_DIR := $(ELECTRON_DIR)\resources\bin
 
 # ========== Build ==========
 all: build
@@ -45,6 +48,19 @@ vsix: build-go
 	cd $(VSIX_DIR) && npm run vsix
 	cmd /c "move $(VSIX_DIR)\$(APP_NAME)-*.vsix $(BUILD_DIR)\"
 	@echo [OK] VSIX package: $(BUILD_DIR)\$(APP_NAME)-*.vsix
+
+# ========== Desktop (Electron) ==========
+
+desktop: build-go
+	@echo [DESKTOP] Copying binary to Electron resources...
+	cd $(ELECTRON_DIR) && node -e "var p=require('./package.json');p.version='$(FULL_VERSION)';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+	@if not exist $(DESKTOP_BIN_DIR) mkdir $(DESKTOP_BIN_DIR)
+	copy $(BUILD_DIR)\$(APP_NAME).exe $(DESKTOP_BIN_DIR)\$(APP_NAME).exe /Y
+	@echo [DESKTOP] Installing Electron dependencies...
+	cd $(ELECTRON_DIR) && npm install
+	@echo [DESKTOP] Packaging Electron app...
+	cd $(ELECTRON_DIR) && npm run package
+	@echo [OK] Desktop package complete
 
 # ========== Development ==========
 dev:
@@ -95,6 +111,9 @@ clean:
 	rm -rf $(VSIX_DIR)\bin
 	rm -f $(VSIX_DIR)\*.vsix
 	rm -f $(BUILD_DIR)\*.vsix
+	rm -rf $(ELECTRON_DIR)\node_modules
+	rm -rf $(ELECTRON_DIR)\dist
+	rm -rf $(DESKTOP_BIN_DIR)
 	rm -f $(DB_PATH)
 	@echo [OK] Clean complete
 
