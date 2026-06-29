@@ -6,9 +6,11 @@ export type SessionState =
   | 'completed'
   | 'archived'
 
-export type TrustLevel = 'always_ask' | 'session_trust' | 'full_trust'
+export type TrustLevel = 'low' | 'normal' | 'elevated'
 
-export type ApprovalPolicy = 'always_ask' | 'session_trust' | 'full_trust'
+export type ApprovalPolicyLevel = 'always_ask' | 'session_trust' | 'full_trust' | 'auto_approve'
+
+export type ApprovalPolicy = Record<string, ApprovalPolicyLevel>
 
 export interface TokenUsage {
   input: number

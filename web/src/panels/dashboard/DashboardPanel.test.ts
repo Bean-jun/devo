@@ -21,8 +21,8 @@ describe('DashboardPanel', () => {
       lastActiveAt: '2026-01-01T00:00:00Z',
       messageCount: 0,
       tokenUsage: { input: 0, output: 0 },
-      trustLevel: 'always_ask',
-      approvalPolicy: 'always_ask',
+      trustLevel: 'normal',
+      approvalPolicy: {},
     }
   }
 

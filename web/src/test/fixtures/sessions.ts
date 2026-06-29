@@ -9,8 +9,8 @@ export const mockSession: Session = {
   lastActiveAt: '2026-01-01T12:00:00Z',
   messageCount: 5,
   tokenUsage: { input: 500, output: 200 },
-  trustLevel: 'session_trust',
-  approvalPolicy: 'session_trust',
+  trustLevel: 'normal',
+  approvalPolicy: {},
 }
 
 export const mockSessions: Session[] = [
@@ -24,8 +24,8 @@ export const mockSessions: Session[] = [
     lastActiveAt: '2026-01-03T00:00:00Z',
     messageCount: 20,
     tokenUsage: { input: 3000, output: 1500 },
-    trustLevel: 'full_trust',
-    approvalPolicy: 'full_trust',
+    trustLevel: 'elevated',
+    approvalPolicy: {},
   },
   {
     id: 'sess-003',
@@ -36,7 +36,7 @@ export const mockSessions: Session[] = [
     lastActiveAt: '2026-01-04T12:00:00Z',
     messageCount: 8,
     tokenUsage: { input: 800, output: 400 },
-    trustLevel: 'always_ask',
-    approvalPolicy: 'always_ask',
+    trustLevel: 'low',
+    approvalPolicy: { execute_command: 'always_ask' },
   },
 ]

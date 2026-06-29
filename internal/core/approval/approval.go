@@ -114,9 +114,10 @@ type UserPolicyStore interface {
 }
 
 type Manager struct {
-	mu              sync.RWMutex
-	requests        map[string]*ApprovalRequest
-	userPolicyStore UserPolicyStore
+	mu               sync.RWMutex
+	requests         map[string]*ApprovalRequest
+	userPolicyStore  UserPolicyStore
+	userGlobalPolicy map[OperationType]PolicyLevel
 }
 
 func NewManager() *Manager {
@@ -136,6 +137,22 @@ func (m *Manager) SetUserPolicyStore(store UserPolicyStore) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.userPolicyStore = store
+}
+
+func (m *Manager) SetUserGlobalPolicy(policy map[OperationType]PolicyLevel) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.userGlobalPolicy = policy
+}
+
+func (m *Manager) GetUserGlobalPolicy() map[OperationType]PolicyLevel {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make(map[OperationType]PolicyLevel, len(m.userGlobalPolicy))
+	for k, v := range m.userGlobalPolicy {
+		result[k] = v
+	}
+	return result
 }
 
 func (m *Manager) CreateRequest(sessionID, toolCallID string, opType OperationType, riskLevel RiskLevel, details map[string]any) *ApprovalRequest {
@@ -259,9 +276,25 @@ func (m *Manager) GetPendingRequest(sessionID string) *ApprovalRequest {
 	return nil
 }
 
-func (m *Manager) ResolveEffectivePolicy(sessionPolicy map[OperationType]PolicyLevel, operationType OperationType) PolicyLevel {
+func (m *Manager) ResolveEffectivePolicy(sessionPolicy map[OperationType]PolicyLevel, projectPolicy map[OperationType]PolicyLevel, operationType OperationType) PolicyLevel {
 	if sessionPolicy != nil {
 		if policy, ok := sessionPolicy[operationType]; ok {
+			return policy
+		}
+	}
+
+	if projectPolicy != nil {
+		if policy, ok := projectPolicy[operationType]; ok {
+			return policy
+		}
+	}
+
+	m.mu.RLock()
+	globalPolicy := m.userGlobalPolicy
+	m.mu.RUnlock()
+
+	if globalPolicy != nil {
+		if policy, ok := globalPolicy[operationType]; ok {
 			return policy
 		}
 	}

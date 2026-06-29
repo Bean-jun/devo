@@ -10,6 +10,7 @@ const uiStore = useUiStore()
 const isRenaming = ref(false)
 const renameValue = ref('')
 const renameInputRef = ref<HTMLInputElement>()
+const yoloLoading = ref(false)
 
 const sessionName = computed(() => sessionStore.currentSession?.title ?? '未连接')
 const statusLabel = computed(() => STATUS_LABELS[sessionStore.sessionStatus] ?? '空闲')
@@ -56,6 +57,19 @@ function toggleTheme(event: MouseEvent) {
   uiStore.toggleThemeWithTransition(x, y)
 }
 
+async function toggleYolo() {
+  yoloLoading.value = true
+  try {
+    await sessionStore.toggleYolo()
+    const label = sessionStore.yoloEnabled ? 'YOLO 模式已开启' : 'YOLO 模式已关闭'
+    uiStore.showToast('success', label)
+  } catch {
+    uiStore.showToast('error', 'YOLO 切换失败')
+  } finally {
+    yoloLoading.value = false
+  }
+}
+
 const connectionStatusText = computed(() => {
   switch (uiStore.connectionStatus) {
     case 'connected': return '已连接'
@@ -76,7 +90,7 @@ const serverPort = computed(() => window.location.port)
 </script>
 
 <template>
-  <header v-if="sessionStore.currentSession" class="statusbar">
+  <header v-if="sessionStore.currentSession" class="statusbar" :class="{ yolo: sessionStore.yoloEnabled }">
     <div class="statusbar-left">
       <input
         v-if="isRenaming"
@@ -96,6 +110,16 @@ const serverPort = computed(() => window.location.port)
         <span class="status-dot" :style="{ background: statusColor }"></span>
         {{ statusLabel }}
       </span>
+      <button
+        class="yolo-toggle"
+        :class="{ active: sessionStore.yoloEnabled }"
+        :title="sessionStore.yoloEnabled ? 'YOLO 模式已开启 - 点击关闭' : 'YOLO 模式 - 点击开启自动批准'"
+        :disabled="yoloLoading"
+        @click="toggleYolo"
+      >
+        <span class="yolo-icon">{{ yoloLoading ? '⏳' : '🔥' }}</span>
+        <span class="yolo-label" :class="{ on: sessionStore.yoloEnabled }">YOLO</span>
+      </button>
       <span v-if="workingDir" class="working-dir" :title="workingDir">
         {{ workingDir }}
       </span>
@@ -236,5 +260,69 @@ const serverPort = computed(() => window.location.port)
 .theme-toggle:hover {
   background: var(--color-bg-hover);
   border-color: var(--color-border);
+}
+
+.statusbar.yolo {
+  background: linear-gradient(90deg, rgba(255, 149, 0, 0.12), rgba(255, 149, 0, 0.04) 40%, var(--color-bg-secondary) 80%);
+}
+
+.yolo-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  transition: all var(--transition-fast);
+  opacity: 0.7;
+}
+
+.yolo-toggle:hover {
+  opacity: 1;
+  border-color: var(--color-text-tertiary);
+}
+
+.yolo-toggle.active {
+  opacity: 1;
+  border-color: #ff9500;
+  background: rgba(255, 149, 0, 0.15);
+  animation: yolo-pulse 2s ease-in-out infinite;
+}
+
+.yolo-toggle.active:hover {
+  border-color: #ff9500;
+  background: rgba(255, 149, 0, 0.22);
+}
+
+.yolo-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.yolo-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.yolo-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--color-text-tertiary);
+  transition: color var(--transition-fast);
+}
+
+.yolo-label.on {
+  color: #ff9500;
+}
+
+@keyframes yolo-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 149, 0, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(255, 149, 0, 0); }
 }
 </style>

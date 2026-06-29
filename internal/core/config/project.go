@@ -11,8 +11,9 @@ import (
 const configFileName = "config.json"
 
 type ProjectConfig struct {
-	Skills []string `json:"skills"`
-	MCP    []string `json:"mcp"`
+	Skills         []string          `json:"skills"`
+	MCP            []string          `json:"mcp"`
+	ApprovalPolicy map[string]string `json:"approval_policy,omitempty"`
 }
 
 func Load(projectDir string) (*ProjectConfig, error) {
@@ -45,16 +46,28 @@ func Save(projectDir string, cfg *ProjectConfig) error {
 		_ = json.Unmarshal(data, &existing)
 	}
 
-	skillsData, err := json.Marshal(cfg.Skills)
-	if err != nil {
-		return fmt.Errorf("marshal skills: %w", err)
+	if cfg.Skills != nil {
+		skillsData, err := json.Marshal(cfg.Skills)
+		if err != nil {
+			return fmt.Errorf("marshal skills: %w", err)
+		}
+		existing["skills"] = skillsData
 	}
-	mcpData, err := json.Marshal(cfg.MCP)
-	if err != nil {
-		return fmt.Errorf("marshal mcp: %w", err)
+	if cfg.MCP != nil {
+		mcpData, err := json.Marshal(cfg.MCP)
+		if err != nil {
+			return fmt.Errorf("marshal mcp: %w", err)
+		}
+		existing["mcp"] = mcpData
 	}
-	existing["skills"] = skillsData
-	existing["mcp"] = mcpData
+
+	if cfg.ApprovalPolicy != nil {
+		approvalData, err := json.Marshal(cfg.ApprovalPolicy)
+		if err != nil {
+			return fmt.Errorf("marshal approval_policy: %w", err)
+		}
+		existing["approval_policy"] = approvalData
+	}
 
 	data, err := json.MarshalIndent(existing, "", "  ")
 	if err != nil {

@@ -165,6 +165,7 @@ type listSessionsItem struct {
 	MessageCount         int                `json:"message_count"`
 	TokenUsage           session.TokenUsage `json:"token_usage"`
 	CurrentContextTokens int                `json:"current_context_tokens"`
+	TrustLevel           string             `json:"trust_level"`
 }
 
 type listSessionsResponse struct {
@@ -216,6 +217,7 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 			MessageCount:         s.MessageCount,
 			TokenUsage:           s.TokenUsage,
 			CurrentContextTokens: s.CurrentContextTokens,
+			TrustLevel:           string(s.TrustLevel),
 		}
 	}
 

@@ -8,14 +8,15 @@ import (
 )
 
 type getProjectConfigResponse struct {
-	Skills []string `json:"skills"`
-	MCP    []string `json:"mcp"`
+	Skills         []string          `json:"skills"`
+	MCP            []string          `json:"mcp"`
+	ApprovalPolicy map[string]string `json:"approval_policy"`
 }
 
 func (h *Handler) GetProjectConfig(w http.ResponseWriter, r *http.Request) {
 	wd := h.projectDir
 	if wd == "" {
-		writeJSON(w, http.StatusOK, getProjectConfigResponse{Skills: []string{}, MCP: []string{}})
+		writeJSON(w, http.StatusOK, getProjectConfigResponse{Skills: []string{}, MCP: []string{}, ApprovalPolicy: map[string]string{}})
 		return
 	}
 
@@ -26,19 +27,26 @@ func (h *Handler) GetProjectConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if cfg == nil {
-		writeJSON(w, http.StatusOK, getProjectConfigResponse{Skills: []string{}, MCP: []string{}})
+		writeJSON(w, http.StatusOK, getProjectConfigResponse{Skills: []string{}, MCP: []string{}, ApprovalPolicy: map[string]string{}})
 		return
 	}
 
+	approvalPolicy := cfg.ApprovalPolicy
+	if approvalPolicy == nil {
+		approvalPolicy = map[string]string{}
+	}
+
 	writeJSON(w, http.StatusOK, getProjectConfigResponse{
-		Skills: cfg.Skills,
-		MCP:    cfg.MCP,
+		Skills:         cfg.Skills,
+		MCP:            cfg.MCP,
+		ApprovalPolicy: approvalPolicy,
 	})
 }
 
 type setProjectConfigRequest struct {
-	Skills []string `json:"skills"`
-	MCP    []string `json:"mcp"`
+	Skills         []string          `json:"skills"`
+	MCP            []string          `json:"mcp"`
+	ApprovalPolicy map[string]string `json:"approval_policy"`
 }
 
 func (h *Handler) SetProjectConfig(w http.ResponseWriter, r *http.Request) {
@@ -60,8 +68,9 @@ func (h *Handler) SetProjectConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := &config.ProjectConfig{
-		Skills: req.Skills,
-		MCP:    req.MCP,
+		Skills:         req.Skills,
+		MCP:            req.MCP,
+		ApprovalPolicy: req.ApprovalPolicy,
 	}
 
 	if err := config.Save(wd, cfg); err != nil {

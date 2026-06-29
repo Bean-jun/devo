@@ -40,6 +40,7 @@ type App struct {
 	addr         string
 	baseURL      string
 	port         int
+	devoDir      string
 	tuiMode      bool
 	webMode      bool
 }
@@ -171,7 +172,11 @@ func (a *App) initHandler() {
 		log.Printf("[devo] Project config init warning: %v", err)
 	}
 
+	a.devoDir = defaultDevoDir()
 	a.handler.SetProjectDir(wd)
+	a.handler.SetUserConfigDir(a.devoDir)
+
+	a.loadUserApprovalPolicy()
 }
 
 func (a *App) Run() {
@@ -219,6 +224,10 @@ func (a *App) Shutdown() {
 	if a.store != nil {
 		a.store.Close()
 	}
+}
+
+func (a *App) loadUserApprovalPolicy() {
+	a.handler.LoadUserApprovalPolicy()
 }
 
 func ensureProjectConfig(workingDir string, sm *skills.Manager, mcpMgr *mcp.Manager) error {

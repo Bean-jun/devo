@@ -11,6 +11,20 @@ describe('StatusBar', () => {
   })
 
   it('should render default status', () => {
+    const sessionStore = useSessionStore()
+    sessionStore.currentSession = {
+      id: 'sess-1',
+      title: 'Test',
+      state: 'idle',
+      workingDirectory: '',
+      createdAt: '',
+      lastActiveAt: '',
+      messageCount: 0,
+      tokenUsage: { input: 0, output: 0 },
+      trustLevel: 'normal',
+      approvalPolicy: {},
+    }
+
     const wrapper = mount(StatusBar)
 
     const statusIndicator = wrapper.find('.status-indicator')
@@ -28,8 +42,8 @@ describe('StatusBar', () => {
       lastActiveAt: '',
       messageCount: 0,
       tokenUsage: { input: 0, output: 0 },
-      trustLevel: 'always_ask',
-      approvalPolicy: 'always_ask',
+      trustLevel: 'normal',
+      approvalPolicy: {},
     }
 
     const wrapper = mount(StatusBar)
@@ -40,6 +54,20 @@ describe('StatusBar', () => {
   })
 
   it('should render connection status', () => {
+    const sessionStore = useSessionStore()
+    sessionStore.currentSession = {
+      id: 'sess-1',
+      title: 'Test',
+      state: 'idle',
+      workingDirectory: '',
+      createdAt: '',
+      lastActiveAt: '',
+      messageCount: 0,
+      tokenUsage: { input: 0, output: 0 },
+      trustLevel: 'normal',
+      approvalPolicy: {},
+    }
+
     const uiStore = useUiStore()
     uiStore.setConnectionStatus('connected')
 

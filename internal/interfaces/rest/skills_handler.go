@@ -248,7 +248,7 @@ func (h *Handler) SolidifySession(w http.ResponseWriter, r *http.Request) {
 	for k, v := range sess.ApprovalPolicy {
 		sessionPolicy[approval.OperationType(k)] = approval.PolicyLevel(v)
 	}
-	effectivePolicy := approvalManager.ResolveEffectivePolicy(sessionPolicy, opType)
+	effectivePolicy := approvalManager.ResolveEffectivePolicy(sessionPolicy, nil, opType)
 
 	if approvalManager.IsAutoApproved(effectivePolicy) {
 		skill, err := h.skillsManager.SaveSkill(result.SkillName, result.Content)

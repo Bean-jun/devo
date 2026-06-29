@@ -291,7 +291,7 @@ func TestResolveEffectivePolicy_SessionPolicy(t *testing.T) {
 		OpFileWriteNew: PolicySessionTrust,
 	}
 
-	policy := mgr.ResolveEffectivePolicy(sessionPolicy, OpFileWriteNew)
+	policy := mgr.ResolveEffectivePolicy(sessionPolicy, nil, OpFileWriteNew)
 	if policy != PolicySessionTrust {
 		t.Errorf("expected session_trust, got %s", policy)
 	}
@@ -300,12 +300,12 @@ func TestResolveEffectivePolicy_SessionPolicy(t *testing.T) {
 func TestResolveEffectivePolicy_DefaultFallback(t *testing.T) {
 	mgr := NewManager()
 
-	policy := mgr.ResolveEffectivePolicy(nil, OpExecuteCommand)
+	policy := mgr.ResolveEffectivePolicy(nil, nil, OpExecuteCommand)
 	if policy != PolicyAlwaysAsk {
 		t.Errorf("expected default always_ask for execute_command, got %s", policy)
 	}
 
-	policy = mgr.ResolveEffectivePolicy(nil, OpMemoryUpdate)
+	policy = mgr.ResolveEffectivePolicy(nil, nil, OpMemoryUpdate)
 	if policy != PolicyAutoApprove {
 		t.Errorf("expected default auto_approve for memory_update, got %s", policy)
 	}
@@ -314,7 +314,7 @@ func TestResolveEffectivePolicy_DefaultFallback(t *testing.T) {
 func TestResolveEffectivePolicy_UnknownType(t *testing.T) {
 	mgr := NewManager()
 
-	policy := mgr.ResolveEffectivePolicy(nil, "unknown_type")
+	policy := mgr.ResolveEffectivePolicy(nil, nil, "unknown_type")
 	if policy != PolicyAlwaysAsk {
 		t.Errorf("expected always_ask for unknown type, got %s", policy)
 	}
@@ -345,12 +345,12 @@ func TestResolveEffectivePolicy_FullTrustViaUserStore(t *testing.T) {
 		},
 	})
 
-	policy := mgr.ResolveEffectivePolicy(nil, OpFileWriteNew)
+	policy := mgr.ResolveEffectivePolicy(nil, nil, OpFileWriteNew)
 	if policy != PolicyFullTrust {
 		t.Errorf("expected full_trust from user store, got %s", policy)
 	}
 
-	policy = mgr.ResolveEffectivePolicy(nil, OpExecuteCommand)
+	policy = mgr.ResolveEffectivePolicy(nil, nil, OpExecuteCommand)
 	if policy != PolicyAlwaysAsk {
 		t.Errorf("expected always_ask for non-full-trust type, got %s", policy)
 	}
@@ -368,7 +368,7 @@ func TestResolveEffectivePolicy_SessionPolicyOverridesUserStore(t *testing.T) {
 		OpFileWriteNew: PolicyAlwaysAsk,
 	}
 
-	policy := mgr.ResolveEffectivePolicy(sessionPolicy, OpFileWriteNew)
+	policy := mgr.ResolveEffectivePolicy(sessionPolicy, nil, OpFileWriteNew)
 	if policy != PolicyAlwaysAsk {
 		t.Errorf("session policy should override user store, expected always_ask, got %s", policy)
 	}

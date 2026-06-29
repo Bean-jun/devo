@@ -87,8 +87,15 @@ function selectWorkspace(ws: { id: string; name: string; path: string }) {
     .catch(() => {})
 }
 
-function selectSession(sessionId: string) {
-  sessionStore.switchSessionById(sessionId)
+async function selectSession(sessionId: string) {
+  const ok = await sessionStore.switchSessionById(sessionId)
+  if (ok && sessionStore.currentSession?.workingDirectory) {
+    fetch(`${API_BASE}/current-workspace`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ working_directory: sessionStore.currentSession.workingDirectory }),
+    }).catch(() => {})
+  }
   router.push('/chat')
 }
 

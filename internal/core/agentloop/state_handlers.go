@@ -138,14 +138,21 @@ func (l *Loop) evaluatingResultHandler(ctx context.Context, lc *LoopContext) (Lo
 }
 
 func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
-	assistantMsg := session.Message{
-		ID:        session.GenerateID("msg"),
-		Role:      session.RoleAssistant,
-		ToolCalls: lc.LLMResult.ToolCalls,
-		CreatedAt: time.Now(),
+	if lc.ExecutedToolCallIDs == nil {
+		lc.ExecutedToolCallIDs = make(map[string]bool)
 	}
-	if err := l.store.AddMessage(lc.SessionID, assistantMsg); err != nil {
-		return LoopStateError, fmt.Errorf("add assistant message with tool calls: %w", err)
+
+	if len(lc.ExecutedToolCallIDs) == 0 {
+		assistantMsg := session.Message{
+			ID:        session.GenerateID("msg"),
+			Role:      session.RoleAssistant,
+			Content:   lc.LLMResult.Text,
+			ToolCalls: lc.LLMResult.ToolCalls,
+			CreatedAt: time.Now(),
+		}
+		if err := l.store.AddMessage(lc.SessionID, assistantMsg); err != nil {
+			return LoopStateError, fmt.Errorf("add assistant message with tool calls: %w", err)
+		}
 	}
 
 	sess, _ := l.store.Get(lc.SessionID)
@@ -157,8 +164,13 @@ func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopS
 }
 
 func (l *Loop) executeToolsSerial(ctx context.Context, lc *LoopContext) (LoopState, error) {
+	var pendingApprovals []session.ToolCall
 
 	for _, tc := range lc.LLMResult.ToolCalls {
+		if lc.ExecutedToolCallIDs[tc.ID] {
+			continue
+		}
+
 		select {
 		case <-lc.CancelCh:
 			return LoopStateCancelled, nil
@@ -190,6 +202,7 @@ func (l *Loop) executeToolsSerial(ctx context.Context, lc *LoopContext) (LoopSta
 				"success":   false,
 				"summary":   "no tool executor available",
 			})
+			lc.ExecutedToolCallIDs[tc.ID] = true
 			continue
 		}
 
@@ -214,6 +227,7 @@ func (l *Loop) executeToolsSerial(ctx context.Context, lc *LoopContext) (LoopSta
 				"success":   false,
 				"summary":   "unknown tool: " + tc.ToolName,
 			})
+			lc.ExecutedToolCallIDs[tc.ID] = true
 			continue
 		}
 
@@ -243,32 +257,49 @@ func (l *Loop) executeToolsSerial(ctx context.Context, lc *LoopContext) (LoopSta
 						"success":   false,
 						"summary":   fmt.Sprintf("security error: %v", err),
 					})
+					lc.ExecutedToolCallIDs[tc.ID] = true
 					continue
 				}
 			}
 
 			sess, _ := l.store.Get(lc.SessionID)
 			opType := l.determineOperationType(tool, sess.WorkingDirectory, tc.Params)
-			effectivePolicy := l.resolveEffectivePolicy(sess, approval.OperationType(opType))
 
-			if l.approvalManager.IsAutoApproved(effectivePolicy) {
-				policyLevelStr := string(effectivePolicy)
+			if sess.TrustLevel == string(approval.TrustElevated) {
 				lc.EventBus.Publish("approval_auto", map[string]any{
 					"operation_type": opType,
-					"summary":        fmt.Sprintf("根据策略 %s 自动批准操作 %s", policyLevelStr, opType),
-					"policy_level":   policyLevelStr,
+					"summary":        fmt.Sprintf("YOLO 模式：自动批准操作 %s", opType),
+					"policy_level":   "yolo",
 				})
-
 				systemNote := session.Message{
 					ID:        session.GenerateID("msg"),
 					Role:      session.RoleSystem,
-					Content:   fmt.Sprintf("已根据信任策略（%s）自动批准 %s 操作", policyLevelStr, opType),
+					Content:   fmt.Sprintf("🔥 YOLO 模式：自动批准 %s 操作", opType),
 					CreatedAt: time.Now(),
 				}
 				l.store.AddMessage(lc.SessionID, systemNote)
 			} else {
-				lc.PendingToolCall = &tc
-				return LoopStateAwaitingApproval, nil
+				effectivePolicy := l.resolveEffectivePolicy(sess, approval.OperationType(opType))
+
+				if l.approvalManager.IsAutoApproved(effectivePolicy) {
+					policyLevelStr := string(effectivePolicy)
+					lc.EventBus.Publish("approval_auto", map[string]any{
+						"operation_type": opType,
+						"summary":        fmt.Sprintf("根据策略 %s 自动批准操作 %s", policyLevelStr, opType),
+						"policy_level":   policyLevelStr,
+					})
+
+					systemNote := session.Message{
+						ID:        session.GenerateID("msg"),
+						Role:      session.RoleSystem,
+						Content:   fmt.Sprintf("已根据信任策略（%s）自动批准 %s 操作", policyLevelStr, opType),
+						CreatedAt: time.Now(),
+					}
+					l.store.AddMessage(lc.SessionID, systemNote)
+				} else {
+					pendingApprovals = append(pendingApprovals, tc)
+					continue
+				}
 			}
 		}
 
@@ -279,6 +310,11 @@ func (l *Loop) executeToolsSerial(ctx context.Context, lc *LoopContext) (LoopSta
 		if nextState != LoopStateToolExecuting {
 			return nextState, nil
 		}
+	}
+
+	if len(pendingApprovals) > 0 {
+		lc.PendingToolCall = &pendingApprovals[0]
+		return LoopStateAwaitingApproval, nil
 	}
 
 	lc.EventBus.Publish("loop.tool_execution_done", nil)
@@ -324,6 +360,7 @@ func (l *Loop) executeSingleTool(ctx context.Context, lc *LoopContext, tc sessio
 			"summary":   fmt.Sprintf("error: %v", execErr),
 		})
 
+		lc.ExecutedToolCallIDs[tc.ID] = true
 		if l.incrementToolCallCount(lc.SessionID, lc.EventBus) {
 			return LoopStateIdle, nil
 		}
@@ -370,6 +407,7 @@ func (l *Loop) executeSingleTool(ctx context.Context, lc *LoopContext, tc sessio
 
 	l.archiveManager.AppendToolResult(lc.SessionID, tc.ToolName, toolResult.Success, summary)
 
+	lc.ExecutedToolCallIDs[tc.ID] = true
 	if l.incrementToolCallCount(lc.SessionID, lc.EventBus) {
 		return LoopStateIdle, nil
 	}
@@ -379,9 +417,14 @@ func (l *Loop) executeSingleTool(ctx context.Context, lc *LoopContext, tc sessio
 
 func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxConcurrent int) (LoopState, error) {
 	toolCalls := lc.LLMResult.ToolCalls
+	var pendingApprovals []session.ToolCall
 
-	// Pre-check: if any tool needs manual approval, handle it first
+	// Pre-check: identify tool calls that need manual approval
 	for _, tc := range toolCalls {
+		if lc.ExecutedToolCallIDs[tc.ID] {
+			continue
+		}
+
 		select {
 		case <-lc.CancelCh:
 			return LoopStateCancelled, nil
@@ -394,63 +437,132 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 		l.archiveManager.AppendToolCall(lc.SessionID, tc.ToolName, tc.Params)
 
 		if l.toolExecutor == nil {
+			toolResult := &tools.ToolResult{
+				ToolCallID: tc.ID,
+				Success:    false,
+				Content:    "",
+				Error:      "no tool executor available",
+			}
+			toolMsg := l.toolResultToMessage(toolResult)
+			l.store.AddMessage(lc.SessionID, toolMsg)
+			lc.EventBus.Publish("tool_call_request", map[string]any{
+				"tool_name":         tc.ToolName,
+				"params":            tc.Params,
+				"requires_approval": false,
+				"risk_level":        "-",
+			})
+			lc.EventBus.Publish("tool_result", map[string]any{
+				"tool_name": tc.ToolName,
+				"success":   false,
+				"summary":   "no tool executor available",
+			})
+			lc.ExecutedToolCallIDs[tc.ID] = true
 			continue
 		}
+
 		tool, ok := l.toolExecutor.GetTool(tc.ToolName)
 		if !ok {
+			lc.EventBus.Publish("tool_call_request", map[string]any{
+				"tool_name":         tc.ToolName,
+				"params":            tc.Params,
+				"requires_approval": false,
+				"risk_level":        "-",
+			})
+			toolResult := &tools.ToolResult{
+				ToolCallID: tc.ID,
+				Success:    false,
+				Error:      "unknown tool: " + tc.ToolName,
+			}
+			toolMsg := l.toolResultToMessage(toolResult)
+			l.store.AddMessage(lc.SessionID, toolMsg)
+			lc.EventBus.Publish("tool_result", map[string]any{
+				"tool_name": tc.ToolName,
+				"success":   false,
+				"summary":   "unknown tool: " + tc.ToolName,
+			})
+			lc.ExecutedToolCallIDs[tc.ID] = true
 			continue
 		}
 
 		riskLevel := tool.RiskLevel()
 		requiresApproval := riskLevel == tools.RiskLevelMedium || riskLevel == tools.RiskLevelHigh
-		if !requiresApproval {
-			continue
-		}
 
-		// Check if auto-approved
-		sess, _ := l.store.Get(lc.SessionID)
-		opType := l.determineOperationType(tool, sess.WorkingDirectory, tc.Params)
-		effectivePolicy := l.resolveEffectivePolicy(sess, approval.OperationType(opType))
-
-		if l.approvalManager.IsAutoApproved(effectivePolicy) {
-			policyLevelStr := string(effectivePolicy)
-			lc.EventBus.Publish("approval_auto", map[string]any{
-				"operation_type": opType,
-				"summary":        fmt.Sprintf("根据策略 %s 自动批准操作 %s", policyLevelStr, opType),
-				"policy_level":   policyLevelStr,
-			})
-			systemNote := session.Message{
-				ID:        session.GenerateID("msg"),
-				Role:      session.RoleSystem,
-				Content:   fmt.Sprintf("已根据信任策略（%s）自动批准 %s 操作", policyLevelStr, opType),
-				CreatedAt: time.Now(),
-			}
-			l.store.AddMessage(lc.SessionID, systemNote)
-			continue
-		}
-
-		lc.PendingToolCall = &tc
-		return LoopStateAwaitingApproval, nil
-	}
-
-	// Publish tool_call_request events for all tools
-	for _, tc := range toolCalls {
-		riskLevel := tools.RiskLevelLow
-		if l.toolExecutor != nil {
-			if tool, ok := l.toolExecutor.GetTool(tc.ToolName); ok {
-				riskLevel = tool.RiskLevel()
-			}
-		}
-		requiresApproval := riskLevel == tools.RiskLevelMedium || riskLevel == tools.RiskLevelHigh
 		lc.EventBus.Publish("tool_call_request", map[string]any{
 			"tool_name":         tc.ToolName,
 			"params":            tc.Params,
 			"requires_approval": requiresApproval,
 			"risk_level":        string(riskLevel),
 		})
+
+		if requiresApproval {
+			if checker, ok := tool.(tools.PreChecker); ok {
+				if err := checker.PreCheck(tc.Params); err != nil {
+					rejectionMsg := session.Message{
+						ID:         session.GenerateID("msg"),
+						Role:       session.RoleTool,
+						Content:    "安全错误: " + err.Error(),
+						ToolCallID: tc.ID,
+						CreatedAt:  time.Now(),
+					}
+					l.store.AddMessage(lc.SessionID, rejectionMsg)
+					lc.EventBus.Publish("tool_result", map[string]any{
+						"tool_name": tc.ToolName,
+						"success":   false,
+						"summary":   fmt.Sprintf("security error: %v", err),
+					})
+					lc.ExecutedToolCallIDs[tc.ID] = true
+					continue
+				}
+			}
+
+			sess, _ := l.store.Get(lc.SessionID)
+			opType := l.determineOperationType(tool, sess.WorkingDirectory, tc.Params)
+
+			if sess.TrustLevel == string(approval.TrustElevated) {
+				lc.EventBus.Publish("approval_auto", map[string]any{
+					"operation_type": opType,
+					"summary":        fmt.Sprintf("YOLO 模式：自动批准操作 %s", opType),
+					"policy_level":   "yolo",
+				})
+				systemNote := session.Message{
+					ID:        session.GenerateID("msg"),
+					Role:      session.RoleSystem,
+					Content:   fmt.Sprintf("🔥 YOLO 模式：自动批准 %s 操作", opType),
+					CreatedAt: time.Now(),
+				}
+				l.store.AddMessage(lc.SessionID, systemNote)
+			} else {
+				effectivePolicy := l.resolveEffectivePolicy(sess, approval.OperationType(opType))
+
+				if l.approvalManager.IsAutoApproved(effectivePolicy) {
+					policyLevelStr := string(effectivePolicy)
+					lc.EventBus.Publish("approval_auto", map[string]any{
+						"operation_type": opType,
+						"summary":        fmt.Sprintf("根据策略 %s 自动批准操作 %s", policyLevelStr, opType),
+						"policy_level":   policyLevelStr,
+					})
+					systemNote := session.Message{
+						ID:        session.GenerateID("msg"),
+						Role:      session.RoleSystem,
+						Content:   fmt.Sprintf("已根据信任策略（%s）自动批准 %s 操作", policyLevelStr, opType),
+						CreatedAt: time.Now(),
+					}
+					l.store.AddMessage(lc.SessionID, systemNote)
+				} else {
+					pendingApprovals = append(pendingApprovals, tc)
+					continue
+				}
+			}
+		}
 	}
 
-	// Execute all tools in parallel
+	// Build set of pending IDs for quick lookup
+	pendingIDs := make(map[string]bool)
+	for _, tc := range pendingApprovals {
+		pendingIDs[tc.ID] = true
+	}
+
+	// Execute all non-pending, non-executed tools in parallel
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(maxConcurrent)
 
@@ -458,6 +570,10 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 	var tooManyTools bool
 
 	for _, tc := range toolCalls {
+		if lc.ExecutedToolCallIDs[tc.ID] || pendingIDs[tc.ID] {
+			continue
+		}
+
 		tc := tc
 		g.Go(func() error {
 			select {
@@ -511,6 +627,7 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 					"summary":   fmt.Sprintf("error: %v", execErr),
 				})
 
+				lc.ExecutedToolCallIDs[tc.ID] = true
 				if l.incrementToolCallCount(lc.SessionID, lc.EventBus) {
 					tooManyTools = true
 				}
@@ -558,6 +675,7 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 
 			l.archiveManager.AppendToolResult(lc.SessionID, tc.ToolName, toolResult.Success, summary)
 
+			lc.ExecutedToolCallIDs[tc.ID] = true
 			if l.incrementToolCallCount(lc.SessionID, lc.EventBus) {
 				tooManyTools = true
 			}
@@ -577,6 +695,11 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 		default:
 		}
 		return LoopStateError, fmt.Errorf("parallel tool execution: %w", err)
+	}
+
+	if len(pendingApprovals) > 0 {
+		lc.PendingToolCall = &pendingApprovals[0]
+		return LoopStateAwaitingApproval, nil
 	}
 
 	if tooManyTools {
@@ -689,7 +812,7 @@ func (l *Loop) awaitingApprovalHandler(ctx context.Context, lc *LoopContext) (Lo
 			if nextState == LoopStateIdle {
 				return LoopStateIdle, nil
 			}
-			return LoopStatePreparing, nil
+			return LoopStateToolExecuting, nil
 		}
 
 		sess, err := l.store.Get(lc.SessionID)

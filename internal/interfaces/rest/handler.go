@@ -22,6 +22,7 @@ type Handler struct {
 	mcpManager    *mcp.Manager
 	version       string
 	projectDir    string
+	userConfigDir string
 	llmConfigured bool
 }
 
@@ -35,6 +36,10 @@ func (h *Handler) SetMcpManager(mgr *mcp.Manager) {
 
 func (h *Handler) SetSkillsManager(sm *skills.Manager) {
 	h.skillsManager = sm
+}
+
+func (h *Handler) SetUserConfigDir(dir string) {
+	h.userConfigDir = dir
 }
 
 func (h *Handler) SetProjectDir(dir string) {
@@ -69,6 +74,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sessions/{id}/approve/{approval_id}", h.Approve)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/trust", h.SetTrustLevel)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/approval-policy", h.SetApprovalPolicy)
+
+	// 全局有效
+	mux.HandleFunc("GET /api/v1/user/approval-policy", h.GetUserApprovalPolicy)
+	mux.HandleFunc("PUT /api/v1/user/approval-policy", h.SetUserApprovalPolicy)
 
 	mux.HandleFunc("POST /api/v1/sessions/{id}/cancel", h.Cancel)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/pause", h.Pause)

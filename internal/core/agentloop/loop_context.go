@@ -21,6 +21,8 @@ type LoopContext struct {
 	PendingToolResult *tools.ToolResult
 	ApprovalCh        chan ApprovalDecision
 
+	ExecutedToolCallIDs map[string]bool
+
 	CancelCh chan struct{}
 	PauseCh  chan struct{}
 	ResumeCh chan struct{}

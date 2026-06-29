@@ -10,6 +10,11 @@ import (
 )
 
 func defaultDBPath() string {
+	devoDir := defaultDevoDir()
+	return filepath.Join(devoDir, "devo.db")
+}
+
+func defaultDevoDir() string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatalf("[devo] Failed to get home directory: %v", err)
@@ -18,7 +23,7 @@ func defaultDBPath() string {
 	if err := os.MkdirAll(devoDir, 0755); err != nil {
 		log.Fatalf("[devo] Failed to create .devo directory: %v", err)
 	}
-	return filepath.Join(devoDir, "devo.db")
+	return devoDir
 }
 
 func findFreePort() (int, error) {

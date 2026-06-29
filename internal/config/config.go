@@ -15,9 +15,10 @@ type LLMConfig struct {
 }
 
 type Config struct {
-	LLM     LLMConfig `json:"llm"`
-	DBPath  string    `json:"db_path,omitempty"`
-	LogPath string    `json:"log_path,omitempty"`
+	LLM            LLMConfig         `json:"llm"`
+	DBPath         string            `json:"db_path,omitempty"`
+	LogPath        string            `json:"log_path,omitempty"`
+	ApprovalPolicy map[string]string `json:"approval_policy,omitempty"`
 }
 
 func Load() (*Config, error) {
