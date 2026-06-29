@@ -452,8 +452,8 @@ func TestAwaitingApprovalHandler_Approved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
-	if nextState != LoopStatePreparing {
-		t.Errorf("expected next state Preparing, got %s", nextState)
+	if nextState != LoopStateToolExecuting {
+		t.Errorf("expected next state ToolExecuting, got %s", nextState)
 	}
 }
 

@@ -82,7 +82,8 @@ func (t *ListFilesTool) Execute(workingDir string, params map[string]interface{}
 	var result strings.Builder
 	count := 0
 
-	err = walkDir(&result, absWorkDir, safePath, ".", maxDepth, 0, maxFiles, &count)
+	gi := pathsec.LoadGitignore(workingDir)
+	err = walkDir(&result, absWorkDir, safePath, ".", maxDepth, 0, maxFiles, &count, gi)
 	if err != nil {
 		return "", err
 	}
@@ -94,7 +95,7 @@ func (t *ListFilesTool) Execute(workingDir string, params map[string]interface{}
 	return result.String(), nil
 }
 
-func walkDir(result *strings.Builder, absWorkDir, currentPath, displayPrefix string, maxDepth, currentDepth, maxFiles int, count *int) error {
+func walkDir(result *strings.Builder, absWorkDir, currentPath, displayPrefix string, maxDepth, currentDepth, maxFiles int, count *int, gi *pathsec.Gitignore) error {
 	if currentDepth > maxDepth {
 		return nil
 	}
@@ -113,6 +114,10 @@ func walkDir(result *strings.Builder, absWorkDir, currentPath, displayPrefix str
 	for _, e := range entries {
 		name := e.Name()
 		if name == ".git" || strings.HasPrefix(name, ".") {
+			continue
+		}
+		relPath, _ := filepath.Rel(absWorkDir, filepath.Join(currentPath, name))
+		if gi.IsIgnored(relPath, e.IsDir()) {
 			continue
 		}
 		sorted = append(sorted, entry{name: name, isDir: e.IsDir()})
@@ -140,7 +145,7 @@ func walkDir(result *strings.Builder, absWorkDir, currentPath, displayPrefix str
 		if e.isDir && currentDepth < maxDepth {
 			subPath := filepath.Join(currentPath, e.name)
 			subDisplay := filepath.Join(displayPrefix, e.name)
-			walkDir(result, absWorkDir, subPath, subDisplay, maxDepth, currentDepth+1, maxFiles, count)
+			walkDir(result, absWorkDir, subPath, subDisplay, maxDepth, currentDepth+1, maxFiles, count, gi)
 		}
 	}
 

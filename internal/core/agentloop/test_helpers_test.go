@@ -13,11 +13,12 @@ import (
 func newTestLoopContext(sessionID string, store session.SessionStore) *LoopContext {
 	eventBus, _ := store.GetEventBus(sessionID)
 	return &LoopContext{
-		SessionID: sessionID,
-		EventBus:  eventBus,
-		CancelCh:  make(chan struct{}, 1),
-		PauseCh:   make(chan struct{}, 1),
-		ResumeCh:  make(chan struct{}, 1),
+		SessionID:           sessionID,
+		EventBus:            eventBus,
+		CancelCh:            make(chan struct{}, 1),
+		PauseCh:             make(chan struct{}, 1),
+		ResumeCh:            make(chan struct{}, 1),
+		ExecutedToolCallIDs: make(map[string]bool),
 	}
 }
 

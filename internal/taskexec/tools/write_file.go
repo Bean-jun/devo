@@ -102,6 +102,12 @@ func (t *WriteFileTool) Execute(workingDir string, params map[string]interface{}
 		return "", fmt.Errorf("path security check failed")
 	}
 
+	gi := pathsec.LoadGitignore(workingDir)
+	relPath, _ := filepath.Rel(workingDir, safePath)
+	if gi.IsIgnored(relPath, false) {
+		return "", fmt.Errorf("file is excluded by .gitignore: %s", path)
+	}
+
 	_, statErr := os.Stat(safePath)
 	isNew := statErr != nil
 
@@ -182,6 +188,12 @@ func (t *EditFileTool) Execute(workingDir string, params map[string]interface{})
 	safePath, err := pathsec.CheckPath(workingDir, path)
 	if err != nil {
 		return "", fmt.Errorf("path security check failed")
+	}
+
+	gi := pathsec.LoadGitignore(workingDir)
+	relPath, _ := filepath.Rel(workingDir, safePath)
+	if gi.IsIgnored(relPath, false) {
+		return "", fmt.Errorf("file is excluded by .gitignore: %s", path)
 	}
 
 	switch mode {

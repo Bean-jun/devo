@@ -65,6 +65,8 @@ func (t *SearchCodebaseTool) Execute(workingDir string, params map[string]interf
 		}
 	}
 
+	gi := pathsec.LoadGitignore(workingDir)
+
 	maxResults := 50
 	var results []string
 	absWorkDir, _ := filepath.Abs(workingDir)
@@ -79,6 +81,10 @@ func (t *SearchCodebaseTool) Execute(workingDir string, params map[string]interf
 			if name == ".git" || strings.HasPrefix(name, ".") {
 				return filepath.SkipDir
 			}
+			relPath, _ := filepath.Rel(absWorkDir, path)
+			if gi.IsIgnored(relPath, true) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
@@ -86,9 +92,13 @@ func (t *SearchCodebaseTool) Execute(workingDir string, params map[string]interf
 			return filepath.SkipAll
 		}
 
-		relPath, err := filepath.Rel(absWorkDir, path)
-		if err != nil {
-			relPath = path
+		relPath, _ := filepath.Rel(absWorkDir, path)
+		if gi.IsIgnored(relPath, false) {
+			return nil
+		}
+
+		if isBinaryFile(info) {
+			return nil
 		}
 
 		data, err := os.ReadFile(path)
@@ -122,4 +132,21 @@ func (t *SearchCodebaseTool) Execute(workingDir string, params map[string]interf
 	}
 
 	return strings.Join(results, "\n"), nil
+}
+
+func isBinaryFile(info os.FileInfo) bool {
+	ext := strings.ToLower(filepath.Ext(info.Name()))
+	switch ext {
+	case ".exe", ".dll", ".so", ".dylib", ".bin", ".dat",
+		".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar",
+		".vsix", ".vsixmanifest",
+		".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg",
+		".mp3", ".mp4", ".avi", ".mov", ".wav", ".ogg",
+		".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+		".ttf", ".otf", ".woff", ".woff2", ".eot",
+		".pyc", ".class", ".jar", ".war",
+		".wasm", ".o", ".a", ".lib", ".obj":
+		return true
+	}
+	return false
 }

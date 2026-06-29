@@ -120,15 +120,21 @@ func TestMultiTurnConversation(t *testing.T) {
 
 	_, ok := waitForEvent(ch, "session_state_change", 2*time.Second)
 	if !ok {
+		t.Fatal("timed out waiting for first round to start")
+	}
+	_, ok = waitForEvent(ch, "session_state_change", 2*time.Second)
+	if !ok {
 		t.Fatal("timed out waiting for first round to complete")
 	}
-
-	time.Sleep(50 * time.Millisecond)
 
 	if err := loop.ProcessMessage(context.Background(), "sess-1", "Second message"); err != nil {
 		t.Fatalf("second message: %v", err)
 	}
 
+	_, ok = waitForEvent(ch, "session_state_change", 2*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for second round to start")
+	}
 	_, ok = waitForEvent(ch, "session_state_change", 2*time.Second)
 	if !ok {
 		t.Fatal("timed out waiting for second round to complete")
@@ -167,7 +173,11 @@ func TestStateTransitions(t *testing.T) {
 
 	_, ok := waitForEvent(ch, "session_state_change", 2*time.Second)
 	if !ok {
-		t.Fatal("timed out waiting for session_state_change")
+		t.Fatal("timed out waiting for session_state_change (start)")
+	}
+	_, ok = waitForEvent(ch, "session_state_change", 2*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for session_state_change (complete)")
 	}
 
 	sess, _ = store.Get("sess-1")

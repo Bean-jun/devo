@@ -3,6 +3,7 @@ package tools
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"devo/internal/taskexec/pathsec"
 )
@@ -43,6 +44,12 @@ func (t *ReadFileTool) Execute(workingDir string, params map[string]interface{})
 	safePath, err := pathsec.CheckPath(workingDir, path)
 	if err != nil {
 		return "", fmt.Errorf("path security check failed")
+	}
+
+	gi := pathsec.LoadGitignore(workingDir)
+	relPath, _ := filepath.Rel(workingDir, safePath)
+	if gi.IsIgnored(relPath, false) {
+		return "", fmt.Errorf("file is excluded by .gitignore: %s", path)
 	}
 
 	info, err := os.Stat(safePath)

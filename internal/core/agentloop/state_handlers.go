@@ -129,6 +129,7 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 
 func (l *Loop) evaluatingResultHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
 	if len(lc.LLMResult.ToolCalls) > 0 {
+		lc.ExecutedToolCallIDs = make(map[string]bool)
 		lc.EventBus.Publish("loop.result_evaluated", map[string]string{"type": "tool_calls"})
 		return LoopStateToolExecuting, nil
 	}
