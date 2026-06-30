@@ -88,6 +88,15 @@ func NewWithTools(store session.SessionStore, llmClient llmclient.Client, toolEx
 	return l
 }
 
+func (l *Loop) EstimateInitialContextTokens(sess *session.Session) int {
+	systemPrompt := l.promptAssembler.Assemble(sess)
+	tokens := tokenmeter.EstimateTokens(systemPrompt)
+	if l.toolExecutor != nil {
+		tokens += tools.EstimateToolTokens(l.toolExecutor.ListTools())
+	}
+	return tokens
+}
+
 func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) error {
 	sess, err := l.store.Get(sessionID)
 	if err != nil {

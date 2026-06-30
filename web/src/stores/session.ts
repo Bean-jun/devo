@@ -60,6 +60,7 @@ export const useSessionStore = defineStore('session', () => {
         trustLevel: data.trust_level || 'normal',
         approvalPolicy: data.approval_policy || {},
         maxContextTokens: data.max_context_tokens,
+        currentContextTokens: data.current_context_tokens,
       }
       currentSession.value = session
       sessions.value.unshift(session)

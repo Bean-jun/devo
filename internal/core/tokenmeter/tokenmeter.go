@@ -65,3 +65,19 @@ func EstimateCost(totalTokens int) string {
 	cost := float64(totalTokens) / 1000.0 * costPer1K
 	return fmt.Sprintf("$%.4f", cost)
 }
+
+func EstimateTokens(s string) int {
+	asciiChars, cjkChars := 0, 0
+	for _, r := range s {
+		if (r >= 0x4E00 && r <= 0x9FFF) ||
+			(r >= 0x3400 && r <= 0x4DBF) ||
+			(r >= 0x20000 && r <= 0x2A6DF) ||
+			(r >= 0x3040 && r <= 0x30FF) ||
+			(r >= 0xAC00 && r <= 0xD7AF) {
+			cjkChars++
+		} else {
+			asciiChars++
+		}
+	}
+	return asciiChars/3 + cjkChars
+}

@@ -2,10 +2,12 @@ package compressor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"devo/internal/core/session"
+	"devo/internal/core/tokenmeter"
 	"devo/internal/taskexec/llmclient"
 )
 
@@ -213,8 +215,16 @@ func (c *Compressor) generateSummary(ctx context.Context, msgs []session.Message
 func estimateTokens(msgs []session.Message) int {
 	total := 0
 	for _, msg := range msgs {
-		total += len(msg.Content) / 4
-		total += len(msg.ID) / 4
+		total += tokenmeter.EstimateTokens(msg.Content)
+		total += tokenmeter.EstimateTokens(msg.ID)
+		total += tokenmeter.EstimateTokens(msg.ToolCallID)
+		for _, tc := range msg.ToolCalls {
+			total += tokenmeter.EstimateTokens(tc.ID)
+			total += tokenmeter.EstimateTokens(tc.ToolName)
+			if paramsJSON, err := json.Marshal(tc.Params); err == nil {
+				total += tokenmeter.EstimateTokens(string(paramsJSON))
+			}
+		}
 	}
 	return total
 }
@@ -222,10 +232,6 @@ func estimateTokens(msgs []session.Message) int {
 func EstimateContextTokens(msgs []session.Message, compressionState *session.CompressionState) int {
 	activeMsgs := FilterActiveMessages(msgs, compressionState)
 	return estimateTokens(activeMsgs)
-}
-
-func EstimateStringTokens(s string) int {
-	return len(s) / 4
 }
 
 func FilterActiveMessages(msgs []session.Message, compressionState *session.CompressionState) []session.Message {

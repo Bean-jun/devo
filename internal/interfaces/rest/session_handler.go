@@ -76,6 +76,7 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 		ApprovalTimeoutSeconds: timeoutSeconds,
 		SystemPromptOverride:   req.SystemPromptOverride,
 	}
+	sess.CurrentContextTokens = h.loop.EstimateInitialContextTokens(sess)
 
 	if err := h.store.Create(sess); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")

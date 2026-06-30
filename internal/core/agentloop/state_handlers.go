@@ -10,6 +10,7 @@ import (
 	"devo/internal/core/approval"
 	"devo/internal/core/compressor"
 	"devo/internal/core/session"
+	"devo/internal/core/tokenmeter"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
 
@@ -37,7 +38,7 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 	}
 
 	dynamicPrompt := l.promptAssembler.Assemble(sess)
-	systemPromptTokens := compressor.EstimateStringTokens(dynamicPrompt)
+	systemPromptTokens := tokenmeter.EstimateTokens(dynamicPrompt)
 
 	if result, err := l.compressor.Compress(ctx, lc.SessionID, lc.EventBus, systemPromptTokens); err != nil {
 		return LoopStateError, fmt.Errorf("compress: %w", err)
@@ -57,6 +58,9 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 	activeMsgs := compressor.FilterActiveMessages(msgs, sess.CompressionState)
 
 	currentContextTokens := compressor.EstimateContextTokens(msgs, sess.CompressionState) + systemPromptTokens
+	if l.toolExecutor != nil {
+		currentContextTokens += tools.EstimateToolTokens(l.toolExecutor.ListTools())
+	}
 	if currentContextTokens != sess.CurrentContextTokens {
 		sess.CurrentContextTokens = currentContextTokens
 		if err := l.store.Update(sess); err != nil {

@@ -1,6 +1,10 @@
 package tools
 
-import "context"
+import (
+	"context"
+	"devo/internal/core/tokenmeter"
+	"encoding/json"
+)
 
 type RiskLevel string
 
@@ -69,6 +73,18 @@ func (r *Registry) ListTools() []Tool {
 		result = append(result, t)
 	}
 	return result
+}
+
+func EstimateToolTokens(toolList []Tool) int {
+	total := 0
+	for _, t := range toolList {
+		total += tokenmeter.EstimateTokens(t.Name())
+		total += tokenmeter.EstimateTokens(t.Description())
+		if paramsJSON, err := json.Marshal(t.ParamsSchema()); err == nil {
+			total += tokenmeter.EstimateTokens(string(paramsJSON))
+		}
+	}
+	return total
 }
 
 func (r *Registry) Execute(workingDir string, toolName string, params map[string]interface{}) (*ToolResult, error) {
