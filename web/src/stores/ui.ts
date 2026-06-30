@@ -22,7 +22,6 @@ export type RightTabType =
   | 'memory'
   | 'dashboard'
   | 'settings'
-  | 'terminal'
 
 export interface WorkspaceEntry {
   id: string

@@ -29,13 +29,21 @@ export const useMemoryStore = defineStore('memory', () => {
     }
     isLoading.value = true
     try {
-      const url = type
-        ? `${API_BASE}/sessions/${sessionId}/memory?type=${type}`
-        : `${API_BASE}/sessions/${sessionId}/memory?type=user`
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(`Failed to fetch memories: ${res.status}`)
-      const data = await res.json()
-      memories.value = data.memories || []
+      if (type) {
+        const url = `${API_BASE}/sessions/${sessionId}/memory?type=${type}`
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`Failed to fetch memories: ${res.status}`)
+        const data = await res.json()
+        memories.value = data.memories || []
+      } else {
+        const [userRes, projRes] = await Promise.all([
+          fetch(`${API_BASE}/sessions/${sessionId}/memory?type=user`),
+          fetch(`${API_BASE}/sessions/${sessionId}/memory?type=project`),
+        ])
+        const userData = userRes.ok ? await userRes.json() : { memories: [] }
+        const projData = projRes.ok ? await projRes.json() : { memories: [] }
+        memories.value = [...(userData.memories || []), ...(projData.memories || [])]
+      }
     } catch (e) {
       console.error('获取记忆列表失败', e)
     } finally {

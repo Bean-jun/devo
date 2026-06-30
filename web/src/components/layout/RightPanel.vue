@@ -10,7 +10,6 @@ const McpPanel = defineAsyncComponent(() => import('@/panels/mcp/McpPanel.vue'))
 const MemoryPanel = defineAsyncComponent(() => import('@/panels/memory/MemoryPanel.vue'))
 const DashboardPanel = defineAsyncComponent(() => import('@/panels/dashboard/DashboardPanel.vue'))
 const SettingsPanel = defineAsyncComponent(() => import('@/panels/settings/SettingsPanel.vue'))
-const TerminalPanel = defineAsyncComponent(() => import('@/panels/terminal/TerminalPanel.vue'))
 
 interface TabDef {
   key: RightTabType
@@ -25,7 +24,6 @@ const allTabs: TabDef[] = [
   { key: 'memory', label: 'Memory', icon: '🧠' },
   { key: 'dashboard', label: 'Dashboard', icon: '📊' },
   { key: 'settings', label: 'Settings', icon: '⚙' },
-  { key: 'terminal', label: 'Terminal', icon: '🖥' },
 ]
 
 function selectTab(tab: TabDef) {
@@ -55,7 +53,6 @@ function selectTab(tab: TabDef) {
       <MemoryPanel v-else-if="uiStore.activeRightTab === 'memory'" />
       <DashboardPanel v-else-if="uiStore.activeRightTab === 'dashboard'" />
       <SettingsPanel v-else-if="uiStore.activeRightTab === 'settings'" />
-      <TerminalPanel v-else-if="uiStore.activeRightTab === 'terminal'" />
     </div>
   </aside>
 </template>
