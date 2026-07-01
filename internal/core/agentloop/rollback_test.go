@@ -241,7 +241,7 @@ func TestRollbackStateResetToIdle(t *testing.T) {
 	loop, store := setupTestLoop()
 	sess := createTestSession(store, "sess-1")
 
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	store.AddMessage("sess-1", session.Message{

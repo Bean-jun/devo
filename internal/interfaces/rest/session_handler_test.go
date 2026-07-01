@@ -279,7 +279,7 @@ func TestListSessionsAll(t *testing.T) {
 		ID:               "sess-list-2",
 		Title:            "List Test 2",
 		WorkingDirectory: tmpDir2,
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		CreatedAt:        time.Now(),
 		LastActiveAt:     time.Now(),
 	})
@@ -324,7 +324,7 @@ func TestListSessionsFilterByStatus(t *testing.T) {
 		ID:               "sess-filter-2",
 		Title:            "Processing Session",
 		WorkingDirectory: tmpDir2,
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		CreatedAt:        time.Now(),
 		LastActiveAt:     time.Now(),
 	})

@@ -10,7 +10,12 @@ export const useSessionStore = defineStore('session', () => {
   const isLoading = ref(false)
   const workingDirectory = ref('')
 
-  const isProcessing = computed(() => currentSession.value?.state?.toLowerCase() === 'processing')
+  const isProcessing = computed(() => {
+    const s = currentSession.value?.state?.toLowerCase()
+    return s === 'processing' || s === 'thinking' || s === 'tool_executing'
+  })
+  const isThinking = computed(() => currentSession.value?.state?.toLowerCase() === 'thinking')
+  const isToolExecuting = computed(() => currentSession.value?.state?.toLowerCase() === 'tool_executing')
   const isAwaitingApproval = computed(() => currentSession.value?.state?.toLowerCase() === 'awaiting_approval')
   const isPaused = computed(() => currentSession.value?.state?.toLowerCase() === 'paused')
   const isArchived = computed(() => currentSession.value?.state?.toLowerCase() === 'archived')
@@ -22,11 +27,11 @@ export const useSessionStore = defineStore('session', () => {
 
   const yoloEnabled = computed(() => currentSession.value?.trustLevel === 'elevated')
 
-  const canPause = computed(() => currentSession.value?.state?.toLowerCase() === 'processing')
+  const canPause = computed(() => currentSession.value?.state?.toLowerCase() === 'tool_executing')
   const canResume = computed(() => currentSession.value?.state?.toLowerCase() === 'paused')
   const canCancel = computed(() => {
     const s = currentSession.value?.state?.toLowerCase()
-    return s === 'processing' || s === 'awaiting_approval'
+    return s === 'thinking' || s === 'tool_executing' || s === 'processing' || s === 'awaiting_approval' || s === 'paused'
   })
 
   function defaultTitle(): string {
@@ -307,6 +312,8 @@ export const useSessionStore = defineStore('session', () => {
     isLoading,
     workingDirectory,
     isProcessing,
+    isThinking,
+    isToolExecuting,
     isAwaitingApproval,
     isPaused,
     isArchived,

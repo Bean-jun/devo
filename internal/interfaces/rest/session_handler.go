@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -130,6 +131,8 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+
+	log.Printf("[DEBUG] GetSession: id=%s, state=%s, snake=%s", id, sess.State, sess.State.ToSnakeCase())
 
 	if err := validateWorkingDirectory(sess); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")

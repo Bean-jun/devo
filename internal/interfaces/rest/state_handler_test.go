@@ -18,7 +18,7 @@ func TestCancel_FromProcessing(t *testing.T) {
 		ID:               "sess-test-1",
 		Title:            "Test",
 		WorkingDirectory: tmpDir,
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 	}
 	store.Create(sess)
 
@@ -121,7 +121,7 @@ func TestPause_FromProcessing(t *testing.T) {
 		ID:               "sess-test-1",
 		Title:            "Test",
 		WorkingDirectory: tmpDir,
-		State:            session.StateProcessing,
+		State:            session.StateToolExecuting,
 	}
 	store.Create(sess)
 
@@ -205,13 +205,13 @@ func TestResume_FromPaused(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["state"] != string(session.StateProcessing.ToSnakeCase()) {
-		t.Errorf("expected state Processing, got %q", result["state"])
+	if result["state"] != string(session.StateToolExecuting.ToSnakeCase()) {
+		t.Errorf("expected state tool_executing, got %q", result["state"])
 	}
 
 	sessGot, _ := store.Get("sess-test-1")
-	if sessGot.State != session.StateProcessing {
-		t.Errorf("expected state Processing in store, got %q", sessGot.State)
+	if sessGot.State != session.StateToolExecuting {
+		t.Errorf("expected state ToolExecuting in store, got %q", sessGot.State)
 	}
 }
 
@@ -292,7 +292,7 @@ func TestComplete_FromProcessing(t *testing.T) {
 		ID:               "sess-test-1",
 		Title:            "Test",
 		WorkingDirectory: tmpDir,
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 	}
 	store.Create(sess)
 

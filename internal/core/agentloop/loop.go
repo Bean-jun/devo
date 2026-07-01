@@ -107,7 +107,7 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		return fmt.Errorf("%w: session is archived", session.ErrSessionArchived)
 	}
 
-	if sess.State == session.StateProcessing || sess.State == session.StateAwaitingApproval {
+	if sess.State == session.StateThinking || sess.State == session.StateToolExecuting || sess.State == session.StateAwaitingApproval {
 		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotIdle, sess.State)
 	}
 
@@ -116,23 +116,23 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 	oldState := string(sess.State)
 
 	if sess.State == session.StatePaused {
-		sess.State = session.StateProcessing
+		sess.State = session.StateThinking
 		sess.LastActiveAt = time.Now()
 		if err := l.store.Update(sess); err != nil {
 			return fmt.Errorf("resume session from paused: %w", err)
 		}
 	} else {
-		sess.State = session.StateProcessing
+		sess.State = session.StateThinking
 		sess.LastActiveAt = time.Now()
 		if err := l.store.Update(sess); err != nil {
-			return fmt.Errorf("update session state to processing: %w", err)
+			return fmt.Errorf("update session state to thinking: %w", err)
 		}
 	}
 
 	if eventBus, err := l.store.GetEventBus(sessionID); err == nil {
 		eventBus.Publish("session_state_change", map[string]any{
 			"old_state": session.State(oldState).ToSnakeCase(),
-			"new_state": session.StateProcessing.ToSnakeCase(),
+			"new_state": session.StateThinking.ToSnakeCase(),
 			"reason":    "user_message",
 		})
 	}
@@ -194,7 +194,7 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		l.stateMachine.Run(context.Background(), lc)
 
 		sess, err := l.store.Get(sessionID)
-		if err == nil {
+		if err == nil && sess.State != session.StatePaused {
 			sess.State = session.StateIdle
 			sess.LastActiveAt = time.Now()
 			l.store.Update(sess)

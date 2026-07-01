@@ -19,7 +19,7 @@ func TestRecoverCrashedSessions_ProcessingToIdle(t *testing.T) {
 		ID:               "sess-processing",
 		Title:            "Processing Session",
 		WorkingDirectory: "/tmp/test-processing",
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		ChildPID:         &pid,
 		CreatedAt:        time.Now(),
 		LastActiveAt:     time.Now(),
@@ -82,7 +82,7 @@ func TestRecoverCrashedSessions_SystemMessageInserted(t *testing.T) {
 		ID:               "sess-sysmsg",
 		Title:            "System Message Test",
 		WorkingDirectory: "/tmp/test-sysmsg",
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		CreatedAt:        time.Now(),
 		LastActiveAt:     time.Now(),
 	}
@@ -173,7 +173,7 @@ func TestRecoverCrashedSessions_MixedStates(t *testing.T) {
 	create := []*session.Session{
 		{
 			ID: "sess-1", Title: "Processing", WorkingDirectory: "/tmp/p1",
-			State: session.StateProcessing, ChildPID: &pid,
+			State: session.StateThinking, ChildPID: &pid,
 			CreatedAt: time.Now(), LastActiveAt: time.Now(),
 		},
 		{
@@ -252,7 +252,7 @@ func TestRecoverCrashedSessions_SSEEventPublished(t *testing.T) {
 		ID:               "sess-event",
 		Title:            "Event Test",
 		WorkingDirectory: "/tmp/test-event",
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		CreatedAt:        time.Now(),
 		LastActiveAt:     time.Now(),
 	}
@@ -277,7 +277,7 @@ func TestRecoverCrashedSessions_SSEEventPublished(t *testing.T) {
 				if data["new_state"] != session.StateIdle.ToSnakeCase() {
 					t.Errorf("expected new_state Idle, got %v", data["new_state"])
 				}
-				if data["old_state"] != session.StateProcessing.ToSnakeCase() {
+				if data["old_state"] != session.StateThinking.ToSnakeCase() {
 					t.Errorf("expected old_state Processing, got %v", data["old_state"])
 				}
 			}
@@ -296,7 +296,7 @@ func TestRecoverCrashedSessions_CanContinueAfterRecovery(t *testing.T) {
 		ID:               "sess-continue",
 		Title:            "Continue Test",
 		WorkingDirectory: "/tmp/test-continue",
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		CreatedAt:        time.Now(),
 		LastActiveAt:     time.Now(),
 	}
@@ -358,7 +358,7 @@ func TestRecoverCrashedSessions_NoChildPID(t *testing.T) {
 		ID:               "sess-nochild",
 		Title:            "No Child PID",
 		WorkingDirectory: "/tmp/test-nochild",
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		ChildPID:         nil,
 		CreatedAt:        time.Now(),
 		LastActiveAt:     time.Now(),
@@ -387,7 +387,7 @@ func TestRecoverCrashedSessions_WithBackgroundPIDs(t *testing.T) {
 		ID:               "sess-bg-crash",
 		Title:            "Background PID Crash",
 		WorkingDirectory: "/tmp/test-bg-crash",
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		ChildPID:         &pid,
 		BackgroundPIDs:   []int{100001, 100002},
 		CreatedAt:        time.Now(),
@@ -420,7 +420,7 @@ func TestRecoverCrashedSessions_InvalidChildPID(t *testing.T) {
 		ID:               "sess-invalid",
 		Title:            "Invalid PID",
 		WorkingDirectory: "/tmp/test-invalid",
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		ChildPID:         &invalidPID,
 		CreatedAt:        time.Now(),
 		LastActiveAt:     time.Now(),
@@ -449,7 +449,7 @@ func TestRecoverCrashedSessions_Pagination(t *testing.T) {
 			ID:               fmt.Sprintf("sess-pag-%d", i),
 			Title:            fmt.Sprintf("Page Test %d", i),
 			WorkingDirectory: fmt.Sprintf("/tmp/pag-%d", i),
-			State:            session.StateProcessing,
+			State:            session.StateThinking,
 			CreatedAt:        time.Now(),
 			LastActiveAt:     time.Now(),
 		}

@@ -13,15 +13,26 @@ func (l *Loop) Pause(sessionID string) error {
 		return fmt.Errorf("get session: %w", err)
 	}
 
-	if sess.State != session.StateProcessing {
+	if sess.State != session.StateToolExecuting {
 		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotProcessing, sess.State)
 	}
 
 	lc, ok := l.activeLoops.Load(sessionID)
 	if !ok {
+		oldState := string(sess.State)
+		sess.State = session.StatePaused
 		sess.PauseRequested = true
 		if err := l.store.Update(sess); err != nil {
 			return fmt.Errorf("update pause flag: %w", err)
+		}
+
+		eventBus, err := l.store.GetEventBus(sessionID)
+		if err == nil {
+			eventBus.Publish("session_state_change", map[string]any{
+				"old_state": session.State(oldState).ToSnakeCase(),
+				"new_state": session.StatePaused.ToSnakeCase(),
+				"reason":    "paused",
+			})
 		}
 		return nil
 	}
@@ -30,6 +41,22 @@ func (l *Loop) Pause(sessionID string) error {
 	select {
 	case loopCtx.PauseCh <- struct{}{}:
 	default:
+	}
+
+	oldState := string(sess.State)
+	sess.State = session.StatePaused
+	sess.LastActiveAt = time.Now()
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update session state to paused: %w", err)
+	}
+
+	eventBus, err := l.store.GetEventBus(sessionID)
+	if err == nil {
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": session.State(oldState).ToSnakeCase(),
+			"new_state": session.StatePaused.ToSnakeCase(),
+			"reason":    "paused",
+		})
 	}
 
 	return nil
@@ -45,23 +72,24 @@ func (l *Loop) Resume(sessionID string) error {
 		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotPaused, sess.State)
 	}
 
+	oldState := string(sess.State)
+	sess.State = session.StateToolExecuting
+	sess.LastActiveAt = time.Now()
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update session state: %w", err)
+	}
+
+	eventBus, err := l.store.GetEventBus(sessionID)
+	if err == nil {
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": session.State(oldState).ToSnakeCase(),
+			"new_state": session.StateToolExecuting.ToSnakeCase(),
+			"reason":    "resumed",
+		})
+	}
+
 	lc, ok := l.activeLoops.Load(sessionID)
 	if !ok {
-		oldState := string(sess.State)
-		sess.State = session.StateProcessing
-		sess.LastActiveAt = time.Now()
-		if err := l.store.Update(sess); err != nil {
-			return fmt.Errorf("update session state: %w", err)
-		}
-
-		eventBus, err := l.store.GetEventBus(sessionID)
-		if err == nil {
-			eventBus.Publish("session_state_change", map[string]any{
-				"old_state": session.State(oldState).ToSnakeCase(),
-				"new_state": session.StateProcessing.ToSnakeCase(),
-				"reason":    "resumed",
-			})
-		}
 		return nil
 	}
 
@@ -80,7 +108,7 @@ func (l *Loop) Cancel(sessionID string) error {
 		return fmt.Errorf("get session: %w", err)
 	}
 
-	if sess.State != session.StateProcessing && sess.State != session.StateAwaitingApproval {
+	if sess.State != session.StateThinking && sess.State != session.StateToolExecuting && sess.State != session.StateAwaitingApproval && sess.State != session.StatePaused {
 		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotCancellable, sess.State)
 	}
 
@@ -101,13 +129,26 @@ func (l *Loop) Cancel(sessionID string) error {
 		l.store.Update(sess)
 	}
 
+	oldState := string(sess.State)
+	sess.State = session.StateIdle
+	sess.CancelRequested = true
+	sess.PauseRequested = false
+	sess.LastActiveAt = time.Now()
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update session state to idle after cancel: %w", err)
+	}
+
+	eventBus, err := l.store.GetEventBus(sessionID)
+	if err == nil {
+		eventBus.Publish("session_state_change", map[string]any{
+			"old_state": session.State(oldState).ToSnakeCase(),
+			"new_state": session.StateIdle.ToSnakeCase(),
+			"reason":    "cancelled",
+		})
+	}
+
 	lc, ok := l.activeLoops.Load(sessionID)
 	if !ok {
-		sess.CancelRequested = true
-		sess.PauseRequested = false
-		if err := l.store.Update(sess); err != nil {
-			return fmt.Errorf("update cancel flag: %w", err)
-		}
 		return nil
 	}
 
@@ -130,7 +171,7 @@ func (l *Loop) Complete(sessionID string) error {
 		return fmt.Errorf("%w: session is archived", session.ErrSessionArchived)
 	}
 
-	if sess.State == session.StateProcessing || sess.State == session.StateAwaitingApproval {
+	if sess.State == session.StateThinking || sess.State == session.StateToolExecuting || sess.State == session.StateAwaitingApproval {
 		childPID := sess.ChildPID
 		bgPIDs := sess.BackgroundPIDs
 

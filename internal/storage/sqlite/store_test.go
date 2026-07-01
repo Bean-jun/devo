@@ -112,7 +112,7 @@ func TestGormStoreUpdate(t *testing.T) {
 	store.Create(sess)
 
 	sess.Title = "Updated Title"
-	sess.State = session.StateProcessing
+	sess.State = session.StateToolExecuting
 
 	err := store.Update(sess)
 	if err != nil {
@@ -123,8 +123,8 @@ func TestGormStoreUpdate(t *testing.T) {
 	if got.Title != "Updated Title" {
 		t.Errorf("expected Title %q, got %q", "Updated Title", got.Title)
 	}
-	if got.State != session.StateProcessing {
-		t.Errorf("expected State %q, got %q", session.StateProcessing, got.State)
+	if got.State != session.StateToolExecuting {
+		t.Errorf("expected State %q, got %q", session.StateToolExecuting, got.State)
 	}
 }
 
@@ -155,7 +155,7 @@ func TestGormStoreListSessionsAll(t *testing.T) {
 		ID:               "sess-2",
 		Title:            "Session 2",
 		WorkingDirectory: dir2,
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		CreatedAt:        time.Now(),
 		LastActiveAt:     time.Now(),
 	})
@@ -191,7 +191,7 @@ func TestGormStoreListSessionsFilterByStatus(t *testing.T) {
 		ID:               "sess-2",
 		Title:            "Session 2",
 		WorkingDirectory: dir2,
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 		CreatedAt:        time.Now(),
 		LastActiveAt:     time.Now(),
 	})

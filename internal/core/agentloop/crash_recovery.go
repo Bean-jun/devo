@@ -26,7 +26,7 @@ func (l *Loop) RecoverCrashedSessions() error {
 		sess := &sessions[i]
 
 		switch sess.State {
-		case session.StateProcessing, session.StateAwaitingApproval:
+		case session.StateThinking, session.StateToolExecuting, session.StateAwaitingApproval:
 			l.recoverSession(sess)
 
 		case session.StatePaused, session.StateIdle:

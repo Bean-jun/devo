@@ -217,13 +217,13 @@ func TestProcessMessageConflictDuringProcessing(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	sess, _ := store.Get("sess-1")
-	if sess.State != session.StateProcessing {
-		t.Errorf("expected state Processing after first message starts processing")
+	if sess.State != session.StateThinking {
+		t.Errorf("expected state Thinking after first message starts processing")
 	}
 
 	err := loop.ProcessMessage(context.Background(), "sess-1", "Second")
 	if err == nil {
-		t.Fatal("expected error when session is Processing")
+		t.Fatal("expected error when session is Thinking")
 	}
 }
 
@@ -436,8 +436,8 @@ func TestConcurrentSessionStateIsolation(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	sessA, _ := store.Get("sess-a")
-	if sessA.State != session.StateProcessing {
-		t.Errorf("session A should be Processing, got %q", sessA.State)
+	if sessA.State != session.StateThinking {
+		t.Errorf("session A should be Thinking, got %q", sessA.State)
 	}
 
 	sessB, _ := store.Get("sess-b")

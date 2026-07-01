@@ -83,7 +83,7 @@ func TestUpdate(t *testing.T) {
 	store.Create(sess)
 
 	sess.Title = "Updated Title"
-	sess.State = StateProcessing
+	sess.State = StateToolExecuting
 
 	err := store.Update(sess)
 	if err != nil {
@@ -94,8 +94,8 @@ func TestUpdate(t *testing.T) {
 	if got.Title != "Updated Title" {
 		t.Errorf("expected Title %q, got %q", "Updated Title", got.Title)
 	}
-	if got.State != StateProcessing {
-		t.Errorf("expected State %q, got %q", StateProcessing, got.State)
+	if got.State != StateToolExecuting {
+		t.Errorf("expected State %q, got %q", StateToolExecuting, got.State)
 	}
 }
 
@@ -154,7 +154,7 @@ func TestUpdatePreservesEventBus(t *testing.T) {
 
 	originalEB, _ := store.GetEventBus("sess-1")
 
-	sess.State = StateProcessing
+	sess.State = StateToolExecuting
 	store.Update(sess)
 
 	updatedEB, _ := store.GetEventBus("sess-1")

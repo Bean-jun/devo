@@ -73,7 +73,7 @@ func TestPostMessage_ConflictWhenProcessing(t *testing.T) {
 		ID:               "sess-test-1",
 		Title:            "Test",
 		WorkingDirectory: tmpDir,
-		State:            session.StateProcessing,
+		State:            session.StateThinking,
 	}
 	store.Create(sess)
 
@@ -136,8 +136,8 @@ func TestPostMessage_PausedAutoResumes(t *testing.T) {
 	}
 
 	sessGot, _ := store.Get("sess-test-1")
-	if sessGot.State != session.StateProcessing {
-		t.Errorf("expected state Processing after auto-resume, got %q", sessGot.State)
+	if sessGot.State != session.StateThinking {
+		t.Errorf("expected state Thinking after auto-resume, got %q", sessGot.State)
 	}
 }
 

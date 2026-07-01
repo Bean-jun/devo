@@ -3,6 +3,7 @@ package agentloop
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -73,6 +74,19 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 
 	lc.EventBus.Publish("loop.preparing_done", nil)
 
+	sess, err = l.store.Get(lc.SessionID)
+	if err == nil {
+		oldState := string(sess.State)
+		sess.State = session.StateThinking
+		sess.LastActiveAt = time.Now()
+		l.store.Update(sess)
+		lc.EventBus.Publish("session_state_change", map[string]any{
+			"old_state": session.State(oldState).ToSnakeCase(),
+			"new_state": session.StateThinking.ToSnakeCase(),
+			"reason":    "preparing_done",
+		})
+	}
+
 	return LoopStateThinking, nil
 }
 
@@ -93,6 +107,7 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 				ToolCalls:  evt.ToolCalls,
 				TokenUsage: evt.TokenUsage,
 			}
+			log.Printf("[DEBUG] thinkingHandler got done for session=%s, ToolCalls=%d", lc.SessionID, len(evt.ToolCalls))
 			lc.StepSeq++
 
 			if evt.TokenUsage != nil {
@@ -132,9 +147,31 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 }
 
 func (l *Loop) evaluatingResultHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
+	log.Printf("[DEBUG] evaluatingResultHandler called for session=%s, ToolCalls=%d", lc.SessionID, len(lc.LLMResult.ToolCalls))
 	if len(lc.LLMResult.ToolCalls) > 0 {
 		lc.ExecutedToolCallIDs = make(map[string]bool)
 		lc.EventBus.Publish("loop.result_evaluated", map[string]string{"type": "tool_calls"})
+
+		sess, err := l.store.Get(lc.SessionID)
+		if err != nil {
+			log.Printf("[DEBUG] evaluatingResultHandler: failed to get session: %v", err)
+		} else {
+			oldState := string(sess.State)
+			log.Printf("[DEBUG] evaluatingResultHandler: current state=%s, setting to ToolExecuting", oldState)
+			sess.State = session.StateToolExecuting
+			sess.LastActiveAt = time.Now()
+			if err := l.store.Update(sess); err != nil {
+				log.Printf("[DEBUG] evaluatingResultHandler: failed to update state to ToolExecuting: %v", err)
+			} else {
+				log.Printf("[DEBUG] evaluatingResultHandler: updated state from %s to ToolExecuting", oldState)
+			}
+			lc.EventBus.Publish("session_state_change", map[string]any{
+				"old_state": session.State(oldState).ToSnakeCase(),
+				"new_state": session.StateToolExecuting.ToSnakeCase(),
+				"reason":    "tool_calls_detected",
+			})
+		}
+
 		return LoopStateToolExecuting, nil
 	}
 
@@ -143,6 +180,7 @@ func (l *Loop) evaluatingResultHandler(ctx context.Context, lc *LoopContext) (Lo
 }
 
 func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
+	log.Printf("[DEBUG] toolExecutingHandler called for session=%s, ToolCalls=%d", lc.SessionID, len(lc.LLMResult.ToolCalls))
 	if lc.ExecutedToolCallIDs == nil {
 		lc.ExecutedToolCallIDs = make(map[string]bool)
 	}
@@ -160,7 +198,26 @@ func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopS
 		}
 	}
 
-	sess, _ := l.store.Get(lc.SessionID)
+	sess, err := l.store.Get(lc.SessionID)
+	if err != nil {
+		log.Printf("[DEBUG] toolExecutingHandler: failed to get session: %v", err)
+	} else {
+		oldState := string(sess.State)
+		log.Printf("[DEBUG] toolExecutingHandler: current state=%s, setting to ToolExecuting", oldState)
+		sess.State = session.StateToolExecuting
+		sess.LastActiveAt = time.Now()
+		if err := l.store.Update(sess); err != nil {
+			log.Printf("[DEBUG] toolExecutingHandler: failed to update state to ToolExecuting: %v", err)
+		} else {
+			log.Printf("[DEBUG] toolExecutingHandler: updated state from %s to ToolExecuting", oldState)
+		}
+		lc.EventBus.Publish("session_state_change", map[string]any{
+			"old_state": session.State(oldState).ToSnakeCase(),
+			"new_state": session.StateToolExecuting.ToSnakeCase(),
+			"reason":    "tool_execution_started",
+		})
+	}
+
 	if sess.MaxConcurrentToolCalls > 1 && len(lc.LLMResult.ToolCalls) > 1 {
 		return l.executeToolsParallel(ctx, lc, sess.MaxConcurrentToolCalls)
 	}
@@ -779,7 +836,7 @@ func (l *Loop) awaitingApprovalHandler(ctx context.Context, lc *LoopContext) (Lo
 	l.store.Update(sess)
 
 	lc.EventBus.Publish("session_state_change", map[string]any{
-		"old_state": session.StateProcessing.ToSnakeCase(),
+		"old_state": session.StateToolExecuting.ToSnakeCase(),
 		"new_state": session.StateAwaitingApproval.ToSnakeCase(),
 		"reason":    "awaiting_approval",
 	})
@@ -798,14 +855,14 @@ func (l *Loop) awaitingApprovalHandler(ctx context.Context, lc *LoopContext) (Lo
 		if decision.Decision == "approve" {
 			sess, err := l.store.Get(lc.SessionID)
 			if err == nil {
-				sess.State = session.StateProcessing
+				sess.State = session.StateToolExecuting
 				sess.LastActiveAt = time.Now()
 				l.store.Update(sess)
 			}
 
 			lc.EventBus.Publish("session_state_change", map[string]any{
 				"old_state": session.StateAwaitingApproval.ToSnakeCase(),
-				"new_state": session.StateProcessing.ToSnakeCase(),
+				"new_state": session.StateToolExecuting.ToSnakeCase(),
 				"reason":    "approval_granted",
 			})
 
@@ -822,14 +879,14 @@ func (l *Loop) awaitingApprovalHandler(ctx context.Context, lc *LoopContext) (Lo
 
 		sess, err := l.store.Get(lc.SessionID)
 		if err == nil {
-			sess.State = session.StateProcessing
+			sess.State = session.StateToolExecuting
 			sess.LastActiveAt = time.Now()
 			l.store.Update(sess)
 		}
 
 		lc.EventBus.Publish("session_state_change", map[string]any{
 			"old_state": session.StateAwaitingApproval.ToSnakeCase(),
-			"new_state": session.StateProcessing.ToSnakeCase(),
+			"new_state": session.StateToolExecuting.ToSnakeCase(),
 			"reason":    "approval_denied",
 		})
 
@@ -850,7 +907,7 @@ func (l *Loop) awaitingApprovalHandler(ctx context.Context, lc *LoopContext) (Lo
 
 		sess, err := l.store.Get(lc.SessionID)
 		if err == nil {
-			sess.State = session.StateProcessing
+			sess.State = session.StateToolExecuting
 			sess.LastActiveAt = time.Now()
 			l.store.Update(sess)
 		}
@@ -863,7 +920,7 @@ func (l *Loop) awaitingApprovalHandler(ctx context.Context, lc *LoopContext) (Lo
 
 		lc.EventBus.Publish("session_state_change", map[string]any{
 			"old_state": session.StateAwaitingApproval.ToSnakeCase(),
-			"new_state": session.StateProcessing.ToSnakeCase(),
+			"new_state": session.StateToolExecuting.ToSnakeCase(),
 			"reason":    "approval_cancelled",
 		})
 
@@ -876,7 +933,7 @@ func (l *Loop) awaitingApprovalHandler(ctx context.Context, lc *LoopContext) (Lo
 
 		sess, err := l.store.Get(lc.SessionID)
 		if err == nil {
-			sess.State = session.StateProcessing
+			sess.State = session.StateToolExecuting
 			sess.LastActiveAt = time.Now()
 			l.store.Update(sess)
 		}
@@ -889,7 +946,7 @@ func (l *Loop) awaitingApprovalHandler(ctx context.Context, lc *LoopContext) (Lo
 
 		lc.EventBus.Publish("session_state_change", map[string]any{
 			"old_state": session.StateAwaitingApproval.ToSnakeCase(),
-			"new_state": session.StateProcessing.ToSnakeCase(),
+			"new_state": session.StateToolExecuting.ToSnakeCase(),
 			"reason":    "approval_timeout",
 		})
 

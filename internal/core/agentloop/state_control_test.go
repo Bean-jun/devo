@@ -12,7 +12,7 @@ func TestProcessMessageNotIdle(t *testing.T) {
 	loop, store := setupTestLoop()
 	sess := createTestSession(store, "sess-1")
 
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	err := loop.ProcessMessage(context.Background(), "sess-1", "Hello")
@@ -47,16 +47,16 @@ func TestProcessMessagePausedAutoResume(t *testing.T) {
 	}
 
 	sess, _ = store.Get("sess-1")
-	if sess.State != session.StateProcessing {
-		t.Errorf("expected state Processing after auto-resume from Paused, got %q", sess.State)
+	if sess.State != session.StateThinking {
+		t.Errorf("expected state Thinking after auto-resume from Paused, got %q", sess.State)
 	}
 }
 
-func TestProcessMessageFromProcessing(t *testing.T) {
+func TestProcessMessageFromThinking(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	err := loop.ProcessMessage(context.Background(), "sess-1", "Hello")
@@ -82,7 +82,7 @@ func TestPauseFromProcessing(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	err := loop.Pause("sess-1")
@@ -137,7 +137,7 @@ func TestResumeFromPaused(t *testing.T) {
 	}
 
 	sess, _ = store.Get("sess-1")
-	if sess.State != session.StateProcessing {
+	if sess.State != session.StateThinking {
 		t.Errorf("expected state Processing after resume, got %q", sess.State)
 	}
 }
@@ -182,7 +182,7 @@ func TestResumePublishesEvent(t *testing.T) {
 	}
 
 	data, _ := evt.Data.(map[string]any)
-	if data["new_state"] != session.StateProcessing.ToSnakeCase() {
+	if data["new_state"] != session.StateThinking.ToSnakeCase() {
 		t.Errorf("expected new_state Processing, got %v", data["new_state"])
 	}
 	if data["reason"] != "resumed" {
@@ -194,7 +194,7 @@ func TestCancelFromProcessing(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	err := loop.Cancel("sess-1")
@@ -313,7 +313,7 @@ func TestCompleteFromProcessing(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	err := loop.Complete("sess-1")
@@ -407,7 +407,7 @@ func TestArchiveFromProcessing(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	err := loop.Archive("sess-1")
@@ -458,7 +458,7 @@ func TestPauseChannelSignal(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	lc := &LoopContext{
@@ -485,7 +485,7 @@ func TestCancelChannelSignal(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	lc := &LoopContext{
@@ -539,7 +539,7 @@ func TestPauseFlagFallback(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	err := loop.Pause("sess-1")
@@ -557,7 +557,7 @@ func TestCancelFlagFallback(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	err := loop.Cancel("sess-1")
@@ -576,7 +576,7 @@ func TestCancelChannelSignalKillsChildProcess(t *testing.T) {
 
 	pid := 99999
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	sess.ChildPID = &pid
 	store.Update(sess)
 
@@ -649,7 +649,7 @@ func TestCancelClearsChildPID(t *testing.T) {
 
 	pid := 99999
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	sess.ChildPID = &pid
 	store.Update(sess)
 
@@ -669,7 +669,7 @@ func TestCompleteCancelsRunningProcess(t *testing.T) {
 
 	pid := 99999
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	sess.ChildPID = &pid
 	store.Update(sess)
 
@@ -693,7 +693,7 @@ func TestCancelClearsBackgroundPIDs(t *testing.T) {
 	pid := 99999
 	bgPIDs := []int{100001, 100002}
 	sess := createTestSession(store, "sess-bg")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	sess.ChildPID = &pid
 	sess.BackgroundPIDs = bgPIDs
 	store.Update(sess)
@@ -718,7 +718,7 @@ func TestCompleteClearsBackgroundPIDs(t *testing.T) {
 	pid := 99999
 	bgPIDs := []int{100001}
 	sess := createTestSession(store, "sess-bg-complete")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	sess.ChildPID = &pid
 	sess.BackgroundPIDs = bgPIDs
 	store.Update(sess)
@@ -745,7 +745,7 @@ func TestCancelOnlyBackgroundPIDs(t *testing.T) {
 
 	bgPIDs := []int{100001, 100002, 100003}
 	sess := createTestSession(store, "sess-bg-only")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	sess.BackgroundPIDs = bgPIDs
 	store.Update(sess)
 
@@ -767,7 +767,7 @@ func TestCancelNoPIDs(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-nopid")
-	sess.State = session.StateProcessing
+	sess.State = session.StateThinking
 	store.Update(sess)
 
 	err := loop.Cancel("sess-nopid")

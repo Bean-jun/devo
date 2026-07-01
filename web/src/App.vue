@@ -329,7 +329,7 @@ useKeyboard([
             const data = await res.json().catch(() => ({}))
             throw new Error(data.message || '恢复失败')
           }
-          sessionStore.updateSessionState(sessionStore.currentSession.id, 'processing')
+          sessionStore.updateSessionState(sessionStore.currentSession.id, 'tool_executing')
           uiStore.showToast('info', '会话已恢复')
         } catch (e: any) {
           uiStore.showToast('error', e.message || '恢复失败')
@@ -373,7 +373,7 @@ useKeyboard([
           const data = await res.json().catch(() => ({}))
           throw new Error(data.message || '恢复失败')
         }
-        sessionStore.updateSessionState(sessionStore.currentSession.id, 'processing')
+        sessionStore.updateSessionState(sessionStore.currentSession.id, 'tool_executing')
         uiStore.showToast('info', '会话已恢复')
       } catch (e: any) {
         uiStore.showToast('error', e.message || '恢复失败')

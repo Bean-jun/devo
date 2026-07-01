@@ -31,9 +31,9 @@ func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		h.store.DecrementSSEConnections(id)
 		sess, err := h.store.Get(id)
-		if err == nil && sess.State == session.StateProcessing && sess.ActiveSSEConnections <= 0 {
+		if err == nil && (sess.State == session.StateThinking || sess.State == session.StateToolExecuting || sess.State == session.StateAwaitingApproval) && sess.ActiveSSEConnections <= 0 {
 			eventBus.Publish("session_state_change", map[string]any{
-				"old_state": session.StateProcessing.ToSnakeCase(),
+				"old_state": sess.State.ToSnakeCase(),
 				"new_state": session.StatePaused.ToSnakeCase(),
 				"reason":    "sse_disconnected",
 			})

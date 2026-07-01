@@ -49,7 +49,7 @@ func (h *Handler) Resume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"state": session.StateProcessing.ToSnakeCase()})
+	writeJSON(w, http.StatusOK, map[string]string{"state": session.StateToolExecuting.ToSnakeCase()})
 }
 
 func (h *Handler) Complete(w http.ResponseWriter, r *http.Request) {

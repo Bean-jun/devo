@@ -8,6 +8,8 @@ export const AUTO_SCROLL_THRESHOLD = 100
 
 export const STATUS_LABELS: Record<string, string> = {
   idle: '空闲',
+  thinking: '思考中',
+  tool_executing: '工具执行中',
   processing: '处理中',
   awaiting_approval: '等待审批',
   paused: '已暂停',
@@ -17,6 +19,8 @@ export const STATUS_LABELS: Record<string, string> = {
 
 export const STATUS_COLORS: Record<string, string> = {
   idle: '#34c759',
+  thinking: '#0071e3',
+  tool_executing: '#af52de',
   processing: '#0071e3',
   awaiting_approval: '#ff9500',
   paused: '#aeaeb2',

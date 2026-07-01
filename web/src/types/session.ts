@@ -1,6 +1,8 @@
 export type SessionState =
   | 'idle'
-  | 'processing'
+  | 'thinking'
+  | 'tool_executing'
+  | 'processing' // deprecated: replaced by thinking + tool_executing
   | 'awaiting_approval'
   | 'paused'
   | 'completed'

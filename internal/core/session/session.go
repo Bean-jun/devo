@@ -10,12 +10,14 @@ import (
 type State string
 
 const (
-	StateIdle             State = "Idle"
-	StateProcessing       State = "Processing"
-	StatePaused           State = "Paused"
-	StateAwaitingApproval State = "AwaitingApproval"
-	StateCompleted        State = "Completed"
-	StateArchived         State = "Archived"
+	StateIdle             State = "Idle"             // 等待用户输入
+	StateThinking         State = "Thinking"         // LLM 流式生成中（新增）
+	StateToolExecuting    State = "ToolExecuting"    // 工具执行中（新增）
+	StateAwaitingApproval State = "AwaitingApproval" // 等待用户审批
+	StatePaused           State = "Paused"           // 工具执行暂停
+	StateCompleted        State = "Completed"        // 会话正常结束
+	StateArchived         State = "Archived"         // 已归档
+	// StateProcessing       State = "Processing"       // 废弃：由 StateThinking + StateToolExecuting 替代
 )
 
 // ToSnakeCase converts PascalCase state to snake_case (e.g., "AwaitingApproval" → "awaiting_approval")
@@ -140,7 +142,7 @@ var (
 	ErrSessionArchived       = errors.New("session is archived")
 	ErrSessionNotPaused      = errors.New("session is not paused")
 	ErrSessionNotCompleted   = errors.New("session is not completed")
-	ErrSessionNotProcessing  = errors.New("session is not processing")
+	ErrSessionNotProcessing  = errors.New("session is not in tool_executing state")
 	ErrSessionNotCancellable = errors.New("session is not in a cancellable state")
 	ErrMessageNotFound       = errors.New("message not found")
 )

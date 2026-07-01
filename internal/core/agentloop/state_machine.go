@@ -125,7 +125,7 @@ func (sm *StateMachine) Run(ctx context.Context, lc *LoopContext) {
 				"message": err.Error(),
 			})
 			lc.EventBus.Publish("session_state_change", map[string]any{
-				"old_state": session.StateProcessing.ToSnakeCase(),
+				"old_state": session.State(currentState).ToSnakeCase(),
 				"new_state": session.StateIdle.ToSnakeCase(),
 				"reason":    "error",
 			})

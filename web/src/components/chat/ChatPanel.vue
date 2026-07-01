@@ -154,7 +154,7 @@ async function handleExecuteCommand(text: string) {
           const data = await res.json().catch(() => ({}))
           throw new Error(data.message || `HTTP ${res.status}`)
         }
-        sessionStore.updateSessionState(sid, 'processing')
+        sessionStore.updateSessionState(sid, 'tool_executing')
         uiStore.showToast('info', '会话已恢复')
       } catch (e: any) {
         uiStore.showToast('error', e.message || '恢复失败')

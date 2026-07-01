@@ -1,3 +1,3 @@
 module mock_server
 
-go 1.21
+go 1.25.10
