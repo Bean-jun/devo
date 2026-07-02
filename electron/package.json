@@ -1,6 +1,10 @@
 {
   "name": "devo-desktop",
-  "version": "0.1.0-1bc2584-dirty",
+  "version": "0.1.0-67cb404-dirty",
+  "author": {
+    "name": "Devo AI Coding Agent",
+    "email": "1342104001@qq.com"
+  },
   "description": "Devo AI Coding Agent - Desktop Application",
   "main": "main.js",
   "scripts": {
@@ -14,7 +18,7 @@
   },
   "build": {
     "appId": "com.devo.desktop",
-    "productName": "Devo",
+    "productName": "devo-desktop",
     "win": {
       "target": "portable",
       "icon": "resources/icon.png"

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const path = require("path");
 const cp = require("child_process");
 const fs = require("fs");
@@ -44,13 +44,41 @@ function getDevoPath() {
 }
 
 // ====================== 状态 ======================
+let welcomeWindow = null;
 let mainWindow = null;
 let serverProcess = null;
 let serverPort = null;
+let currentWorkspace = null;
 let isQuitting = false;
 
-// ====================== 创建窗口 ======================
-function createWindow() {
+// ====================== 欢迎页窗口 ======================
+function createWelcomeWindow() {
+  welcomeWindow = new BrowserWindow({
+    width: 900,
+    height: 680,
+    minWidth: 600,
+    minHeight: 480,
+    resizable: true,
+    autoHideMenuBar: true,
+    title: "Devo",
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+
+  welcomeWindow.loadFile(path.join(__dirname, "welcome.html"));
+
+  welcomeWindow.on("closed", () => {
+    welcomeWindow = null;
+    if (!mainWindow) {
+      app.quit();
+    }
+  });
+}
+
+// ====================== 主窗口 ======================
+function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -97,7 +125,7 @@ function handleProcessCrash(code) {
     .then((result) => {
       if (result.response === 0) {
         log("User chose to restart");
-        startServer().then(() => {
+        startServer(currentWorkspace).then(() => {
           if (mainWindow) {
             mainWindow.loadURL(`http://127.0.0.1:${serverPort}/`);
           }
@@ -137,14 +165,16 @@ function getCrashContent(code) {
 }
 
 // ====================== 启动 Go 后端 ======================
-function startServer() {
+function startServer(workspace) {
   return new Promise(async (resolve, reject) => {
+    currentWorkspace = workspace;
     serverPort = await findFreePort();
     log("Free port:", serverPort);
 
     const devoPath = getDevoPath();
-    const args = ["--port", String(serverPort)];
+    const args = ["--port", String(serverPort), "--workspace", workspace];
     log("Binary path:", devoPath);
+    log("Workspace:", workspace);
     log("Spawning:", devoPath, args.join(" "));
 
     serverProcess = cp.spawn(devoPath, args, {
@@ -215,17 +245,48 @@ function cleanupServer() {
   }
 }
 
-// ====================== 应用生命周期 ======================
-app.whenReady().then(async () => {
-  log("App starting...");
+// ====================== IPC 处理 ======================
+function setupIPC() {
+  ipcMain.on("select-folder", async (event) => {
+    const result = await dialog.showOpenDialog(welcomeWindow, {
+      properties: ["openDirectory"],
+      title: "选择项目文件夹",
+    });
 
-  try {
-    await startServer();
-    createWindow();
-  } catch (err) {
-    log("Failed to start:", err.message);
-    app.quit();
-  }
+    if (!result.canceled && result.filePaths.length > 0) {
+      event.reply("folder-selected", result.filePaths[0]);
+    }
+  });
+
+  ipcMain.on("open-recent", async (_event, folderPath) => {
+    log("Opening recent folder:", folderPath);
+
+    if (!fs.existsSync(folderPath)) {
+      dialog.showErrorBox(
+        "路径不存在",
+        `所选目录不存在：\n${folderPath}\n\n该目录可能已被移动或删除。`
+      );
+      return;
+    }
+
+    try {
+      await startServer(folderPath);
+
+      if (welcomeWindow) {
+        welcomeWindow.close();
+      }
+      createMainWindow();
+    } catch (err) {
+      log("Failed to start server:", err.message);
+    }
+  });
+}
+
+// ====================== 应用生命周期 ======================
+app.whenReady().then(() => {
+  log("App starting...");
+  setupIPC();
+  createWelcomeWindow();
 });
 
 app.on("window-all-closed", () => {
@@ -241,7 +302,7 @@ app.on("before-quit", () => {
 });
 
 app.on("activate", () => {
-  if (mainWindow === null) {
-    createWindow();
+  if (mainWindow === null && welcomeWindow === null) {
+    createWelcomeWindow();
   }
 });

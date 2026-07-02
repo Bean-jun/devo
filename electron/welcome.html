@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Devo - 欢迎</title>
+  <link rel="stylesheet" href="welcome.css">
+</head>
+<body>
+  <div class="welcome">
+    <header class="brand">
+      <img class="logo" src="resources/icon.png" alt="Devo Logo" />
+      <h1 class="brand-name">D e v o</h1>
+      <p class="tagline">AI Coding Agent</p>
+      <p class="subtitle">本地运行 · 安全可控 · 智能编码</p>
+    </header>
+
+    <div class="actions">
+      <button class="btn-primary" id="btn-open-folder">
+        <span class="btn-icon">📂</span>
+        <span>打开文件夹</span>
+      </button>
+    </div>
+
+    <section class="recent" id="section-recent">
+      <h2 class="section-title">最近打开</h2>
+      <ul class="recent-list" id="recent-list"></ul>
+      <p class="empty-hint" id="empty-hint">还没有打开过任何项目</p>
+      <button class="btn-more" id="btn-more" style="display:none;">查看更多...</button>
+    </section>
+  </div>
+
+  <div class="modal-overlay" id="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">所有历史记录</h2>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <ul class="modal-list" id="modal-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script src="welcome.js"></script>
+</body>
+</html>

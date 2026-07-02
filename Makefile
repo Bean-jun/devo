@@ -24,26 +24,37 @@ DESKTOP_BIN_DIR := $(ELECTRON_DIR)\resources\bin
 # ========== Build ==========
 all: build
 
-build: vsix
-	@echo [OK] Build complete: $(BUILD_DIR)/$(APP_NAME).exe
+build: build-web build-go vsix-win desktop
+	@echo [OK] Build complete
 
+# ========== Frontend ==========
 build-web:
 	@echo [BUILD] Frontend (version: $(FULL_VERSION))...
 	cd $(WEB_DIR) && npm install && set VITE_APP_VERSION=$(FULL_VERSION) && npm run build
 
-build-go: build-web
+# ========== Backend ==========
+build-go:
 	@echo [BUILD] Backend (version: $(FULL_VERSION))...
 	@if not exist $(BUILD_DIR) mkdir $(BUILD_DIR)
-	go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME).exe $(GO_ENTRY)
+	@echo [BUILD]   Windows (amd64)...
+	set GOOS=windows&& set GOARCH=amd64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(GO_ENTRY)
+	upx -9 $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe
+	@echo [BUILD]   Linux (amd64)...
+	set GOOS=linux&& set GOARCH=amd64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(GO_ENTRY)
+	upx -9 $(BUILD_DIR)\$(APP_NAME)-linux-amd64
+	@echo [BUILD]   macOS (amd64)...
+	set GOOS=darwin&& set GOARCH=amd64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
+	@echo [BUILD]   macOS (arm64)...
+	set GOOS=darwin&& set GOARCH=arm64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
+	@echo [OK] 3 platforms (4 binaries) built
 
 # ========== VS Code Extension ==========
-vsix: build-go
+vsix-win:
 	@echo [VSIX] Syncing version $(FULL_VERSION) to extension...
 	cd $(VSIX_DIR) && node -e "var p=require('./package.json');p.version='$(FULL_VERSION)';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 	@echo [VSIX] Copying binary to extension...
 	@if not exist $(VSIX_DIR)\bin mkdir $(VSIX_DIR)\bin
-	upx -9 $(BUILD_DIR)\$(APP_NAME).exe
-	copy $(BUILD_DIR)\$(APP_NAME).exe $(VSIX_DIR)\bin\$(APP_NAME).exe
+	copy $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe $(VSIX_DIR)\bin\$(APP_NAME).exe /Y
 	@echo [VSIX] Packaging extension...
 	cd $(VSIX_DIR) && npm run vsix
 	cmd /c "move $(VSIX_DIR)\$(APP_NAME)-*.vsix $(BUILD_DIR)\"
@@ -51,15 +62,16 @@ vsix: build-go
 
 # ========== Desktop (Electron) ==========
 
-desktop: build-go
+desktop:
 	@echo [DESKTOP] Copying binary to Electron resources...
 	cd $(ELECTRON_DIR) && node -e "var p=require('./package.json');p.version='$(FULL_VERSION)';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 	@if not exist $(DESKTOP_BIN_DIR) mkdir $(DESKTOP_BIN_DIR)
-	copy $(BUILD_DIR)\$(APP_NAME).exe $(DESKTOP_BIN_DIR)\$(APP_NAME).exe /Y
+	copy $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe $(DESKTOP_BIN_DIR)\$(APP_NAME).exe /Y
 	@echo [DESKTOP] Installing Electron dependencies...
 	cd $(ELECTRON_DIR) && npm install
 	@echo [DESKTOP] Packaging Electron app...
 	cd $(ELECTRON_DIR) && npm run package
+	cmd /c "move $(ELECTRON_DIR)\dist\$(APP_NAME)-*.exe $(BUILD_DIR)\"
 	@echo [OK] Desktop package complete
 
 # ========== Development ==========
