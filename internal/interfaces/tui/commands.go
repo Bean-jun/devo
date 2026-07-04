@@ -34,13 +34,19 @@ func (a *App) initSessionCmd() tea.Cmd {
 }
 
 func (a *App) sendMessageCmd(content string) tea.Cmd {
+	a.toast.Hide()
+	a.statusBar.ToastActive = false
 	userMsg := types.Message{
 		Role:    "user",
 		Content: content,
 	}
 	a.msgs = append(a.msgs, userMsg)
 	a.chatView.MessageView.AddMessage(userMsg)
+	a.chatView.MessageView.ClearToolCards()
 	a.chatView.InputArea.Reset()
+	if a.state == StateCancelled {
+		a.state = StateReady
+	}
 	a.state = StateProcessing
 	a.statusBar.SessionState = "processing"
 	a.chatView.Processing = true
@@ -213,5 +219,15 @@ func (a *App) exportArchiveCmd() tea.Cmd {
 			return messages.APIResponse{Kind: "archive_done", Err: err}
 		}
 		return messages.APIResponse{Kind: "archive_done", Data: result}
+	}
+}
+
+func (a *App) setTrustCmd(level string) tea.Cmd {
+	return func() tea.Msg {
+		err := a.apiClient.SetTrustLevel(a.activeSession.ID, level)
+		if err != nil {
+			return messages.APIResponse{Kind: "trust_set", Err: err}
+		}
+		return messages.APIResponse{Kind: "trust_set", Data: level}
 	}
 }

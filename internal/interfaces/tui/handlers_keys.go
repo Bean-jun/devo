@@ -118,6 +118,9 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	}
 
 	if a.state == StateAwaitingApproval {
+		if a.yoloMode {
+			return func() tea.Msg { return messages.ApprovalDecision{Approved: true} }
+		}
 		switch key {
 		case "y", "Y":
 			return func() tea.Msg { return messages.ApprovalDecision{Approved: true} }
@@ -138,76 +141,43 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		a.state = StateQuitting
 		return tea.Quit
 
-	case "ctrl+p":
-		if a.activeSession == nil {
-			return nil
-		}
-		state := a.activeSession.State
-		if state == "processing" {
-			return a.pauseCmd()
-		}
-		if state == "paused" {
-			return a.resumeCmd()
-		}
-		a.toast.Show(fmt.Sprintf("当前状态为 %s，无法切换", state), true)
-		return nil
-
-	case "ctrl+r":
-		if a.activeSession == nil {
-			return nil
-		}
-		state := a.activeSession.State
-		if state != "paused" {
-			a.toast.Show(fmt.Sprintf("当前状态为 %s，无法恢复", state), true)
-			return nil
-		}
-		return a.resumeCmd()
+	case "alt+y":
+		a.keyConsumed = true
+		return a.toggleYOLO()
 
 	case "enter":
-		if a.isPasting {
-			return nil
-		}
-		if a.chatView.InputArea.Focused() && a.state == StateReady {
+		if a.chatView.InputArea.Focused() && (a.state == StateReady || a.state == StateCancelled) {
+			if a.chatView.InputArea.IsPasteActive() {
+				return nil
+			}
 			content := strings.TrimSpace(a.chatView.InputArea.Value())
 			if content != "" {
-				// Paste detection: if Enter arrives <50ms after last key, it's
-				// part of a multi-line paste — let textarea handle it as newline.
-				if time.Since(a.lastKeyTime) < 50*time.Millisecond {
-					return nil
-				}
-				// Unwrap pasted content if label is intact
-				if a.pastedFullText != "" && content == a.pasteLabel {
-					content = a.pastedFullText
-					a.pastedFullText = ""
-					a.pasteLabel = ""
-					a.pushInputHistory(content)
-					if strings.HasPrefix(content, "/") {
-						return a.executeSlashCommand(content)
-					}
-					return a.sendMessageCmd(content)
-				}
-				// If content is too long and not yet compressed, compress now
-				lines := strings.Split(content, "\n")
-				if len(content) > 200 || len(lines) > 3 {
-					a.pastedFullText = content
-					firstLine := lines[0]
-					if len(firstLine) > 60 {
-						firstLine = firstLine[:60] + "..."
-					}
-					a.pasteLabel = firstLine + fmt.Sprintf(" [已粘贴 %d 行文本]", len(lines))
-					a.chatView.InputArea.SetValue(a.pasteLabel)
-					return nil
-				}
 				a.pushInputHistory(content)
 				if strings.HasPrefix(content, "/") {
 					return a.executeSlashCommand(content)
 				}
 				return a.sendMessageCmd(content)
 			}
+			expanded := false
+			for i := range a.chatView.MessageView.ToolCards {
+				card := &a.chatView.MessageView.ToolCards[i]
+				if !card.Expanded {
+					a.chatView.MessageView.ToggleToolCardExpanded(i)
+					expanded = true
+					break
+				}
+			}
+			if !expanded {
+				for i := range a.chatView.MessageView.ToolCards {
+					if a.chatView.MessageView.ToolCards[i].Expanded {
+						a.chatView.MessageView.ToggleToolCardExpanded(i)
+					}
+				}
+			}
 		}
 
 	case "/":
-		if a.chatView.InputArea.Focused() && a.state == StateReady {
+		if a.chatView.InputArea.Focused() && (a.state == StateReady || a.state == StateCancelled) {
 			if strings.TrimSpace(a.chatView.InputArea.Value()) == "" {
 				a.showCommandPalette = true
 				a.commandPalette.Show()
@@ -217,6 +187,20 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		}
 
 	case "esc":
+		if a.showHelpPanel {
+			a.showHelpPanel = false
+			a.helpPanel.Hide()
+			return nil
+		}
+		if a.state == StateToolExecuting {
+			return a.pauseCmd()
+		}
+		if a.state == StatePaused || a.statusBar.SessionState == "paused" {
+			return a.cancelCmd()
+		}
+		if a.state == StateThinking || a.state == StateProcessing {
+			return a.cancelCmd()
+		}
 		if a.chatView.InputArea.Focused() {
 			a.chatView.Blur()
 		} else {
@@ -330,8 +314,19 @@ func (a *App) executeSlashCommand(input string) tea.Cmd {
 		}
 		return a.cancelCmd()
 
+	case "yolo":
+		return a.toggleYOLO()
+
+	case "trust":
+		if arg == "" {
+			a.toast.Show("用法: /trust <level>  (low, normal, elevated)", true)
+			return nil
+		}
+		return a.setTrustCmd(arg)
+
 	case "help":
-		a.toast.Show("快捷键: Ctrl+P 暂停/恢复  Ctrl+R 恢复  Ctrl+C 取消  Ctrl+Q 退出  Shift+↑↓ 历史", false)
+		a.showHelpPanel = true
+		a.helpPanel.Show()
 		return nil
 
 	case "quit":

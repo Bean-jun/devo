@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, nextTick } from 'vue'
+import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { useKeyboard } from '@/composables/useKeyboard'
@@ -13,11 +13,36 @@ const renameValue = ref('')
 const renameInputRef = ref<HTMLInputElement>()
 const yoloLoading = ref(false)
 
+const SPINNER_CHARS = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']
+const spinnerFrame = ref(0)
+let spinnerTimer: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+  spinnerTimer = setInterval(() => {
+    if (uiStore.activityActive) {
+      spinnerFrame.value = (spinnerFrame.value + 1) % SPINNER_CHARS.length
+    }
+  }, 250)
+})
+
+onUnmounted(() => {
+  if (spinnerTimer) {
+    clearInterval(spinnerTimer)
+    spinnerTimer = null
+  }
+})
+
+const spinnerChar = computed(() => SPINNER_CHARS[spinnerFrame.value])
+
+const activityText = computed(() => {
+  if (!uiStore.activityActive || !uiStore.activityStream) return ''
+  return uiStore.activityStream.replace(/\n/g, ' ').replace(/\r/g, '')
+})
+
 const sessionName = computed(() => sessionStore.currentSession?.title ?? '未连接')
 const statusLabel = computed(() => STATUS_LABELS[sessionStore.sessionStatus] ?? '空闲')
 const statusColor = computed(() => STATUS_COLORS[sessionStore.sessionStatus] ?? '#34c759')
 const isProcessing = computed(() => sessionStore.isProcessing)
-const workingDir = computed(() => sessionStore.currentSession?.workingDirectory ?? '')
 
 const themeIcon = computed(() => uiStore.theme === 'dark' ? '☀️' : '🌙')
 const themeLabel = computed(() => uiStore.theme === 'dark' ? '浅色' : '深色')
@@ -129,9 +154,10 @@ const serverPort = computed(() => window.location.port)
         <span class="yolo-icon">{{ yoloLoading ? '⏳' : '🔥' }}</span>
         <span class="yolo-label" :class="{ on: sessionStore.yoloEnabled }">YOLO</span>
       </button>
-      <span v-if="workingDir" class="working-dir" :title="workingDir">
-        {{ workingDir }}
-      </span>
+    </div>
+    <div v-if="uiStore.activityActive" class="statusbar-center">
+      <span class="activity-spinner">{{ spinnerChar }}</span>
+      <span class="activity-text">{{ activityText }}</span>
     </div>
     <div class="statusbar-right">
       <button class="theme-toggle" :title="themeLabel" @click="toggleTheme">
@@ -165,6 +191,34 @@ const serverPort = computed(() => window.location.port)
   align-items: center;
   gap: var(--space-md);
   -webkit-app-region: no-drag;
+}
+
+.statusbar-center {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--space-md);
+  border-left: 1px solid var(--color-border-light);
+  overflow: hidden;
+}
+
+.activity-spinner {
+  font-size: 14px;
+  color: var(--color-accent);
+  flex-shrink: 0;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.activity-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
 }
 
 .session-name {
@@ -220,15 +274,6 @@ const serverPort = computed(() => window.location.port)
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
-}
-
-.working-dir {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  max-width: 250px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .connection-status {

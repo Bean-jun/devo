@@ -210,6 +210,7 @@ func (a *App) Run() {
 
 	if a.tuiMode {
 		log.Printf("[devo] Launching TUI...")
+		tui.RedirectStdLog()
 		tui.Launch(a.baseURL, Version)
 		log.Printf("[devo] TUI exited, shutting down server...")
 		server.Close()

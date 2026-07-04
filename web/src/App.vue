@@ -121,10 +121,12 @@ function connectSSE(sessionId: string) {
 
   onEvent('thinking', (_data: any) => {
     chatStore.startStreaming()
+    uiStore.setActivity(_data.message || '思考中...')
   })
 
   onEvent('streaming_token', (data: any) => {
     chatStore.appendStreamChunk(data.content || data.token || '')
+    uiStore.setActivity(data.content || data.token || '')
   })
 
   onEvent('streaming_complete', (_data: any) => {
@@ -163,6 +165,7 @@ function connectSSE(sessionId: string) {
         sessionStore.updateSessionState(sessionStore.currentSession.id, 'idle')
       }
     }
+    uiStore.clearActivity()
   })
 
   onEvent('tool_call_request', (data: any) => {
@@ -173,6 +176,7 @@ function connectSSE(sessionId: string) {
       status: 'pending',
       riskLevel: data.risk_level || 'medium',
     })
+    uiStore.setActivity('调用 ' + (data.tool_name || 'unknown') + '...')
   })
 
   onEvent('tool_result', (data: any) => {
@@ -193,6 +197,7 @@ function connectSSE(sessionId: string) {
         break
       }
     }
+    uiStore.setActivity((data.tool_name || '') + ' 完成')
   })
 
   onEvent('tool_progress', (data: any) => {
@@ -206,6 +211,7 @@ function connectSSE(sessionId: string) {
         break
       }
     }
+    uiStore.setActivity(toolName + ' ' + stage)
   })
 
   onEvent('tool_chunk', (data: any) => {
@@ -219,6 +225,7 @@ function connectSSE(sessionId: string) {
         break
       }
     }
+    uiStore.setActivity(toolName + ': ' + chunk)
   })
 
   onEvent('approval_required', (data: any) => {
@@ -263,6 +270,9 @@ function connectSSE(sessionId: string) {
         chatStore.appendSystemMessage('已达到工具调用上限，输入新消息继续')
       } else if (data.reason === 'error') {
         chatStore.appendSystemMessage('发生错误，请重试')
+      }
+      if (newState === 'idle' || newState === 'completed' || newState === 'cancelled') {
+        uiStore.clearActivity()
       }
     }
   })

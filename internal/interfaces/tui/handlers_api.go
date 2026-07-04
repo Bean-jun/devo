@@ -45,6 +45,7 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 
 		a.statusBar.SessionTitle = sess.Title
 		a.statusBar.SessionState = sess.State
+		a.syncYOLOFromTrustLevel(sess.TrustLevel)
 		if sess.TokenUsage.Total > 0 {
 			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)",
 				formatTokens(sess.TokenUsage.Total), formatTokens(sess.TokenUsage.Input), formatTokens(sess.TokenUsage.Output))
@@ -72,6 +73,7 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 		a.msgs = nil
 		a.statusBar.SessionTitle = sess.Title
 		a.statusBar.SessionState = sess.State
+		a.syncYOLOFromTrustLevel(sess.TrustLevel)
 		a.chatView.InputArea.TokenUsage = ""
 		a.chatView.InputArea.ContextUsage = ""
 		if sess.TokenUsage.Total > 0 {
@@ -104,7 +106,12 @@ func (a *App) handleAPIResponse(msg messages.APIResponse) tea.Cmd {
 		a.chatView.Processing = true
 		return nil
 
-	case "pause_done", "resume_done", "cancel_done":
+	case "pause_done", "resume_done":
+		return a.refreshSessionCmd()
+
+	case "cancel_done":
+		a.state = StateCancelled
+		a.chatView.Processing = false
 		return a.refreshSessionCmd()
 
 	case "rename_done":
@@ -163,8 +170,12 @@ func (a *App) updateContextUsage(sess *types.SessionInfo) {
 }
 
 func formatTokens(n int) string {
-	if n < 1000 {
-		return fmt.Sprintf("%d", n)
+	if n >= 1_000_000 {
+		v := float64(n) / 1_000_000
+		if v >= 10 {
+			return fmt.Sprintf("%.0fM", v)
+		}
+		return fmt.Sprintf("%.1fM", v)
 	}
 	v := float64(n) / 1000
 	if v >= 10 {

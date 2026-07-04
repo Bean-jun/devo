@@ -14,8 +14,18 @@ export function formatDuration(ms: number): string {
 }
 
 export function formatTokenCount(count: number): string {
-  if (count < 1000) return String(count)
-  return (count / 1000).toFixed(1) + 'k'
+  if (count >= 1_000_000) {
+    const v = count / 1_000_000
+    if (v >= 10) {
+      return v.toFixed(0) + 'M'
+    }
+    return v.toFixed(1) + 'M'
+  }
+  const v = count / 1000
+  if (v >= 10) {
+    return v.toFixed(0) + 'K'
+  }
+  return v.toFixed(1) + 'K'
 }
 
 export function formatRelativeTime(dateStr: string): string {

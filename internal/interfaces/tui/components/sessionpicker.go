@@ -86,10 +86,18 @@ func formatTokenUsageStr(usage types.TokenUsage) string {
 	if total == 0 {
 		return "0 token"
 	}
-	if total >= 1000 {
-		return fmt.Sprintf("%.1fk token", float64(total)/1000.0)
+	if total >= 1_000_000 {
+		v := float64(total) / 1_000_000
+		if v >= 10 {
+			return fmt.Sprintf("%.0fM token", v)
+		}
+		return fmt.Sprintf("%.1fM token", v)
 	}
-	return fmt.Sprintf("%d token", total)
+	v := float64(total) / 1000
+	if v >= 10 {
+		return fmt.Sprintf("%.0fK token", v)
+	}
+	return fmt.Sprintf("%.1fK token", v)
 }
 
 var statusLabels = map[string]string{

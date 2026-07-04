@@ -13,21 +13,27 @@ import (
 )
 
 type MessageViewport struct {
-	viewport   viewport.Model
-	Messages   []types.Message
-	ToolCards  []ToolCardData
-	Width      int
-	Height     int
-	mdRenderer *glamour.TermRenderer
+	viewport        viewport.Model
+	Messages        []types.Message
+	ToolCards       []ToolCardData
+	Width           int
+	Height          int
+	mdRenderer      *glamour.TermRenderer
+	StreamingBuffer strings.Builder
+	StreamingActive bool
+	SpinnerFrame    int
 }
 
 type ToolCardData struct {
-	ToolName string
-	Params   string
-	Result   string
-	Success  bool
-	Duration string
-	Expanded bool
+	ToolName     string
+	Params       string
+	Result       string
+	Success      bool
+	Duration     string
+	Expanded     bool
+	Stage        string
+	OutputChunks []string
+	GroupID      string
 }
 
 func NewMessageViewport() MessageViewport {
@@ -51,7 +57,28 @@ func (m *MessageViewport) AddMessage(msg types.Message) {
 }
 
 func (m *MessageViewport) AddToolCard(card ToolCardData) {
+	if len(m.ToolCards) > 0 {
+		last := &m.ToolCards[len(m.ToolCards)-1]
+		groupHasResult := false
+		if last.GroupID != "" {
+			for i := range m.ToolCards {
+				if m.ToolCards[i].GroupID == last.GroupID && m.ToolCards[i].Result != "" {
+					groupHasResult = true
+					break
+				}
+			}
+		}
+		if last.Result == "" && !groupHasResult {
+			card.GroupID = last.GroupID
+			if card.GroupID == "" {
+				card.GroupID = fmt.Sprintf("group_%d", len(m.ToolCards))
+				last.GroupID = card.GroupID
+			}
+		}
+	}
 	m.ToolCards = append(m.ToolCards, card)
+	m.renderContent()
+	m.viewport.GotoBottom()
 }
 
 func (m *MessageViewport) UpdateToolCard(toolName string, success bool, summary string, duration string) {
@@ -87,6 +114,58 @@ func (m *MessageViewport) AddThinking(message string) {
 	m.viewport.GotoBottom()
 }
 
+func (m *MessageViewport) AddStreamingChunk(text string) {
+	m.StreamingActive = true
+	m.StreamingBuffer.WriteString(text)
+	m.renderContent()
+	m.viewport.GotoBottom()
+}
+
+func (m *MessageViewport) FinalizeStreaming() string {
+	if !m.StreamingActive {
+		return ""
+	}
+	m.StreamingActive = false
+	content := m.StreamingBuffer.String()
+	m.StreamingBuffer.Reset()
+
+	if content != "" {
+		msg := types.Message{
+			Role:    "assistant",
+			Content: content,
+		}
+		m.Messages = append(m.Messages, msg)
+	}
+	m.renderContent()
+	m.viewport.GotoBottom()
+	return content
+}
+
+func (m *MessageViewport) UpdateToolCardStage(toolName string, stage string) {
+	for i := range m.ToolCards {
+		if m.ToolCards[i].ToolName == toolName {
+			m.ToolCards[i].Stage = stage
+			break
+		}
+	}
+	m.renderContent()
+	m.viewport.GotoBottom()
+}
+
+func (m *MessageViewport) AppendToolCardChunk(toolName string, chunk string) {
+	for i := range m.ToolCards {
+		if m.ToolCards[i].ToolName == toolName {
+			m.ToolCards[i].OutputChunks = append(m.ToolCards[i].OutputChunks, chunk)
+			if m.ToolCards[i].Stage == "" {
+				m.ToolCards[i].Stage = "executing"
+			}
+			break
+		}
+	}
+	m.renderContent()
+	m.viewport.GotoBottom()
+}
+
 func (m *MessageViewport) SetSize(width, height int) {
 	m.Width = width
 	m.Height = height
@@ -118,7 +197,16 @@ func (m *MessageViewport) View() string {
 	return lipgloss.NewStyle().Height(m.Height).Render(m.viewport.View())
 }
 
+func (m *MessageViewport) Refresh() {
+	m.renderContent()
+}
+
 func (m *MessageViewport) renderContent() {
+	if len(m.Messages) == 0 && len(m.ToolCards) == 0 && !m.StreamingActive {
+		m.viewport.SetContent(m.renderEmptyState())
+		return
+	}
+
 	var lines []string
 
 	for _, msg := range m.Messages {
@@ -139,8 +227,13 @@ func (m *MessageViewport) renderContent() {
 		}
 	}
 
-	for _, card := range m.ToolCards {
-		lines = append(lines, m.renderToolCard(card))
+	lines = append(lines, m.renderToolCards())
+
+	if m.StreamingActive {
+		streamingContent := m.StreamingBuffer.String()
+		if streamingContent != "" {
+			lines = append(lines, m.renderStreamingContent(streamingContent))
+		}
 	}
 
 	content := strings.Join(lines, "\n")
@@ -178,40 +271,164 @@ func (m *MessageViewport) renderThinking(msg types.Message) string {
 	return ThinkingStyle.Render("  " + msg.Content)
 }
 
+func (m *MessageViewport) renderToolCards() string {
+	if len(m.ToolCards) == 0 {
+		return ""
+	}
+
+	type group struct {
+		id    string
+		cards []int
+	}
+
+	var groups []group
+
+	for i, card := range m.ToolCards {
+		if card.GroupID == "" || i == 0 || m.ToolCards[i-1].GroupID != card.GroupID {
+			g := group{id: card.GroupID}
+			groups = append(groups, g)
+		}
+		groups[len(groups)-1].cards = append(groups[len(groups)-1].cards, i)
+	}
+
+	sepWidth := m.Width - 8
+	if sepWidth < 20 {
+		sepWidth = 20
+	}
+	sepLine := strings.Repeat("─", sepWidth)
+
+	var lines []string
+	lines = append(lines, ToolCardSeparator.Render("┌"+sepLine))
+
+	for _, g := range groups {
+		if len(g.cards) > 1 && g.id != "" {
+			header := fmt.Sprintf(" 工具调用 (%d)", len(g.cards))
+			groupHeader := lipgloss.NewStyle().
+				Foreground(ColorInfo).
+				Bold(true).
+				Render(header)
+			lines = append(lines, groupHeader)
+		}
+
+		for _, idx := range g.cards {
+			card := m.ToolCards[idx]
+			cardView := m.renderToolCard(card)
+			lines = append(lines, ToolCardGroupBorder.Render(cardView))
+		}
+	}
+
+	lines = append(lines, ToolCardSeparator.Render("└"+sepLine))
+
+	return strings.Join(lines, "\n")
+}
+
+func (m *MessageViewport) ClearToolCards() {
+	m.ToolCards = nil
+	m.renderContent()
+}
+
+func (m *MessageViewport) ToggleToolCardExpanded(index int) {
+	if index >= 0 && index < len(m.ToolCards) {
+		m.ToolCards[index].Expanded = !m.ToolCards[index].Expanded
+	}
+	m.renderContent()
+	m.viewport.GotoBottom()
+}
+
 func (m *MessageViewport) renderToolCard(card ToolCardData) string {
 	statusIcon := "⏳"
-	style := ToolCardStyle
-	if card.Result != "" {
+	statusColor := ColorMuted
+	isDone := card.Result != ""
+	isExecuting := !isDone
+
+	if isExecuting {
+		statusIcon = spinnerChars[m.SpinnerFrame%len(spinnerChars)]
+		statusColor = ColorPrimary
+	} else if isDone {
 		if card.Success {
 			statusIcon = "✓"
-			style = ToolCardSuccess
+			statusColor = ColorSuccess
 		} else {
 			statusIcon = "✗"
+			statusColor = ColorDanger
+		}
+	}
+
+	oneLine := lipgloss.NewStyle().Foreground(statusColor).Render(statusIcon) +
+		" " + lipgloss.NewStyle().Bold(true).Render(card.ToolName)
+
+	if isDone && card.Duration != "" {
+		oneLine += " " + lipgloss.NewStyle().Foreground(ColorMuted).Render(card.Duration)
+	}
+	if isExecuting {
+		oneLine += " " + lipgloss.NewStyle().Foreground(ColorMuted).Render("执行中...")
+	}
+
+	if !card.Expanded {
+		hint := lipgloss.NewStyle().Foreground(ColorMuted).Render("  (Enter 展开)")
+		return ToolCardFoldedStyle.Render(oneLine + hint)
+	}
+
+	style := ToolCardExecutingStyle
+	if isDone {
+		if card.Success {
+			style = ToolCardSuccess
+		} else {
 			style = ToolCardError
 		}
 	}
 
-	header := lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("Tool: %s", card.ToolName))
-	if card.Duration != "" {
-		header += " · " + card.Duration
+	content := oneLine
+	if card.Params != "" {
+		content += "\n" + lipgloss.NewStyle().Foreground(ColorMuted).Render("  params: "+truncate(card.Params, 100))
 	}
-	header += " · " + statusIcon
-
-	content := header
-	if card.Expanded || card.Result != "" {
-		if card.Params != "" {
-			content += "\n" + lipgloss.NewStyle().Foreground(ColorMuted).Render("  params: "+truncate(card.Params, 100))
+	if len(card.OutputChunks) > 0 {
+		showChunks := card.OutputChunks
+		if len(showChunks) > 5 {
+			showChunks = showChunks[len(showChunks)-5:]
 		}
-		if card.Result != "" {
-			resultColor := ColorSuccess
-			if !card.Success {
-				resultColor = ColorDanger
-			}
-			content += "\n" + lipgloss.NewStyle().Foreground(resultColor).Render("  "+truncate(card.Result, 200))
+		for _, chunk := range showChunks {
+			content += "\n" + lipgloss.NewStyle().Foreground(ColorText).Render("    "+truncate(chunk, 200))
 		}
+	}
+	if isDone {
+		resultColor := ColorSuccess
+		if !card.Success {
+			resultColor = ColorDanger
+		}
+		content += "\n" + lipgloss.NewStyle().Foreground(resultColor).Render("  "+truncate(card.Result, 300))
 	}
 
 	return style.Copy().Width(m.Width - 8).Render(content)
+}
+
+func (m *MessageViewport) renderStreamingContent(streamingContent string) string {
+	header := lipgloss.NewStyle().Foreground(ColorInfo).Bold(true).Render("[Assistant]")
+	body := streamingContent
+	if m.mdRenderer != nil {
+		rendered, err := m.mdRenderer.Render(streamingContent)
+		if err == nil {
+			body = rendered
+		}
+	}
+	return StreamingBubbleStyle.Copy().Width(m.Width - 8).Render(header + "\n" + body)
+}
+
+func (m *MessageViewport) renderEmptyState() string {
+	banner := `
+  ____  _____     _______ ____
+  |  _ \| ____|   / /_   _/ __ \
+  | | | |  _|    / /  | || |  | |
+  | |_| | |___  / /___| || |__| |
+  |____/|_____|/_/____|_|\____/
+
+  Type / to see commands, Enter to send
+  `
+	return lipgloss.NewStyle().
+		Foreground(ColorMuted).
+		Width(m.Width).
+		Align(lipgloss.Center).
+		Render(banner)
 }
 
 func truncate(s string, maxLen int) string {

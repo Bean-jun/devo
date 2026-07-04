@@ -32,6 +32,8 @@ func NewCommandPalette() CommandPalette {
 		{Label: "/pause", Description: "暂停当前会话", Action: "pause"},
 		{Label: "/resume", Description: "恢复当前会话", Action: "resume"},
 		{Label: "/cancel", Description: "取消当前操作", Action: "cancel"},
+		{Label: "/yolo", Description: "切换 YOLO 自动批准模式", Action: "yolo"},
+		{Label: "/trust", Description: "设置信任级别 (low/normal/elevated)", Action: "trust"},
 		{Label: "/help", Description: "显示帮助", Action: "help"},
 		{Label: "/quit", Description: "退出", Action: "quit"},
 	}

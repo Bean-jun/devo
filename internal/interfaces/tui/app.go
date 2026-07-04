@@ -23,6 +23,10 @@ const (
 	StateProcessing
 	StateAwaitingApproval
 	StateQuitting
+	StateThinking
+	StateToolExecuting
+	StatePaused
+	StateCancelled
 )
 
 type App struct {
@@ -40,30 +44,28 @@ type App struct {
 	rollbackPicker components.RollbackPicker
 	sessionPicker  components.SessionPicker
 	toast          components.Toast
+	helpPanel      components.HelpPanel
 
 	state              AppState
 	showCommandPalette bool
 	showRollbackPicker bool
 	showSessionPicker  bool
+	showHelpPanel      bool
 	width              int
 	height             int
 	workingDir         string
 	ready              bool
 	apiBaseURL         string
 
-	inputHistory   []string
-	historyIndex   int
-	pastedFullText string
-	pasteLabel     string
-	lastKeyTime    time.Time
-	isPasting      bool
-	pasteBuffer    string
-	preKeyValue    string
-	prePreKeyValue string
+	inputHistory []string
+	historyIndex int
+	lastKeyTime  time.Time
 
-	initStatus string
-	initErr    error
-	tickCount  int
+	initStatus  string
+	initErr     error
+	tickCount   int
+	yoloMode    bool
+	keyConsumed bool
 }
 
 func NewAppWithURL(baseURL string, version string) (*App, error) {
@@ -81,7 +83,9 @@ func NewAppWithURL(baseURL string, version string) (*App, error) {
 	}
 
 	chatView := components.NewChatView()
+	chatView.InputArea.WorkingDir = wd
 	chatView.InputArea.Version = "v" + version
+	chatView.InputArea.SetMaxChars(5000)
 
 	return &App{
 		apiBaseURL:     baseURL,
@@ -97,6 +101,7 @@ func NewAppWithURL(baseURL string, version string) (*App, error) {
 		rollbackPicker: components.NewRollbackPicker(),
 		sessionPicker:  components.NewSessionPicker(),
 		toast:          components.NewToast(),
+		helpPanel:      components.NewHelpPanel(),
 	}, nil
 }
 
@@ -125,11 +130,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.height = msg.Height
 
 	case messages.TickMsg:
-		a.toast.Tick()
-		if a.isPasting && time.Since(a.lastKeyTime) > 120*time.Millisecond {
-			a.finishPaste()
-		}
-		cmds = append(cmds, tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		a.statusBar.ToastActive = a.toast.Visible
+		a.statusBar.ToastMessage = a.toast.Message
+		a.statusBar.ToastIsError = a.toast.IsError
+		a.statusBar.SpinnerFrame++
+		a.chatView.MessageView.SpinnerFrame++
+		a.chatView.MessageView.Refresh()
+		cmds = append(cmds, tea.Tick(250*time.Millisecond, func(t time.Time) tea.Msg {
 			return messages.TickMsg(t)
 		}))
 
@@ -153,12 +160,17 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		wasModalShowing := a.showCommandPalette || a.showRollbackPicker || a.showSessionPicker
+		a.keyConsumed = false
 		cmd := a.handleKeyMsg(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
 		a.layout()
+
+		if a.keyConsumed {
+			return a, tea.Batch(cmds...)
+		}
 
 		if a.approvalModal.Visible {
 			a.approvalModal, cmd = a.approvalModal.Update(msg)
@@ -185,27 +197,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if msg.String() != "esc" {
-			now := time.Now()
-			elapsed := now.Sub(a.lastKeyTime)
-			a.lastKeyTime = now
-
-			if a.isPasting {
-				if elapsed > 120*time.Millisecond {
-					a.finishPaste()
-				} else {
-					a.appendToPasteBuffer(msg)
-					return a, tea.Batch(cmds...)
-				}
-			} else if elapsed < 40*time.Millisecond && a.isPasteableKey(msg) {
-				a.isPasting = true
-				a.pasteBuffer = a.chatView.InputArea.Value()
-				a.chatView.InputArea.SetValue(a.preKeyValue)
-				a.appendToPasteBuffer(msg)
-				return a, tea.Batch(cmds...)
-			}
-
-			a.prePreKeyValue = a.preKeyValue
-			a.preKeyValue = a.chatView.InputArea.Value()
+			a.lastKeyTime = time.Now()
 			a.chatView, cmd = a.chatView.Update(msg)
 			if cmd != nil {
 				cmds = append(cmds, cmd)
@@ -221,7 +213,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd != nil {
 		cmds = append(cmds, cmd)
 	}
-	a.compressPasteIfNeeded()
+	a.chatView.InputArea.UpdateCharCount(a.chatView.InputArea.Value())
 
 	if a.approvalModal.Visible {
 		a.approvalModal, cmd = a.approvalModal.Update(msg)
@@ -242,6 +234,7 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.TickMsg:
 		a.tickCount++
+		a.statusBar.SpinnerFrame++
 		return a, tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
 			return messages.TickMsg(t)
 		})
@@ -277,8 +270,9 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.activeSession = sess
 			a.statusBar.SessionTitle = sess.Title
 			a.statusBar.SessionState = sess.State
-			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %d (↑%d ↓%d)",
-				sess.TokenUsage.Total, sess.TokenUsage.Input, sess.TokenUsage.Output)
+			a.syncYOLOFromTrustLevel(sess.TrustLevel)
+			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)",
+				formatTokens(sess.TokenUsage.Total), formatTokens(sess.TokenUsage.Input), formatTokens(sess.TokenUsage.Output))
 			a.ready = true
 			a.tickCount = 0
 			a.layout()
@@ -299,8 +293,9 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.sessions = []types.SessionInfo{*sess}
 			a.statusBar.SessionTitle = sess.Title
 			a.statusBar.SessionState = sess.State
-			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %d (↑%d ↓%d)",
-				sess.TokenUsage.Total, sess.TokenUsage.Input, sess.TokenUsage.Output)
+			a.syncYOLOFromTrustLevel(sess.TrustLevel)
+			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)",
+				formatTokens(sess.TokenUsage.Total), formatTokens(sess.TokenUsage.Input), formatTokens(sess.TokenUsage.Output))
 			a.ready = true
 			a.tickCount = 0
 			a.layout()
@@ -336,9 +331,33 @@ func (a *App) View() string {
 
 		if a.initErr != nil {
 			lines = append(lines, "")
-			lines = append(lines, lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#EF4444")).
-				Render(fmt.Sprintf("  Error: %v", a.initErr)))
+			if a.isConfigError(a.initErr) {
+				lines = append(lines, lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#F59E0B")).
+					Bold(true).
+					Render("  Config file not found"))
+				lines = append(lines, "")
+				lines = append(lines, lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#6B7280")).
+					Render("  Create a config file at ~/.devo/config.yaml with:"))
+				lines = append(lines, "")
+				lines = append(lines, lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#9CA3AF")).
+					Render("  llm:"))
+				lines = append(lines, lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#9CA3AF")).
+					Render("    provider: openai"))
+				lines = append(lines, lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#9CA3AF")).
+					Render("    api_key: your-api-key"))
+				lines = append(lines, lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#9CA3AF")).
+					Render("    model: gpt-4o"))
+			} else {
+				lines = append(lines, lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#EF4444")).
+					Render(fmt.Sprintf("  Error: %v", a.initErr)))
+			}
 			lines = append(lines, "")
 			lines = append(lines, lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#6B7280")).
@@ -385,31 +404,30 @@ func (a *App) View() string {
 			lipgloss.Center,
 			a.sessionPicker.View(),
 		)
+	} else if a.showHelpPanel {
+		a.helpPanel.SetSize(a.width, a.height-3)
+		mainContent = lipgloss.Place(
+			a.width,
+			a.height-3,
+			lipgloss.Center,
+			lipgloss.Center,
+			a.helpPanel.View(),
+		)
 	} else {
 		mainContent = chatView
 	}
 
-	toastView := a.toast.View()
-
 	var view string
-	if toastView != "" {
-		view = lipgloss.JoinVertical(lipgloss.Left,
-			statusBarView,
-			mainContent,
-			toastView,
-		)
-	} else {
-		view = lipgloss.JoinVertical(lipgloss.Left,
-			statusBarView,
-			mainContent,
-		)
-	}
-
 	if a.approvalModal.Visible {
 		modalView := a.approvalModal.View()
 		view = lipgloss.JoinVertical(lipgloss.Left,
 			statusBarView,
 			modalView,
+		)
+	} else {
+		view = lipgloss.JoinVertical(lipgloss.Left,
+			statusBarView,
+			mainContent,
 		)
 	}
 
@@ -460,93 +478,63 @@ func (a *App) historyNext() {
 	}
 }
 
-func (a *App) isPasteableKey(msg tea.KeyMsg) bool {
-	key := msg.String()
-	if key == "enter" {
-		return true
-	}
-	return len(msg.Runes) == 1 && msg.Runes[0] >= ' '
-}
-
-func (a *App) appendToPasteBuffer(msg tea.KeyMsg) {
-	key := msg.String()
-	if key == "enter" {
-		a.pasteBuffer += "\n"
-	} else if len(msg.Runes) == 1 {
-		a.pasteBuffer += string(msg.Runes[0])
-	}
-}
-
-func (a *App) finishPaste() {
-	a.isPasting = false
-	val := a.pasteBuffer
-	a.pasteBuffer = ""
-
-	lines := strings.Split(val, "\n")
-	if len(val) > 200 || len(lines) > 3 {
-		a.pastedFullText = val
-		prefix := a.preKeyValue
-		if len(prefix) > 60 {
-			prefix = prefix[:60] + "..."
-		}
-		if prefix != "" {
-			prefix += " "
-		}
-		a.pasteLabel = prefix + fmt.Sprintf("[已粘贴 %d 行文本]", len(lines))
-		a.chatView.InputArea.SetValue(a.pasteLabel)
-	} else {
-		a.chatView.InputArea.SetValue(val)
-	}
-}
-
-func (a *App) compressPasteIfNeeded() {
-	// During rapid input (paste), skip compression to avoid flashing
-	if time.Since(a.lastKeyTime) < 100*time.Millisecond {
-		return
-	}
-
-	val := a.chatView.InputArea.Value()
-	if val == "" {
-		return
-	}
-
-	if a.pasteLabel != "" && val == a.pasteLabel {
-		return
-	}
-
-	if a.pasteLabel != "" && val != a.pasteLabel {
-		a.pastedFullText = ""
-		a.pasteLabel = ""
-		return
-	}
-
-	lines := strings.Split(val, "\n")
-	if len(val) > 200 || len(lines) > 3 {
-		a.pastedFullText = val
-		// Keep first line of existing text as visual context
-		firstLine := lines[0]
-		if len(firstLine) > 60 {
-			firstLine = firstLine[:60] + "..."
-		}
-		a.pasteLabel = firstLine + fmt.Sprintf(" [已粘贴 %d 行文本]", len(lines))
-		a.chatView.InputArea.SetValue(a.pasteLabel)
-	}
-}
-
 func (a *App) layout() {
 	a.statusBar.Width = a.width
-	a.toast.Width = a.width
 
 	chatWidth := a.width
 	if chatWidth < 20 {
 		chatWidth = 20
 	}
 
-	topHeight := 3
+	topHeight := 4
 	chatHeight := a.height - topHeight
 	if chatHeight < 10 {
 		chatHeight = 10
 	}
 
 	a.chatView.SetSize(chatWidth, chatHeight)
+}
+
+func (a *App) toggleYOLO() tea.Cmd {
+	a.yoloMode = !a.yoloMode
+	a.statusBar.YOLOMode = a.yoloMode
+
+	if a.yoloMode {
+		a.toast.Show("YOLO 模式已开启，将自动批准所有操作", false)
+		return a.setTrustCmd("elevated")
+	} else {
+		a.toast.Show("YOLO 模式已关闭，恢复手动审批", false)
+		return a.setTrustCmd("normal")
+	}
+}
+
+func (a *App) syncYOLOFromTrustLevel(trustLevel string) {
+	if trustLevel == "elevated" {
+		a.yoloMode = true
+		a.statusBar.YOLOMode = true
+	} else {
+		a.yoloMode = false
+		a.statusBar.YOLOMode = false
+	}
+}
+
+func (a *App) isConfigError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	configKeywords := []string{
+		"config file not found",
+		"no such file or directory",
+		"config",
+		".yaml",
+		".yml",
+		"not found",
+	}
+	for _, kw := range configKeywords {
+		if strings.Contains(strings.ToLower(errStr), kw) {
+			return true
+		}
+	}
+	return false
 }

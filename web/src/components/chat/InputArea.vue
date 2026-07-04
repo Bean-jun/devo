@@ -51,6 +51,8 @@ const sessionTokenUsage = computed(() => {
 
 const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
 
+const workingDir = computed(() => sessionStore.currentSession?.workingDirectory ?? '')
+
 function focusTextarea(): void {
   nextTick(() => {
     textareaRef.value?.focus()
@@ -227,6 +229,7 @@ function autoResize() {
       <span class="footer-item">Tokens {{ sessionTokenUsage }}</span>
       <span class="footer-sep">·</span>
       <span class="footer-item">v{{ appVersion }}</span>
+      <span v-if="workingDir" class="footer-item footer-dir">{{ workingDir }}</span>
     </div>
   </div>
 </template>
@@ -256,6 +259,14 @@ function autoResize() {
 
 .footer-sep {
   opacity: 0.4;
+}
+
+.footer-dir {
+  margin-left: auto;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .input-wrapper {

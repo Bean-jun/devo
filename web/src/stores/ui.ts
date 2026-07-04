@@ -89,6 +89,9 @@ export const useUiStore = defineStore('ui', () => {
   const rightPanelVisible = ref(false)
   const sidebarCollapsed = ref(loadSidebarCollapsed())
 
+  const activityStream = ref('')
+  const activityActive = ref(false)
+
   const workspaceList = ref<WorkspaceEntry[]>([])
 
   async function fetchWorkspaceList(): Promise<WorkspaceEntry[]> {
@@ -238,6 +241,15 @@ export const useUiStore = defineStore('ui', () => {
     saveSidebarCollapsed(sidebarCollapsed.value)
   }
 
+  function setActivity(stream: string): void {
+    activityStream.value = stream
+    activityActive.value = true
+  }
+
+  function clearActivity(): void {
+    activityActive.value = false
+  }
+
   return {
     toasts,
     activeModal,
@@ -271,5 +283,9 @@ export const useUiStore = defineStore('ui', () => {
     setVscodeMode,
     registerThemeTransition,
     toggleThemeWithTransition,
+    activityStream,
+    activityActive,
+    setActivity,
+    clearActivity,
   }
 })

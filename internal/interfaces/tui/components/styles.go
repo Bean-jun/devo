@@ -18,9 +18,12 @@ var (
 
 var StateColors = map[string]lipgloss.Color{
 	"idle":              ColorSuccess,
+	"thinking":          ColorInfo,
+	"tool_executing":    ColorPrimary,
 	"processing":        ColorInfo,
 	"awaiting_approval": ColorWarning,
 	"paused":            ColorMuted,
+	"cancelled":         ColorDanger,
 	"completed":         ColorSuccess,
 	"archived":          ColorMuted,
 }
@@ -57,6 +60,12 @@ var (
 			Padding(0, 1).
 			Margin(0, 0, 1, 2)
 
+	ToolCardExecutingStyle = lipgloss.NewStyle().
+				Border(lipgloss.NormalBorder()).
+				BorderForeground(ColorPrimary).
+				Padding(0, 1).
+				Margin(0, 0, 1, 2)
+
 	ToolCardSuccess = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(ColorSuccess).
@@ -68,6 +77,24 @@ var (
 			BorderForeground(ColorDanger).
 			Padding(0, 1).
 			Margin(0, 0, 1, 2)
+
+	ToolCardFoldedStyle = lipgloss.NewStyle().
+				Padding(0, 0, 0, 2).
+				Margin(0, 0, 0, 2)
+
+	ToolCardGroupBorder = lipgloss.NewStyle().
+				Border(lipgloss.NormalBorder(), false, false, false, true).
+				BorderForeground(ColorBorder).
+				Padding(0, 0, 0, 1)
+
+	ToolCardSeparator = lipgloss.NewStyle().
+				Foreground(ColorBorder)
+
+	StreamingBubbleStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(ColorInfo).
+				Padding(0, 1).
+				Margin(0, 4, 1, 0)
 
 	ModalOverlayStyle = lipgloss.NewStyle().
 				Background(lipgloss.Color("#000000CC"))
@@ -131,6 +158,19 @@ var (
 	ThinkingStyle = lipgloss.NewStyle().
 			Foreground(ColorMuted).
 			Italic(true)
+
+	YOLOStatusBarStyle = lipgloss.NewStyle().
+				Border(lipgloss.NormalBorder()).
+				BorderForeground(ColorWarning).
+				Background(ColorWarning).
+				Foreground(ColorBg).
+				Padding(0, 1)
+
+	YOLOBadgeStyle = lipgloss.NewStyle().
+			Background(ColorWarning).
+			Foreground(ColorBg).
+			Bold(true).
+			Padding(0, 1)
 )
 
 func RiskStyle(level string) lipgloss.Style {

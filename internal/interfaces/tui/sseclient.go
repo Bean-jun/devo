@@ -7,45 +7,65 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"devo/internal/interfaces/tui/messages"
 )
 
 type SSEClient struct {
-	url     string
-	eventCh chan messages.SSEEvent
-	errCh   chan error
-	done    chan struct{}
-	client  *http.Client
+	url                  string
+	eventCh              chan messages.SSEEvent
+	errCh                chan error
+	done                 chan struct{}
+	client               *http.Client
+	maxReconnectAttempts int
+	reconnectDelay       time.Duration
+	reconnectAttempt     int
+	reconnecting         bool
 }
 
 func NewSSEClient() *SSEClient {
 	return &SSEClient{
-		eventCh: make(chan messages.SSEEvent, 100),
-		errCh:   make(chan error, 1),
-		done:    make(chan struct{}),
-		client:  &http.Client{Timeout: 0},
+		eventCh:              make(chan messages.SSEEvent, 100),
+		errCh:                make(chan error, 1),
+		done:                 make(chan struct{}),
+		client:               &http.Client{Timeout: 0},
+		maxReconnectAttempts: 5,
+		reconnectDelay:       1 * time.Second,
 	}
+}
+
+func (s *SSEClient) SetReconnectConfig(maxAttempts int, initialDelay time.Duration) {
+	s.maxReconnectAttempts = maxAttempts
+	s.reconnectDelay = initialDelay
 }
 
 func (s *SSEClient) Connect(sseURL string) error {
 	s.url = sseURL
 	s.done = make(chan struct{})
 
-	req, err := http.NewRequest("GET", sseURL, nil)
+	resp, err := s.doConnect()
 	if err != nil {
-		return fmt.Errorf("create SSE request: %w", err)
+		return err
+	}
+
+	go s.readEvents(resp)
+	return nil
+}
+
+func (s *SSEClient) doConnect() (*http.Response, error) {
+	req, err := http.NewRequest("GET", s.url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create SSE request: %w", err)
 	}
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Cache-Control", "no-cache")
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("SSE connect: %w", err)
+		return nil, fmt.Errorf("SSE connect: %w", err)
 	}
-
-	go s.readEvents(resp)
-	return nil
+	return resp, nil
 }
 
 func (s *SSEClient) Disconnect() {
@@ -65,9 +85,12 @@ func (s *SSEClient) Errors() <-chan error {
 	return s.errCh
 }
 
+func (s *SSEClient) IsReconnecting() bool {
+	return s.reconnecting
+}
+
 func (s *SSEClient) readEvents(resp *http.Response) {
 	defer resp.Body.Close()
-	defer close(s.eventCh)
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -112,10 +135,89 @@ func (s *SSEClient) readEvents(resp *http.Response) {
 
 	if err := scanner.Err(); err != nil {
 		select {
-		case s.errCh <- err:
 		case <-s.done:
+			return
+		default:
+		}
+
+		s.reconnecting = true
+		s.reconnectAttempt += 1
+		if s.reconnectAttempt <= s.maxReconnectAttempts {
+			s.sendReconnectEvent()
+			s.tryReconnect()
+		} else {
+			select {
+			case s.errCh <- err:
+			case <-s.done:
+			}
 		}
 	}
+}
+
+func (s *SSEClient) sendReconnectEvent() {
+	event := messages.SSEEvent{
+		Type: "reconnecting",
+		Data: map[string]interface{}{
+			"attempt":     s.reconnectAttempt,
+			"max_attempt": s.maxReconnectAttempts,
+		},
+	}
+	select {
+	case s.eventCh <- event:
+	case <-s.done:
+	}
+}
+
+func (s *SSEClient) tryReconnect() {
+	delay := s.reconnectDelay * (1 << (s.reconnectAttempt - 1))
+	if delay > 30*time.Second {
+		delay = 30 * time.Second
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+	case <-s.done:
+		return
+	}
+
+	s.done = make(chan struct{})
+
+	resp, err := s.doConnect()
+	if err != nil {
+		s.reconnecting = false
+		if s.reconnectAttempt < s.maxReconnectAttempts {
+			s.reconnectAttempt += 1
+			s.sendReconnectEvent()
+			s.tryReconnect()
+		} else {
+			select {
+			case s.errCh <- err:
+			case <-s.done:
+			}
+		}
+		return
+	}
+
+	s.reconnecting = false
+	s.reconnectAttempt = 0
+
+	event := messages.SSEEvent{
+		Type: "reconnected",
+		Data: map[string]interface{}{
+			"message": "reconnected successfully",
+		},
+	}
+	select {
+	case s.eventCh <- event:
+	case <-s.done:
+		resp.Body.Close()
+		return
+	}
+
+	go s.readEvents(resp)
 }
 
 func (s *SSEClient) parseEvent(eventType string, eventID int64, data string) messages.SSEEvent {
