@@ -13,15 +13,17 @@ import (
 )
 
 type MessageViewport struct {
-	viewport        viewport.Model
-	Messages        []types.Message
-	ToolCards       []ToolCardData
-	Width           int
-	Height          int
-	mdRenderer      *glamour.TermRenderer
-	StreamingBuffer strings.Builder
-	StreamingActive bool
-	SpinnerFrame    int
+	viewport          viewport.Model
+	Messages          []types.Message
+	ToolCards         []ToolCardData
+	Width             int
+	Height            int
+	mdRenderer        *glamour.TermRenderer
+	StreamingBuffer   strings.Builder
+	StreamingActive   bool
+	SpinnerFrame      int
+	ThinkingCollapsed bool
+	ThinkingContent   string
 }
 
 type ToolCardData struct {
@@ -46,6 +48,8 @@ func NewMessageViewport() MessageViewport {
 func (m *MessageViewport) SetMessages(messages []types.Message) {
 	m.Messages = messages
 	m.ToolCards = nil
+	m.ThinkingContent = ""
+	m.ThinkingCollapsed = true
 	m.renderContent()
 	m.viewport.GotoBottom()
 }
@@ -105,11 +109,7 @@ func (m *MessageViewport) AddSystemNotice(content string) {
 }
 
 func (m *MessageViewport) AddThinking(message string) {
-	msg := types.Message{
-		Role:    "thinking",
-		Content: message,
-	}
-	m.Messages = append(m.Messages, msg)
+	m.ThinkingContent += message
 	m.renderContent()
 	m.viewport.GotoBottom()
 }
@@ -222,8 +222,6 @@ func (m *MessageViewport) renderContent() {
 			lines = append(lines, m.renderSystemMessage(msg))
 		case "tool":
 			lines = append(lines, m.renderToolMessage(msg))
-		case "thinking":
-			lines = append(lines, m.renderThinking(msg))
 		}
 	}
 
@@ -241,13 +239,30 @@ func (m *MessageViewport) renderContent() {
 }
 
 func (m *MessageViewport) renderUserMessage(msg types.Message) string {
-	header := lipgloss.NewStyle().Foreground(ColorPrimary).Bold(true).Render("[You]")
+	prefix := UserPrefixStyle.Render("You")
 	body := msg.Content
-	return UserBubbleStyle.Copy().Width(m.Width - 8).Render(header + "\n" + body)
+
+	lines := strings.Split(prefix+"\n"+body, "\n")
+	maxW := m.Width - 4
+	if maxW < 20 {
+		maxW = 20
+	}
+
+	var result []string
+	for _, line := range lines {
+		lineLen := lipgloss.Width(line)
+		pad := maxW - lineLen
+		if pad < 0 {
+			pad = 0
+		}
+		result = append(result, strings.Repeat(" ", pad)+line)
+	}
+
+	return strings.Join(result, "\n")
 }
 
 func (m *MessageViewport) renderAssistantMessage(msg types.Message) string {
-	header := lipgloss.NewStyle().Foreground(ColorInfo).Bold(true).Render("[Assistant]")
+	prefix := AssistantPrefixStyle.Render("🤖")
 	body := msg.Content
 	if m.mdRenderer != nil {
 		rendered, err := m.mdRenderer.Render(msg.Content)
@@ -255,7 +270,36 @@ func (m *MessageViewport) renderAssistantMessage(msg types.Message) string {
 			body = rendered
 		}
 	}
-	return AssistantBubbleStyle.Copy().Width(m.Width - 8).Render(header + "\n" + body)
+
+	thinking := m.renderThinkingContent()
+	if thinking == "" {
+		return prefix + "\n" + body
+	}
+
+	thinkPrefix := lipgloss.NewStyle().Foreground(ColorMuted).Render("💭")
+	header := prefix + "  " + thinkPrefix
+	sep := lipgloss.NewStyle().Foreground(ColorBorder).Render("  ──────────────────────────────")
+	return header + "\n" + thinking + "\n" + sep + "\n" + body
+}
+
+func (m *MessageViewport) renderThinkingContent() string {
+	if m.ThinkingContent == "" {
+		return ""
+	}
+	if m.ThinkingCollapsed {
+		hint := lipgloss.NewStyle().Foreground(ColorMuted).Render("Thinking... (Enter 展开)")
+		return "  " + hint
+	}
+	lines := strings.Split(m.ThinkingContent, "\n")
+	var rendered []string
+	for _, line := range lines {
+		rendered = append(rendered, lipgloss.NewStyle().
+			Foreground(ColorMuted).
+			Render("  "+line))
+	}
+	sep := lipgloss.NewStyle().Foreground(ColorBorder).Render("  ── 思考结束 ──")
+	return strings.Join(rendered, "\n") + "\n" + sep + "\n  " +
+		lipgloss.NewStyle().Foreground(ColorMuted).Render("(Enter 折叠)")
 }
 
 func (m *MessageViewport) renderSystemMessage(msg types.Message) string {
@@ -264,11 +308,7 @@ func (m *MessageViewport) renderSystemMessage(msg types.Message) string {
 
 func (m *MessageViewport) renderToolMessage(msg types.Message) string {
 	header := lipgloss.NewStyle().Foreground(ColorWarning).Render("[Tool Result]")
-	return ToolCardStyle.Copy().Width(m.Width - 8).Render(header + "\n" + truncate(msg.Content, 200))
-}
-
-func (m *MessageViewport) renderThinking(msg types.Message) string {
-	return ThinkingStyle.Render("  " + msg.Content)
+	return ToolCardStyle.Copy().Width(m.Width - 4).Render(header + "\n" + truncate(msg.Content, 200))
 }
 
 func (m *MessageViewport) renderToolCards() string {
@@ -291,7 +331,7 @@ func (m *MessageViewport) renderToolCards() string {
 		groups[len(groups)-1].cards = append(groups[len(groups)-1].cards, i)
 	}
 
-	sepWidth := m.Width - 8
+	sepWidth := m.Width - 4
 	if sepWidth < 20 {
 		sepWidth = 20
 	}
@@ -324,6 +364,8 @@ func (m *MessageViewport) renderToolCards() string {
 
 func (m *MessageViewport) ClearToolCards() {
 	m.ToolCards = nil
+	m.ThinkingContent = ""
+	m.ThinkingCollapsed = true
 	m.renderContent()
 }
 
@@ -331,6 +373,12 @@ func (m *MessageViewport) ToggleToolCardExpanded(index int) {
 	if index >= 0 && index < len(m.ToolCards) {
 		m.ToolCards[index].Expanded = !m.ToolCards[index].Expanded
 	}
+	m.renderContent()
+	m.viewport.GotoBottom()
+}
+
+func (m *MessageViewport) ToggleThinking() {
+	m.ThinkingCollapsed = !m.ThinkingCollapsed
 	m.renderContent()
 	m.viewport.GotoBottom()
 }
@@ -369,15 +417,6 @@ func (m *MessageViewport) renderToolCard(card ToolCardData) string {
 		return ToolCardFoldedStyle.Render(oneLine + hint)
 	}
 
-	style := ToolCardExecutingStyle
-	if isDone {
-		if card.Success {
-			style = ToolCardSuccess
-		} else {
-			style = ToolCardError
-		}
-	}
-
 	content := oneLine
 	if card.Params != "" {
 		content += "\n" + lipgloss.NewStyle().Foreground(ColorMuted).Render("  params: "+truncate(card.Params, 100))
@@ -399,11 +438,11 @@ func (m *MessageViewport) renderToolCard(card ToolCardData) string {
 		content += "\n" + lipgloss.NewStyle().Foreground(resultColor).Render("  "+truncate(card.Result, 300))
 	}
 
-	return style.Copy().Width(m.Width - 8).Render(content)
+	return ToolCardFoldedStyle.Render(content)
 }
 
 func (m *MessageViewport) renderStreamingContent(streamingContent string) string {
-	header := lipgloss.NewStyle().Foreground(ColorInfo).Bold(true).Render("[Assistant]")
+	prefix := AssistantPrefixStyle.Render("🤖")
 	body := streamingContent
 	if m.mdRenderer != nil {
 		rendered, err := m.mdRenderer.Render(streamingContent)
@@ -411,7 +450,15 @@ func (m *MessageViewport) renderStreamingContent(streamingContent string) string
 			body = rendered
 		}
 	}
-	return StreamingBubbleStyle.Copy().Width(m.Width - 8).Render(header + "\n" + body)
+
+	thinking := m.renderThinkingContent()
+	if thinking == "" {
+		return prefix + "\n" + body
+	}
+	thinkPrefix := lipgloss.NewStyle().Foreground(ColorMuted).Render("💭")
+	header := prefix + "  " + thinkPrefix
+	sep := lipgloss.NewStyle().Foreground(ColorBorder).Render("  ──────────────────────────────")
+	return header + "\n" + thinking + "\n" + sep + "\n" + body
 }
 
 func (m *MessageViewport) renderEmptyState() string {

@@ -56,14 +56,15 @@ func (s *StatusBar) View() string {
 		serverIndicator = lipgloss.NewStyle().Foreground(ColorDanger).Render("[Disconnected]")
 	}
 
-	left := lipgloss.NewStyle().Foreground(ColorPrimary).Bold(true).Render(s.AppName)
+	left := ""
 	if s.SessionTitle != "" {
-		left += " · " + s.SessionTitle
+		left = s.SessionTitle
+		left += " · "
 	}
-	left += " · " + stateDot + " " + stateDisplay
+	left += stateDot + " " + stateDisplay
 
 	if s.YOLOMode {
-		yoloBadge := YOLOBadgeStyle.Render("YOLO")
+		yoloBadge := YOLOSmallBadgeStyle.Render("YOLO")
 		left += " " + yoloBadge
 	}
 

@@ -14,7 +14,7 @@ func Launch(baseURL string, version string) {
 		os.Exit(1)
 	}
 
-	p := tea.NewProgram(app, tea.WithOutput(os.Stderr), tea.WithMouseCellMotion())
+	p := tea.NewProgram(app, tea.WithOutput(os.Stderr), tea.WithMouseCellMotion(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 	}

@@ -283,7 +283,7 @@ func TestCtrlR_Removed(t *testing.T) {
 	}
 }
 
-func TestCtrlC_StillWorks(t *testing.T) {
+func TestCtrlC_NoLongerCancels(t *testing.T) {
 	app := newTestApp()
 	sess := &types.SessionInfo{
 		ID:    "test-session",
@@ -296,8 +296,8 @@ func TestCtrlC_StillWorks(t *testing.T) {
 	msg := tea.KeyMsg{Type: tea.KeyCtrlC}
 	cmd := app.handleKeyMsg(msg)
 
-	if cmd == nil {
-		t.Error("Ctrl+C should still trigger cancel command")
+	if cmd != nil {
+		t.Error("Ctrl+C should no longer trigger cancel command")
 	}
 }
 

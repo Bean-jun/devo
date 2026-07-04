@@ -33,5 +33,13 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['vue', 'pinia', 'vue-router'],
+          'markdown': ['marked', 'marked-highlight', 'highlight.js'],
+        },
+      },
+    },
   },
 })

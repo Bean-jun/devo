@@ -134,8 +134,11 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	}
 
 	switch key {
-	case "ctrl+c":
-		return a.cancelCmd()
+	case "ctrl+k":
+		a.showCommandPalette = true
+		a.commandPalette.Show()
+		a.chatView.Blur()
+		return nil
 
 	case "ctrl+q":
 		a.state = StateQuitting
@@ -159,18 +162,39 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 				return a.sendMessageCmd(content)
 			}
 			expanded := false
-			for i := range a.chatView.MessageView.ToolCards {
-				card := &a.chatView.MessageView.ToolCards[i]
-				if !card.Expanded {
-					a.chatView.MessageView.ToggleToolCardExpanded(i)
+
+			hasThinking := a.chatView.MessageView.ThinkingContent != ""
+			if hasThinking {
+				if a.chatView.MessageView.ThinkingCollapsed {
+					a.chatView.MessageView.ToggleThinking()
 					expanded = true
-					break
+				} else {
+					a.chatView.MessageView.ToggleThinking()
 				}
 			}
+
 			if !expanded {
+				expandedIdx := -1
 				for i := range a.chatView.MessageView.ToolCards {
 					if a.chatView.MessageView.ToolCards[i].Expanded {
-						a.chatView.MessageView.ToggleToolCardExpanded(i)
+						expandedIdx = i
+						break
+					}
+				}
+				if expandedIdx >= 0 {
+					a.chatView.MessageView.ToggleToolCardExpanded(expandedIdx)
+					nextIdx := expandedIdx + 1
+					if nextIdx < len(a.chatView.MessageView.ToolCards) {
+						a.chatView.MessageView.ToggleToolCardExpanded(nextIdx)
+					}
+					expanded = true
+				} else {
+					for i := range a.chatView.MessageView.ToolCards {
+						if !a.chatView.MessageView.ToolCards[i].Expanded {
+							a.chatView.MessageView.ToggleToolCardExpanded(i)
+							expanded = true
+							break
+						}
 					}
 				}
 			}
@@ -323,6 +347,10 @@ func (a *App) executeSlashCommand(input string) tea.Cmd {
 			return nil
 		}
 		return a.setTrustCmd(arg)
+
+	case "version":
+		a.toast.Show(fmt.Sprintf("Devo %s", a.version), false)
+		return nil
 
 	case "help":
 		a.showHelpPanel = true

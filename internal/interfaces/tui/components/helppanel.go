@@ -71,8 +71,8 @@ func (h *HelpPanel) buildContent() string {
 	}{
 		{"Esc", "工具执行中 → 暂停, 暂停/思考/处理中 → 取消"},
 		{"Alt+Y", "切换 YOLO 自动批准模式"},
+		{"Ctrl+K", "打开命令面板"},
 		{"F2", "重命名当前会话"},
-		{"Ctrl+C", "取消当前操作"},
 		{"Ctrl+Q", "退出"},
 		{"↑↓", "滚动消息列表"},
 		{"Shift+↑↓", "输入历史"},
@@ -114,6 +114,7 @@ func (h *HelpPanel) buildContent() string {
 		{"/cancel", "取消当前操作"},
 		{"/yolo", "切换 YOLO 模式"},
 		{"/trust <level>", "设置信任级别 (low/normal/elevated)"},
+		{"/version", "显示版本信息"},
 		{"/help", "显示此帮助面板"},
 		{"/quit", "退出"},
 	}

@@ -30,23 +30,19 @@ var StateColors = map[string]lipgloss.Color{
 
 var (
 	StatusBarStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder()).
+			Border(lipgloss.NormalBorder(), false, false, true, false).
 			BorderForeground(ColorBorder).
 			Background(ColorSurface).
 			Foreground(ColorWhite).
 			Padding(0, 1)
 
-	UserBubbleStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorPrimary).
-			Padding(0, 1).
-			Margin(0, 0, 1, 4)
+	UserPrefixStyle = lipgloss.NewStyle().
+			Foreground(ColorWarning).
+			Bold(true)
 
-	AssistantBubbleStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(ColorBorder).
-				Padding(0, 1).
-				Margin(0, 4, 1, 0)
+	AssistantPrefixStyle = lipgloss.NewStyle().
+				Foreground(ColorInfo).
+				Bold(true)
 
 	SystemNoticeStyle = lipgloss.NewStyle().
 				Foreground(ColorMuted).
@@ -55,46 +51,30 @@ var (
 				Margin(0, 0, 1, 0)
 
 	ToolCardStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder()).
-			BorderForeground(ColorInfo).
-			Padding(0, 1).
-			Margin(0, 0, 1, 2)
+			Padding(0, 0, 0, 2).
+			Margin(0, 0, 1, 0)
 
 	ToolCardExecutingStyle = lipgloss.NewStyle().
-				Border(lipgloss.NormalBorder()).
-				BorderForeground(ColorPrimary).
-				Padding(0, 1).
-				Margin(0, 0, 1, 2)
+				Padding(0, 0, 0, 2).
+				Margin(0, 0, 0, 0)
 
 	ToolCardSuccess = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder()).
-			BorderForeground(ColorSuccess).
-			Padding(0, 1).
-			Margin(0, 0, 1, 2)
+			Padding(0, 0, 0, 2).
+			Margin(0, 0, 0, 0)
 
 	ToolCardError = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder()).
-			BorderForeground(ColorDanger).
-			Padding(0, 1).
-			Margin(0, 0, 1, 2)
+			Padding(0, 0, 0, 2).
+			Margin(0, 0, 0, 0)
 
 	ToolCardFoldedStyle = lipgloss.NewStyle().
 				Padding(0, 0, 0, 2).
 				Margin(0, 0, 0, 2)
 
 	ToolCardGroupBorder = lipgloss.NewStyle().
-				Border(lipgloss.NormalBorder(), false, false, false, true).
-				BorderForeground(ColorBorder).
 				Padding(0, 0, 0, 1)
 
 	ToolCardSeparator = lipgloss.NewStyle().
 				Foreground(ColorBorder)
-
-	StreamingBubbleStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(ColorInfo).
-				Padding(0, 1).
-				Margin(0, 4, 1, 0)
 
 	ModalOverlayStyle = lipgloss.NewStyle().
 				Background(lipgloss.Color("#000000CC"))
@@ -122,8 +102,9 @@ var (
 				Background(ColorPrimary)
 
 	InputAreaStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder()).
+			Border(lipgloss.NormalBorder(), false, false, true, false).
 			BorderForeground(ColorBorder).
+			Background(ColorSurface).
 			Padding(0, 1)
 
 	ToastErrorStyle = lipgloss.NewStyle().
@@ -159,8 +140,12 @@ var (
 			Foreground(ColorMuted).
 			Italic(true)
 
+	ThinkingCollapsedStyle = lipgloss.NewStyle().
+				Foreground(ColorMuted).
+				Padding(0, 1)
+
 	YOLOStatusBarStyle = lipgloss.NewStyle().
-				Border(lipgloss.NormalBorder()).
+				Border(lipgloss.NormalBorder(), false, false, true, false).
 				BorderForeground(ColorWarning).
 				Background(ColorWarning).
 				Foreground(ColorBg).
@@ -171,6 +156,10 @@ var (
 			Foreground(ColorBg).
 			Bold(true).
 			Padding(0, 1)
+
+	YOLOSmallBadgeStyle = lipgloss.NewStyle().
+				Foreground(ColorWarning).
+				Bold(true)
 )
 
 func RiskStyle(level string) lipgloss.Style {

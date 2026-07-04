@@ -56,6 +56,7 @@ type App struct {
 	workingDir         string
 	ready              bool
 	apiBaseURL         string
+	version            string
 
 	inputHistory []string
 	historyIndex int
@@ -84,12 +85,11 @@ func NewAppWithURL(baseURL string, version string) (*App, error) {
 
 	chatView := components.NewChatView()
 	chatView.InputArea.WorkingDir = wd
-	chatView.InputArea.Version = "v" + version
-	chatView.InputArea.SetMaxChars(5000)
 
 	return &App{
 		apiBaseURL:     baseURL,
 		workingDir:     wd,
+		version:        version,
 		width:          80,
 		height:         24,
 		state:          StateReady,
@@ -213,7 +213,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd != nil {
 		cmds = append(cmds, cmd)
 	}
-	a.chatView.InputArea.UpdateCharCount(a.chatView.InputArea.Value())
 
 	if a.approvalModal.Visible {
 		a.approvalModal, cmd = a.approvalModal.Update(msg)
@@ -312,7 +311,7 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Log("[TUI] Retrying session creation...")
 			return a, a.initSessionCmd()
 		}
-		if msg.String() == "ctrl+c" || msg.String() == "ctrl+q" {
+		if msg.String() == "ctrl+q" {
 			return a, tea.Quit
 		}
 	}

@@ -25,12 +25,12 @@ const sessions = computed(() => {
 
 const currentSessionId = computed(() => sessionStore.currentSession?.id)
 
-const deleteTarget = ref<{ id: string; name: string; path: string } | null>(null)
+const deleteTarget = ref<{ id: string; name: string; path: string; exists: boolean } | null>(null)
 const confirmInput = ref('')
 const confirmError = ref('')
 
-function openDeleteConfirm(ws: { id: string; name: string; path: string }) {
-  deleteTarget.value = ws
+function openDeleteConfirm(ws: { id: string; name: string; path: string; exists: boolean }) {
+  deleteTarget.value = { id: ws.id, name: ws.name, path: ws.path, exists: ws.exists }
   confirmInput.value = ''
   confirmError.value = ''
   nextTick(() => {
@@ -41,7 +41,7 @@ function openDeleteConfirm(ws: { id: string; name: string; path: string }) {
 
 function confirmDelete() {
   if (!deleteTarget.value) return
-  if (confirmInput.value !== deleteTarget.value.path) {
+  if (deleteTarget.value.exists && confirmInput.value !== deleteTarget.value.path) {
     confirmError.value = '输入的路径不匹配'
     return
   }
@@ -231,30 +231,37 @@ function cancelNewSession(e?: Event) {
 
   <Teleport to="body">
     <div v-if="deleteTarget" class="confirm-overlay" @click.self="cancelDelete">
-      <div class="confirm-dialog">
-        <h3 class="confirm-title">⚠️ 删除工作区</h3>
+      <div class="confirm-dialog" :class="{ 'confirm-dialog-sm': !deleteTarget.exists }">
+        <h3 class="confirm-title">{{ deleteTarget.exists ? '⚠️ 删除工作区' : '移除工作区记录' }}</h3>
         <p class="confirm-desc">
-          此操作将删除 <strong>{{ deleteTarget.name }}</strong> 下的所有会话和记录，不可恢复。
+          <template v-if="deleteTarget.exists">
+            此操作将删除 <strong>{{ deleteTarget.name }}</strong> 下的所有会话和记录，不可恢复。
+          </template>
+          <template v-else>
+            该目录已不存在，将仅从列表中移除 <strong>{{ deleteTarget.name }}</strong> 的记录。
+          </template>
         </p>
-        <p class="confirm-path-label">请输入以下路径以确认删除：</p>
-        <code class="confirm-path">{{ deleteTarget.path }}</code>
-        <input
-          v-model="confirmInput"
-          class="confirm-input"
-          :class="{ 'confirm-input-error': confirmError }"
-          placeholder="输入路径以确认..."
-          @keydown.enter="confirmDelete"
-          @keydown.escape="cancelDelete"
-        />
-        <p v-if="confirmError" class="confirm-error">{{ confirmError }}</p>
+        <template v-if="deleteTarget.exists">
+          <p class="confirm-path-label">请输入以下路径以确认删除：</p>
+          <code class="confirm-path">{{ deleteTarget.path }}</code>
+          <input
+            v-model="confirmInput"
+            class="confirm-input"
+            :class="{ 'confirm-input-error': confirmError }"
+            placeholder="输入路径以确认..."
+            @keydown.enter="confirmDelete"
+            @keydown.escape="cancelDelete"
+          />
+          <p v-if="confirmError" class="confirm-error">{{ confirmError }}</p>
+        </template>
         <div class="confirm-actions">
           <button class="confirm-btn confirm-btn-cancel" @click="cancelDelete">取消</button>
           <button
             class="confirm-btn confirm-btn-danger"
-            :disabled="confirmInput !== deleteTarget.path"
+            :disabled="deleteTarget.exists && confirmInput !== deleteTarget.path"
             @click="confirmDelete"
           >
-            删除
+            {{ deleteTarget.exists ? '删除' : '确认移除' }}
           </button>
         </div>
       </div>
@@ -311,6 +318,11 @@ function cancelNewSession(e?: Event) {
 
 .sidebar-section {
   padding: 4px 8px;
+}
+
+.sidebar-section:first-child {
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 .sidebar-section:last-child {

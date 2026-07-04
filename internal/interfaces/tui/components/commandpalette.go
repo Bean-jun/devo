@@ -34,6 +34,7 @@ func NewCommandPalette() CommandPalette {
 		{Label: "/cancel", Description: "取消当前操作", Action: "cancel"},
 		{Label: "/yolo", Description: "切换 YOLO 自动批准模式", Action: "yolo"},
 		{Label: "/trust", Description: "设置信任级别 (low/normal/elevated)", Action: "trust"},
+		{Label: "/version", Description: "显示版本信息", Action: "version"},
 		{Label: "/help", Description: "显示帮助", Action: "help"},
 		{Label: "/quit", Description: "退出", Action: "quit"},
 	}

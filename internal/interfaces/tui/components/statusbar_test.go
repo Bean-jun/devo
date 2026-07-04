@@ -7,7 +7,6 @@ import (
 
 func TestStatusBar_YOLOMode(t *testing.T) {
 	s := NewStatusBar()
-	s.AppName = "Devo"
 	s.SessionState = "idle"
 	s.Width = 80
 	s.YOLOMode = true
@@ -20,7 +19,6 @@ func TestStatusBar_YOLOMode(t *testing.T) {
 
 func TestStatusBar_YOLOModeOff(t *testing.T) {
 	s := NewStatusBar()
-	s.AppName = "Devo"
 	s.SessionState = "idle"
 	s.Width = 80
 	s.YOLOMode = false
@@ -33,7 +31,6 @@ func TestStatusBar_YOLOModeOff(t *testing.T) {
 
 func TestStatusBar_StateDot(t *testing.T) {
 	s := NewStatusBar()
-	s.AppName = "Devo"
 	s.SessionState = "idle"
 	s.Width = 80
 
@@ -51,7 +48,6 @@ func TestStatusBar_AllStates(t *testing.T) {
 
 	for _, state := range states {
 		s := NewStatusBar()
-		s.AppName = "Devo"
 		s.SessionState = state
 		s.Width = 80
 
