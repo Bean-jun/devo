@@ -59,6 +59,7 @@ async function confirmRollback() {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
+    e.stopPropagation()
     uiStore.setActiveModal(null)
     return
   }

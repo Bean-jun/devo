@@ -10,6 +10,8 @@ export interface ToolCall {
   riskLevel?: RiskLevel
   duration?: number
   approvalId?: string
+  streamingOutput?: string
+  stage?: string
 }
 
 export interface ToolResult {

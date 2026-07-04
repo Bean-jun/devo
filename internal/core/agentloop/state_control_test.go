@@ -82,7 +82,7 @@ func TestPauseFromProcessing(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateThinking
+	sess.State = session.StateToolExecuting
 	store.Update(sess)
 
 	err := loop.Pause("sess-1")
@@ -137,8 +137,8 @@ func TestResumeFromPaused(t *testing.T) {
 	}
 
 	sess, _ = store.Get("sess-1")
-	if sess.State != session.StateThinking {
-		t.Errorf("expected state Processing after resume, got %q", sess.State)
+	if sess.State != session.StateToolExecuting {
+		t.Errorf("expected state ToolExecuting after resume, got %q", sess.State)
 	}
 }
 
@@ -182,8 +182,8 @@ func TestResumePublishesEvent(t *testing.T) {
 	}
 
 	data, _ := evt.Data.(map[string]any)
-	if data["new_state"] != session.StateThinking.ToSnakeCase() {
-		t.Errorf("expected new_state Processing, got %v", data["new_state"])
+	if data["new_state"] != session.StateToolExecuting.ToSnakeCase() {
+		t.Errorf("expected new_state tool_executing, got %v", data["new_state"])
 	}
 	if data["reason"] != "resumed" {
 		t.Errorf("expected reason resumed, got %v", data["reason"])
@@ -262,8 +262,13 @@ func TestCancelFromPaused(t *testing.T) {
 	store.Update(sess)
 
 	err := loop.Cancel("sess-1")
-	if err == nil {
-		t.Fatal("expected error when cancelling from Paused state")
+	if err != nil {
+		t.Fatalf("expected no error when cancelling from Paused state, got: %v", err)
+	}
+
+	sess, _ = store.Get("sess-1")
+	if sess.State != session.StateIdle {
+		t.Errorf("expected state Idle after cancel from Paused, got %q", sess.State)
 	}
 }
 
@@ -458,7 +463,7 @@ func TestPauseChannelSignal(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateThinking
+	sess.State = session.StateToolExecuting
 	store.Update(sess)
 
 	lc := &LoopContext{
@@ -539,7 +544,7 @@ func TestPauseFlagFallback(t *testing.T) {
 	loop, store := setupTestLoop()
 
 	sess := createTestSession(store, "sess-1")
-	sess.State = session.StateThinking
+	sess.State = session.StateToolExecuting
 	store.Update(sess)
 
 	err := loop.Pause("sess-1")

@@ -646,9 +646,9 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 		session.Close()
 		delete(m.sessions, serverID)
 		delete(m.clients, serverID)
-		if info, ok := m.servers[serverID]; ok {
-			info.Status = StatusDisconnected
-		}
+	}
+	for serverID := range m.servers {
+		m.servers[serverID].Status = StatusDisconnected
 	}
 	return nil
 }
@@ -777,7 +777,13 @@ func (a *mcpToolAdapter) ParamsSchema() map[string]interface{} {
 	return nil
 }
 
-func (a *mcpToolAdapter) Execute(workingDir string, params map[string]interface{}) (string, error) {
-	ctx := context.Background()
-	return a.manager.CallToolByServer(ctx, a.serverID, a.toolName, params)
+func (a *mcpToolAdapter) Execute(ctx context.Context, workingDir string, params map[string]interface{}, w tools.StreamWriter) error {
+	result, err := a.manager.CallToolByServer(ctx, a.serverID, a.toolName, params)
+	if err != nil {
+		w.WriteError(err)
+		return err
+	}
+	w.WriteChunk(result)
+	w.WriteDone(true, "MCP tool executed successfully")
+	return nil
 }

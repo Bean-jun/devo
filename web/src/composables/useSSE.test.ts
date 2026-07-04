@@ -69,6 +69,27 @@ describe('useSSE', () => {
     vi.useRealTimers()
   })
 
+  it('should preserve handlers after reconnect', () => {
+    vi.useFakeTimers()
+    const { connect, onEvent } = useSSE()
+    const handler = vi.fn()
+
+    onEvent('streaming_token', handler)
+    connect('sess-001')
+
+    const instance = (globalThis.EventSource as any).instances[0]
+    instance.dispatchEvent('error', '')
+
+    vi.advanceTimersByTime(2000)
+
+    const reconnectedInstance = (globalThis.EventSource as any).instances[1]
+    reconnectedInstance.dispatchEvent('message', JSON.stringify({ type: 'streaming_token', data: { content: 'Hello after reconnect' } }))
+
+    expect(handler).toHaveBeenCalledWith({ content: 'Hello after reconnect' })
+
+    vi.useRealTimers()
+  })
+
   it('should handle malformed JSON gracefully', () => {
     const { connect, onEvent } = useSSE()
     const handler = vi.fn()

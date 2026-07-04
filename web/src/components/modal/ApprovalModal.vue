@@ -83,6 +83,7 @@ function handleKeydown(e: KeyboardEvent) {
   } else if (e.key === 'n' || e.key === 'N') {
     handleReject()
   } else if (e.key === 'Escape') {
+    e.stopPropagation()
     uiStore.setActiveModal(null)
   }
 }

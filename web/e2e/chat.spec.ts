@@ -87,3 +87,87 @@ test.describe('Chat Flow', () => {
     expect(value).toContain('\n')
   })
 })
+
+test.describe('Tool Streaming', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await page.waitForSelector('[data-test="chat-panel"]', { timeout: 10_000 })
+  })
+
+  test('should display streaming output chunk by chunk', async ({ page }) => {
+    await page.evaluate(() => {
+      const store = (window as any).__chatStore
+      store.appendToolCallMessage({
+        id: 'tool-stream-001',
+        name: 'search_codebase',
+        parameters: { query: 'main function' },
+        status: 'pending',
+        riskLevel: 'low',
+      })
+    })
+
+    const toolCard = page.locator('[data-test="tool-call-card"]')
+    await expect(toolCard).toBeVisible({ timeout: 5_000 })
+    await expect(toolCard.locator('[data-test="tool-name"]')).toContainText('search_codebase')
+
+    await page.evaluate(() => {
+      const store = (window as any).__chatStore
+      store.updateToolProgress('tool-stream-001', 'running')
+      store.appendToolStreamChunk('tool-stream-001', '找到 3 个匹配...\n')
+    })
+    await expect(page.locator('[data-test="tool-streaming"]')).toContainText('找到 3 个匹配')
+
+    await page.evaluate(() => {
+      const store = (window as any).__chatStore
+      store.appendToolStreamChunk('tool-stream-001', '文件: main.go 第 12 行\n')
+    })
+    await expect(page.locator('[data-test="tool-streaming"]')).toContainText('main.go')
+
+    await page.evaluate(() => {
+      const store = (window as any).__chatStore
+      store.appendToolStreamChunk('tool-stream-001', '文件: utils.go 第 45 行\n')
+    })
+    await expect(page.locator('[data-test="tool-streaming"]')).toContainText('utils.go')
+
+    await page.evaluate(() => {
+      const store = (window as any).__chatStore
+      store.updateToolCallStatus('tool-stream-001', 'success', {
+        success: true,
+        stdout: '搜索完成，共 3 个匹配',
+      })
+    })
+    await expect(page.locator('[data-test="tool-streaming"]')).not.toBeVisible()
+    await expect(page.locator('.tool-result')).toContainText('搜索完成')
+  })
+
+  test('should show stage transitions', async ({ page }) => {
+    await page.evaluate(() => {
+      const store = (window as any).__chatStore
+      store.appendToolCallMessage({
+        id: 'tool-progress-001',
+        name: 'execute_command',
+        parameters: { command: 'go build ./...' },
+        status: 'pending',
+        riskLevel: 'medium',
+      })
+    })
+
+    await page.evaluate(() => {
+      const store = (window as any).__chatStore
+      store.updateToolProgress('tool-progress-001', 'starting')
+    })
+    await expect(page.locator('[data-test="tool-stage"]')).toContainText('starting')
+
+    await page.evaluate(() => {
+      const store = (window as any).__chatStore
+      store.updateToolProgress('tool-progress-001', 'running')
+    })
+    await expect(page.locator('[data-test="tool-stage"]')).toContainText('running')
+
+    await page.evaluate(() => {
+      const store = (window as any).__chatStore
+      store.updateToolProgress('tool-progress-001', 'done')
+    })
+    await expect(page.locator('[data-test="tool-stage"]')).toContainText('done')
+  })
+})

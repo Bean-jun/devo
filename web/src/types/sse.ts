@@ -5,6 +5,7 @@
   | 'tool_call_request'
   | 'tool_result'
   | 'tool_progress'
+  | 'tool_chunk'
   | 'message_complete'
   | 'approval_required'
   | 'approval_auto'

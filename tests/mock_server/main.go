@@ -191,12 +191,12 @@ var toolParams map[string]map[string]interface{}
 func initToolParams() {
 	toolParams = map[string]map[string]interface{}{
 		"read_file":       {"path": "README.md"},
-		"write_file":      {"path": filepath.Join(os.TempDir(), "mock_output.txt"), "content": "Hello from mock server"},
-		"edit_file":       {"path": filepath.Join(os.TempDir(), "mock_edit.txt"), "mode": "replace", "old_str": "old line", "new_str": "new line"},
+		"write_file":      {"path": "mock_output.txt", "content": "Hello from mock server"},
+		"edit_file":       {"path": "mock_output.txt", "mode": "replace", "old_str": "Hello from mock server", "new_str": "Hello from mock server (updated)"},
 		"list_files":      {"path": ".", "max_depth": float64(1)},
 		"search_codebase": {"pattern": "func main"},
-		"execute_command": {"command": "powershell -Command Start-Sleep -Seconds 5"},
-		"exec_python":     {"code": "print('hello from mock')"},
+		"execute_command": {"command": "powershell -Command \"for ($i=1; $i -le 5; $i++) { Write-Output ('Line '+$i+': Hello from mock server'); Start-Sleep -Seconds 1 }\"", "timeout_seconds": float64(30)},
+		"exec_python":     {"code": "import time\nfor i in range(1, 6):\n    print(f'Line {i}: Hello from mock server')\n    time.sleep(1)"},
 		"use_skill":       {"skill_name": "Go Expert"},
 	}
 }

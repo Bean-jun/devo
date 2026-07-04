@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,26 +87,32 @@ func (t *WriteFileTool) OperationType(workingDir string, params map[string]inter
 	return string(OpFileWriteNew)
 }
 
-func (t *WriteFileTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
+func (t *WriteFileTool) Execute(ctx context.Context, workingDir string, params map[string]interface{}, w StreamWriter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	path, ok := params["path"].(string)
 	if !ok || path == "" {
-		return "", fmt.Errorf("missing required parameter: path")
+		return fmt.Errorf("missing required parameter: path")
 	}
 
 	content, ok := params["content"].(string)
 	if !ok {
-		return "", fmt.Errorf("missing required parameter: content")
+		return fmt.Errorf("missing required parameter: content")
 	}
 
 	safePath, err := pathsec.CheckPath(workingDir, path)
 	if err != nil {
-		return "", fmt.Errorf("path security check failed")
+		return fmt.Errorf("path security check failed")
 	}
 
 	gi := pathsec.LoadGitignore(workingDir)
 	relPath, _ := filepath.Rel(workingDir, safePath)
 	if gi.IsIgnored(relPath, false) {
-		return "", fmt.Errorf("file is excluded by .gitignore: %s", path)
+		return fmt.Errorf("file is excluded by .gitignore: %s", path)
 	}
 
 	_, statErr := os.Stat(safePath)
@@ -113,17 +120,19 @@ func (t *WriteFileTool) Execute(workingDir string, params map[string]interface{}
 
 	dir := filepath.Dir(safePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create directory: %v", err)
+		return fmt.Errorf("failed to create directory: %v", err)
 	}
 
 	if err := os.WriteFile(safePath, []byte(content), 0644); err != nil {
-		return "", fmt.Errorf("failed to write file: %v", err)
+		return fmt.Errorf("failed to write file: %v", err)
 	}
 
 	if isNew {
-		return fmt.Sprintf("File created successfully: %s", path), nil
+		w.WriteDone(true, fmt.Sprintf("File created successfully: %s", path))
+	} else {
+		w.WriteDone(true, fmt.Sprintf("File updated successfully: %s", path))
 	}
-	return fmt.Sprintf("File updated successfully: %s", path), nil
+	return nil
 }
 
 type EditFileTool struct{}
@@ -174,203 +183,6 @@ func (t *EditFileTool) OperationType(workingDir string, params map[string]interf
 	return string(OpFileEdit)
 }
 
-func (t *EditFileTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
-	path, ok := params["path"].(string)
-	if !ok || path == "" {
-		return "", fmt.Errorf("missing required parameter: path")
-	}
-
-	mode, ok := params["mode"].(string)
-	if !ok {
-		return "", fmt.Errorf("missing required parameter: mode")
-	}
-
-	safePath, err := pathsec.CheckPath(workingDir, path)
-	if err != nil {
-		return "", fmt.Errorf("path security check failed")
-	}
-
-	gi := pathsec.LoadGitignore(workingDir)
-	relPath, _ := filepath.Rel(workingDir, safePath)
-	if gi.IsIgnored(relPath, false) {
-		return "", fmt.Errorf("file is excluded by .gitignore: %s", path)
-	}
-
-	switch mode {
-	case "replace":
-		return t.executeReplace(safePath, params)
-	case "patch":
-		return t.executePatch(safePath, params)
-	default:
-		return "", fmt.Errorf("unknown edit mode: %s (supported: replace, patch)", mode)
-	}
-}
-
-func (t *EditFileTool) executeReplace(safePath string, params map[string]interface{}) (string, error) {
-	oldStr, ok := params["old_str"].(string)
-	if !ok || oldStr == "" {
-		return "", fmt.Errorf("missing required parameter: old_str")
-	}
-
-	newStr, ok := params["new_str"].(string)
-	if !ok {
-		newStr = ""
-	}
-
-	data, err := os.ReadFile(safePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %v", err)
-	}
-
-	content := string(data)
-	count := strings.Count(content, oldStr)
-
-	if count == 0 {
-		return "", fmt.Errorf("old_str not found in file")
-	}
-
-	if count > 1 {
-		return "", fmt.Errorf("old_str matches %d unique locations in the file, please provide more context to make the replacement unique", count)
-	}
-
-	newContent := strings.Replace(content, oldStr, newStr, 1)
-
-	// 生成 diff（在写入前）
-	diff := generateUnifiedDiff(content, newContent)
-
-	if err := os.WriteFile(safePath, []byte(newContent), 0644); err != nil {
-		return "", fmt.Errorf("failed to write file: %v", err)
-	}
-
-	result := fmt.Sprintf("File successfully edited: replaced 1 occurrence")
-	if diff != "" {
-		result += "\n__DEVO_DIFF__\n" + diff
-	}
-	return result, nil
-}
-
-func (t *EditFileTool) executePatch(safePath string, params map[string]interface{}) (string, error) {
-	patchData, ok := params["patch"].(string)
-	if !ok || patchData == "" {
-		return "", fmt.Errorf("missing required parameter: patch")
-	}
-
-	data, err := os.ReadFile(safePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %v", err)
-	}
-
-	patchedContent, err := applyUnifiedDiff(string(data), patchData)
-	if err != nil {
-		return "", fmt.Errorf("patch application failed: %v", err)
-	}
-
-	diff := generateUnifiedDiff(string(data), patchedContent)
-
-	if err := os.WriteFile(safePath, []byte(patchedContent), 0644); err != nil {
-		return "", fmt.Errorf("failed to write file: %v", err)
-	}
-
-	result := "File successfully patched with unified diff"
-	if diff != "" {
-		result += "\n__DEVO_DIFF__\n" + diff
-	}
-	return result, nil
-}
-
-func applyUnifiedDiff(original, diffText string) (string, error) {
-	lines := strings.Split(original, "\n")
-	diffLines := strings.Split(diffText, "\n")
-
-	var result []string
-	origIdx := 0
-	diffIdx := 0
-	inHunk := false
-	hunkOrigStart := 0
-	var hunkLines []string
-
-	for diffIdx < len(diffLines) {
-		line := diffLines[diffIdx]
-
-		if strings.HasPrefix(line, "@@") {
-			if inHunk {
-				applied, newOrigIdx, err := applyHunk(lines, origIdx, hunkOrigStart, hunkLines)
-				if err != nil {
-					return "", fmt.Errorf("failed to apply hunk at line %d: %v", hunkOrigStart+1, err)
-				}
-				result = append(result, applied...)
-				origIdx = newOrigIdx
-			}
-
-			inHunk = true
-			hunkLines = nil
-			hunkOrigStart = origIdx
-			diffIdx++
-			continue
-		}
-
-		if inHunk {
-			hunkLines = append(hunkLines, line)
-			diffIdx++
-			continue
-		}
-
-		diffIdx++
-	}
-
-	if inHunk {
-		applied, newOrigIdx, err := applyHunk(lines, origIdx, hunkOrigStart, hunkLines)
-		if err != nil {
-			return "", fmt.Errorf("failed to apply hunk at line %d: %v", hunkOrigStart+1, err)
-		}
-		result = append(result, applied...)
-		origIdx = newOrigIdx
-	}
-
-	if origIdx < len(lines) {
-		result = append(result, lines[origIdx:]...)
-	}
-
-	return strings.Join(result, "\n"), nil
-}
-
-func applyHunk(original []string, origIdx, hunkOrigStart int, hunkLines []string) ([]string, int, error) {
-	for origIdx < hunkOrigStart {
-		origIdx = hunkOrigStart
-	}
-
-	var result []string
-	origLineIdx := hunkOrigStart
-
-	for _, line := range hunkLines {
-		if line == "" {
-			continue
-		}
-
-		switch line[0] {
-		case ' ':
-			if origLineIdx < len(original) {
-				result = append(result, original[origLineIdx])
-			}
-			origLineIdx++
-		case '-':
-			if origLineIdx < len(original) {
-				if strings.TrimRight(original[origLineIdx], "\r") != strings.TrimRight(line[1:], "\r") {
-					return nil, origIdx, fmt.Errorf("expected removal line %q but found %q", line[1:], original[origLineIdx])
-				}
-			}
-			origLineIdx++
-		case '+':
-			result = append(result, line[1:])
-		case '\\':
-		default:
-			return nil, origIdx, fmt.Errorf("unexpected diff line prefix: %q", string(line[0]))
-		}
-	}
-
-	return result, origLineIdx, nil
-}
-
 func (t *EditFileTool) PreCheck(params map[string]interface{}) error {
 	path, ok := params["path"].(string)
 	if !ok || path == "" {
@@ -388,13 +200,11 @@ func (t *EditFileTool) PreCheck(params map[string]interface{}) error {
 		if !ok || oldStr == "" {
 			return fmt.Errorf("missing required parameter: old_str")
 		}
-		_ = oldStr
 	case "patch":
-		patchData, ok := params["patch"].(string)
-		if !ok || patchData == "" {
+		patch, ok := params["patch"].(string)
+		if !ok || patch == "" {
 			return fmt.Errorf("missing required parameter: patch")
 		}
-		_ = patchData
 	default:
 		return fmt.Errorf("unknown edit mode: %s (supported: replace, patch)", mode)
 	}
@@ -422,9 +232,8 @@ func (t *EditFileTool) PreviewDiff(workingDir string, params map[string]interfac
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %v", err)
 	}
-	oldContent := string(oldData)
 
-	var newContent string
+	originalContent := string(oldData)
 
 	switch mode {
 	case "replace":
@@ -433,12 +242,9 @@ func (t *EditFileTool) PreviewDiff(workingDir string, params map[string]interfac
 			return "", fmt.Errorf("missing required parameter: old_str")
 		}
 
-		newStr, ok := params["new_str"].(string)
-		if !ok {
-			newStr = ""
-		}
+		newStr, _ := params["new_str"].(string)
 
-		count := strings.Count(oldContent, oldStr)
+		count := strings.Count(originalContent, oldStr)
 		if count == 0 {
 			return "", fmt.Errorf("old_str not found in file")
 		}
@@ -446,27 +252,270 @@ func (t *EditFileTool) PreviewDiff(workingDir string, params map[string]interfac
 			return "", fmt.Errorf("old_str matches %d unique locations in the file, please provide more context to make the replacement unique", count)
 		}
 
-		newContent = strings.Replace(oldContent, oldStr, newStr, 1)
+		newContent := strings.Replace(originalContent, oldStr, newStr, 1)
+		return generateUnifiedDiff(originalContent, newContent), nil
 
 	case "patch":
-		patchData, ok := params["patch"].(string)
-		if !ok || patchData == "" {
+		patchContent, ok := params["patch"].(string)
+		if !ok || patchContent == "" {
 			return "", fmt.Errorf("missing required parameter: patch")
 		}
 
-		patched, err := applyUnifiedDiff(oldContent, patchData)
+		patchedContent, err := applyPatch(originalContent, patchContent)
 		if err != nil {
-			return "", fmt.Errorf("patch application failed: %v", err)
+			return "", fmt.Errorf("failed to apply patch: %v", err)
 		}
-		newContent = patched
+
+		return generateUnifiedDiff(originalContent, patchedContent), nil
 
 	default:
 		return "", fmt.Errorf("unknown edit mode: %s", mode)
 	}
+}
 
-	if oldContent == newContent {
-		return "", nil
+func (t *EditFileTool) Execute(ctx context.Context, workingDir string, params map[string]interface{}, w StreamWriter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
-	return generateUnifiedDiff(oldContent, newContent), nil
+	path, ok := params["path"].(string)
+	if !ok || path == "" {
+		return fmt.Errorf("missing required parameter: path")
+	}
+
+	mode, ok := params["mode"].(string)
+	if !ok {
+		return fmt.Errorf("missing required parameter: mode")
+	}
+
+	safePath, err := pathsec.CheckPath(workingDir, path)
+	if err != nil {
+		return fmt.Errorf("path security check failed")
+	}
+
+	gi := pathsec.LoadGitignore(workingDir)
+	relPath, _ := filepath.Rel(workingDir, safePath)
+	if gi.IsIgnored(relPath, false) {
+		return fmt.Errorf("file is excluded by .gitignore: %s", path)
+	}
+
+	switch mode {
+	case "replace":
+		return t.executeReplace(ctx, safePath, params, w)
+	case "patch":
+		return t.executePatch(ctx, safePath, params, w)
+	default:
+		return fmt.Errorf("unknown edit mode: %s (supported: replace, patch)", mode)
+	}
+}
+
+func (t *EditFileTool) executeReplace(ctx context.Context, safePath string, params map[string]interface{}, w StreamWriter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	oldStr, ok := params["old_str"].(string)
+	if !ok || oldStr == "" {
+		return fmt.Errorf("missing required parameter: old_str")
+	}
+
+	newStr, ok := params["new_str"].(string)
+	if !ok {
+		newStr = ""
+	}
+
+	data, err := os.ReadFile(safePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %v", err)
+	}
+
+	content := string(data)
+	count := strings.Count(content, oldStr)
+
+	if count == 0 {
+		return fmt.Errorf("old_str not found in file")
+	}
+
+	if count > 1 {
+		return fmt.Errorf("old_str matches %d unique locations in the file, please provide more context to make the replacement unique", count)
+	}
+
+	newContent := strings.Replace(content, oldStr, newStr, 1)
+
+	diff := generateUnifiedDiff(content, newContent)
+
+	if err := os.WriteFile(safePath, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("failed to write file: %v", err)
+	}
+
+	result := fmt.Sprintf("File successfully edited: replaced 1 occurrence")
+	if diff != "" {
+		result += "\n__DEVO_DIFF__\n" + diff
+	}
+	w.WriteDone(true, result)
+	return nil
+}
+
+func (t *EditFileTool) executePatch(ctx context.Context, safePath string, params map[string]interface{}, w StreamWriter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	patchContent, ok := params["patch"].(string)
+	if !ok || patchContent == "" {
+		return fmt.Errorf("missing required parameter: patch for patch mode")
+	}
+
+	data, err := os.ReadFile(safePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %v", err)
+	}
+
+	originalContent := string(data)
+	patchedContent, err := applyPatch(originalContent, patchContent)
+	if err != nil {
+		return fmt.Errorf("failed to apply patch: %v", err)
+	}
+
+	diff := generateUnifiedDiff(originalContent, patchedContent)
+
+	if err := os.WriteFile(safePath, []byte(patchedContent), 0644); err != nil {
+		return fmt.Errorf("failed to write file: %v", err)
+	}
+
+	result := fmt.Sprintf("File successfully patched")
+	if diff != "" {
+		result += "\n__DEVO_DIFF__\n" + diff
+	}
+	w.WriteDone(true, result)
+	return nil
+}
+
+func applyPatch(originalContent, patchContent string) (string, error) {
+	origLines := strings.Split(originalContent, "\n")
+	patchedLines := make([]string, 0, len(origLines))
+
+	lines := strings.Split(patchContent, "\n")
+	i := 0
+	for i < len(lines) {
+		line := strings.TrimRight(lines[i], "\r")
+		i++
+
+		if strings.HasPrefix(line, "@@") {
+			oldStart, oldCount, newStart, newCount := parseHunkHeader(line)
+			if oldStart < 0 || newStart < 0 {
+				continue
+			}
+
+			origIdx := oldStart - 1
+			newIdx := newStart - 1
+
+			if origIdx < 0 {
+				origIdx = 0
+			}
+			if newIdx < 0 {
+				newIdx = 0
+			}
+
+			for origIdx > len(patchedLines) && len(patchedLines) < len(origLines) {
+				patchedLines = append(patchedLines, origLines[len(patchedLines)])
+			}
+
+			_ = oldCount
+			_ = newCount
+
+			tempResult := patchedLines[:newIdx]
+
+			for i < len(lines) {
+				line = strings.TrimRight(lines[i], "\r")
+				i++
+
+				if strings.HasPrefix(line, "@@") {
+					i--
+					break
+				}
+
+				if strings.HasPrefix(line, " ") {
+					if origIdx < len(origLines) {
+						expected := origLines[origIdx]
+						actual := line[1:]
+						if expected != actual {
+							return "", fmt.Errorf("patch hunk context mismatch at line %d: expected %q, got %q", origIdx+1, expected, actual)
+						}
+						tempResult = append(tempResult, origLines[origIdx])
+					} else {
+						tempResult = append(tempResult, line[1:])
+					}
+					origIdx++
+				} else if strings.HasPrefix(line, "-") {
+					if origIdx < len(origLines) {
+						expected := origLines[origIdx]
+						actual := line[1:]
+						if expected != actual {
+							return "", fmt.Errorf("patch hunk deletion mismatch at line %d: expected to delete %q, but original has %q", origIdx+1, actual, expected)
+						}
+					}
+					origIdx++
+				} else if strings.HasPrefix(line, "+") {
+					tempResult = append(tempResult, line[1:])
+				}
+			}
+
+			for origIdx < len(origLines) {
+				tempResult = append(tempResult, origLines[origIdx])
+				origIdx++
+			}
+
+			patchedLines = tempResult
+		}
+	}
+
+	result := strings.Join(patchedLines, "\n")
+	return result, nil
+}
+
+func parseHunkHeader(line string) (oldStart, oldCount, newStart, newCount int) {
+	oldStart = -1
+	newStart = -1
+
+	parts := strings.Split(line, " ")
+
+	for _, part := range parts {
+		isOld := strings.HasPrefix(part, "-")
+		isNew := strings.HasPrefix(part, "+")
+
+		clean := strings.TrimPrefix(part, "-")
+		clean = strings.TrimPrefix(clean, "+")
+
+		if idx := strings.Index(clean, ","); idx != -1 {
+			start := 0
+			count := 0
+			fmt.Sscanf(clean, "%d,%d", &start, &count)
+			if isOld {
+				oldStart = start
+				oldCount = count
+			} else if isNew {
+				newStart = start
+				newCount = count
+			}
+		} else {
+			start := 0
+			fmt.Sscanf(clean, "%d", &start)
+			if isOld {
+				oldStart = start
+				oldCount = 1
+			} else if isNew {
+				newStart = start
+				newCount = 1
+			}
+		}
+	}
+
+	return
 }

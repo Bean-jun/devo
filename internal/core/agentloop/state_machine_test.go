@@ -536,3 +536,101 @@ func TestStateMachine_ErrorHandlerReturnsError(t *testing.T) {
 		t.Fatal("expected session_state_change event")
 	}
 }
+
+func TestStateMachine_HandlerReturnsPaused(t *testing.T) {
+	store := session.NewInMemoryStore()
+	createTestSession(store, "test-handler-paused")
+	lc := newTestLoopContext("test-handler-paused", store)
+
+	ch, unsubscribe := lc.EventBus.Subscribe()
+	defer unsubscribe()
+
+	sm := NewStateMachine()
+	handlerCalled := false
+
+	sm.Register(LoopStatePreparing, func(ctx context.Context, lc *LoopContext) (LoopState, error) {
+		return LoopStateThinking, nil
+	})
+	sm.Register(LoopStateThinking, func(ctx context.Context, lc *LoopContext) (LoopState, error) {
+		lc.PausedInState = LoopStateThinking
+		if !handlerCalled {
+			handlerCalled = true
+			return LoopStatePaused, nil
+		}
+		return LoopStateIdle, nil
+	})
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		lc.ResumeCh <- struct{}{}
+	}()
+
+	sm.Run(context.Background(), lc)
+
+	if !handlerCalled {
+		t.Error("thinking handler was not called")
+	}
+
+	var events []session.Event
+	timeout := time.After(500 * time.Millisecond)
+drainLoop:
+	for {
+		select {
+		case <-timeout:
+			break drainLoop
+		case evt, ok := <-ch:
+			if !ok {
+				break drainLoop
+			}
+			events = append(events, evt)
+		}
+	}
+
+	hasPaused := false
+	stateChanges := make([]string, 0)
+	for _, evt := range events {
+		if evt.Type == "loop.paused" {
+			hasPaused = true
+		}
+		if evt.Type == "loop.state_change" {
+			data, _ := evt.Data.(map[string]any)
+			oldS, _ := data["old_state"].(string)
+			newS, _ := data["new_state"].(string)
+			stateChanges = append(stateChanges, fmt.Sprintf("%s->%s", oldS, newS))
+		}
+	}
+
+	if !hasPaused {
+		t.Error("expected loop.paused event")
+	}
+
+	t.Logf("State changes: %v", stateChanges)
+	if len(stateChanges) < 4 {
+		t.Errorf("expected at least 4 state changes, got %d: %v", len(stateChanges), stateChanges)
+	}
+}
+
+func TestStateMachine_HandlerReturnsCancelled(t *testing.T) {
+	store := session.NewInMemoryStore()
+	createTestSession(store, "test-handler-cancelled")
+	lc := newTestLoopContext("test-handler-cancelled", store)
+
+	ch, unsubscribe := lc.EventBus.Subscribe()
+	defer unsubscribe()
+
+	sm := NewStateMachine()
+
+	sm.Register(LoopStatePreparing, func(ctx context.Context, lc *LoopContext) (LoopState, error) {
+		return LoopStateThinking, nil
+	})
+	sm.Register(LoopStateThinking, func(ctx context.Context, lc *LoopContext) (LoopState, error) {
+		return LoopStateCancelled, nil
+	})
+
+	sm.Run(context.Background(), lc)
+
+	_, ok := waitForEvent(ch, "loop.cancelled", 2*time.Second)
+	if !ok {
+		t.Fatal("expected loop.cancelled event")
+	}
+}

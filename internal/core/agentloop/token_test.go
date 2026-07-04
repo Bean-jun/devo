@@ -87,7 +87,9 @@ func TestSessionTokenUsageAccumulates(t *testing.T) {
 		t.Fatalf("first message: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	if err := waitForIdle(store, "sess-token-3", 5*time.Second); err != nil {
+		t.Fatalf("first round did not finish: %v", err)
+	}
 
 	sess, _ := store.Get("sess-token-3")
 	if sess.TokenUsage.Total <= 0 {
@@ -102,17 +104,12 @@ func TestSessionTokenUsageAccumulates(t *testing.T) {
 
 	firstUsage := sess.TokenUsage
 
-	eventBus, _ := store.GetEventBus("sess-token-3")
-	ch, unsubscribe := eventBus.Subscribe()
-	defer unsubscribe()
-
 	if err := loop.ProcessMessage(context.Background(), "sess-token-3", "Second message"); err != nil {
 		t.Fatalf("second message: %v", err)
 	}
 
-	_, ok := waitForEvent(ch, "session_state_change", 2*time.Second)
-	if !ok {
-		t.Fatal("timed out waiting for second round to complete")
+	if err := waitForIdle(store, "sess-token-3", 5*time.Second); err != nil {
+		t.Fatalf("second round did not finish: %v", err)
 	}
 
 	sess, _ = store.Get("sess-token-3")
@@ -190,7 +187,10 @@ func TestTokenUsageMonotonicallyIncreasing(t *testing.T) {
 		}
 
 		if evt.Type == "session_state_change" {
-			break
+			data, ok := evt.Data.(map[string]any)
+			if ok && data["reason"] == "completed" {
+				break
+			}
 		}
 	}
 

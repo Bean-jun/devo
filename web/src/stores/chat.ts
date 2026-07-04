@@ -114,6 +114,40 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function updateToolProgress(toolCallId: string, stage: string, message?: string): void {
+    for (let i = messages.value.length - 1; i >= 0; i--) {
+      const msg = messages.value[i]
+      if (msg.toolCall?.id === toolCallId) {
+        messages.value[i] = {
+          ...msg,
+          toolCall: {
+            ...msg.toolCall!,
+            status: 'executing',
+            stage,
+          },
+        }
+        break
+      }
+    }
+  }
+
+  function appendToolStreamChunk(toolCallId: string, chunk: string): void {
+    for (let i = messages.value.length - 1; i >= 0; i--) {
+      const msg = messages.value[i]
+      if (msg.toolCall?.id === toolCallId) {
+        messages.value[i] = {
+          ...msg,
+          toolCall: {
+            ...msg.toolCall!,
+            status: 'executing',
+            streamingOutput: (msg.toolCall?.streamingOutput ?? '') + chunk,
+          },
+        }
+        break
+      }
+    }
+  }
+
   function clearMessages(): void {
     messages.value = []
     isStreaming.value = false
@@ -206,6 +240,8 @@ export const useChatStore = defineStore('chat', () => {
     appendStreamChunk,
     finishStreaming,
     updateToolCallStatus,
+    updateToolProgress,
+    appendToolStreamChunk,
     clearMessages,
     rollbackTo,
     fetchMessages,

@@ -2,6 +2,7 @@
 import { computed, ref, nextTick } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
+import { useKeyboard } from '@/composables/useKeyboard'
 import { STATUS_LABELS, STATUS_COLORS } from '@/utils/constants'
 
 const sessionStore = useSessionStore()
@@ -44,11 +45,19 @@ async function confirmRename() {
   }
 }
 
-function cancelRename() {
+function cancelRename(e?: KeyboardEvent) {
+  e?.stopPropagation()
   isRenaming.value = false
 }
 
 defineExpose({ startRename })
+
+useKeyboard([
+  {
+    key: 'F2',
+    handler: () => startRename(),
+  },
+])
 
 function toggleTheme(event: MouseEvent) {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()

@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"runtime"
@@ -120,16 +121,22 @@ func (t *ExecuteCommandTool) PreCheck(params map[string]interface{}) error {
 	return nil
 }
 
-func (t *ExecuteCommandTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
+func (t *ExecuteCommandTool) Execute(ctx context.Context, workingDir string, params map[string]interface{}, w StreamWriter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	command, ok := params["command"].(string)
 	if !ok || command == "" {
-		return "", fmt.Errorf("missing required parameter: command")
+		return fmt.Errorf("missing required parameter: command")
 	}
 
 	command = strings.TrimSpace(command)
 
 	if err := isBlacklistedDetailed(command); err != nil {
-		return "", err
+		return err
 	}
 
 	timeoutSeconds := 30
@@ -149,9 +156,15 @@ func (t *ExecuteCommandTool) Execute(workingDir string, params map[string]interf
 		}
 	}
 
-	result, err := t.executor.Execute(workingDir, command, timeoutSeconds, mode)
+	result, err := t.executor.ExecuteStreaming(ctx, workingDir, command, timeoutSeconds, mode, func(line string, isStderr bool) {
+		if isStderr {
+			w.WriteChunk("[stderr] " + line + "\n")
+		} else {
+			w.WriteChunk(line + "\n")
+		}
+	})
 	if err != nil {
-		return "", fmt.Errorf("execution failed: %v", err)
+		return fmt.Errorf("execution failed: %v", err)
 	}
 
 	pidTag := fmt.Sprintf("\n__DEVO_CHILD_PID__=%d", result.PID)
@@ -166,12 +179,14 @@ func (t *ExecuteCommandTool) Execute(workingDir string, params map[string]interf
 		}
 		output += fmt.Sprintf("\n__DEVO_BACKGROUND__=true")
 		output += pidTag
-		return output, nil
+		w.WriteDone(true, output)
+		return nil
 	}
 
 	if result.TimedOut {
-		return fmt.Sprintf("Command timed out after %d seconds.\nExit code: %d\nStdout:\n%s\nStderr:\n%s%s",
-			timeoutSeconds, result.ExitCode, result.Stdout, result.Stderr, pidTag), nil
+		w.WriteDone(false, fmt.Sprintf("Command timed out after %d seconds.\nExit code: %d\nStdout:\n%s\nStderr:\n%s%s",
+			timeoutSeconds, result.ExitCode, result.Stdout, result.Stderr, pidTag))
+		return nil
 	}
 
 	output := fmt.Sprintf("Exit code: %d\nStdout:\n%s", result.ExitCode, result.Stdout)
@@ -180,7 +195,8 @@ func (t *ExecuteCommandTool) Execute(workingDir string, params map[string]interf
 	}
 	output += pidTag
 
-	return output, nil
+	w.WriteDone(true, output)
+	return nil
 }
 
 func isBlacklisted(command string) bool {

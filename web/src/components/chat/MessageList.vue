@@ -61,7 +61,11 @@ const groupedMessages = computed(() => {
 watch(
   () => [chatStore.messages.length, chatStore.streamingContent],
   () => {
-    nextTick(() => props.scrollToBottom(false))
+    nextTick(() => {
+      requestAnimationFrame(() => {
+        props.scrollToBottom(false)
+      })
+    })
   },
   { deep: false }
 )

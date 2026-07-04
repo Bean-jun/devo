@@ -47,6 +47,25 @@ func waitForEvent(ch chan session.Event, eventType string, timeout time.Duration
 	}
 }
 
+func waitForIdle(store *session.InMemoryStore, sessionID string, timeout time.Duration) error {
+	deadline := time.After(timeout)
+	for {
+		select {
+		case <-deadline:
+			return fmt.Errorf("timed out waiting for session %s to become Idle", sessionID)
+		default:
+			sess, err := store.Get(sessionID)
+			if err != nil {
+				return err
+			}
+			if sess.State == session.StateIdle {
+				return nil
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+}
+
 func TestProcessMessageReturnsImmediately(t *testing.T) {
 	loop, store := setupTestLoop()
 	createTestSession(store, "sess-1")
@@ -122,9 +141,9 @@ func TestMultiTurnConversation(t *testing.T) {
 	if !ok {
 		t.Fatal("timed out waiting for first round to start")
 	}
-	_, ok = waitForEvent(ch, "session_state_change", 2*time.Second)
-	if !ok {
-		t.Fatal("timed out waiting for first round to complete")
+
+	if err := waitForIdle(store, "sess-1", 5*time.Second); err != nil {
+		t.Fatalf("first round did not finish: %v", err)
 	}
 
 	if err := loop.ProcessMessage(context.Background(), "sess-1", "Second message"); err != nil {
@@ -135,9 +154,9 @@ func TestMultiTurnConversation(t *testing.T) {
 	if !ok {
 		t.Fatal("timed out waiting for second round to start")
 	}
-	_, ok = waitForEvent(ch, "session_state_change", 2*time.Second)
-	if !ok {
-		t.Fatal("timed out waiting for second round to complete")
+
+	if err := waitForIdle(store, "sess-1", 5*time.Second); err != nil {
+		t.Fatalf("second round did not finish: %v", err)
 	}
 
 	msgs, total, _ := store.GetMessages("sess-1", 0, 0)
@@ -175,9 +194,9 @@ func TestStateTransitions(t *testing.T) {
 	if !ok {
 		t.Fatal("timed out waiting for session_state_change (start)")
 	}
-	_, ok = waitForEvent(ch, "session_state_change", 2*time.Second)
-	if !ok {
-		t.Fatal("timed out waiting for session_state_change (complete)")
+
+	if err := waitForIdle(store, "sess-1", 5*time.Second); err != nil {
+		t.Fatalf("loop did not finish: %v", err)
 	}
 
 	sess, _ = store.Get("sess-1")

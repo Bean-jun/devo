@@ -559,7 +559,7 @@ func TestMcpToolAdapter_ImplementsTool(t *testing.T) {
 		t.Fatal("expected non-nil params schema")
 	}
 
-	result, err := adapter.Execute(tmpDir, map[string]interface{}{
+	result, err := executeMCPTool(t, adapter, tmpDir, map[string]interface{}{
 		"query": "hello",
 	})
 	if err != nil {
@@ -957,14 +957,14 @@ func TestMcpToolAdapter_ExecuteUsesServerRouting(t *testing.T) {
 		toolName: "mock_search",
 	}
 
-	resultA, err := adapterA.Execute(tmpDir, map[string]interface{}{
+	resultA, err := executeMCPTool(t, adapterA, tmpDir, map[string]interface{}{
 		"query": "from-server-a",
 	})
 	if err != nil {
 		t.Fatalf("adapterA.Execute failed: %v", err)
 	}
 
-	resultB, err := adapterB.Execute(tmpDir, map[string]interface{}{
+	resultB, err := executeMCPTool(t, adapterB, tmpDir, map[string]interface{}{
 		"query": "from-server-b",
 	})
 	if err != nil {
@@ -1084,4 +1084,24 @@ func TestSetProjectDir_WorkspaceIsolation(t *testing.T) {
 	if !serverIDs["global-server"] {
 		t.Error("expected global-server to persist across workspace switch")
 	}
+}
+
+func executeMCPTool(t *testing.T, adapter *mcpToolAdapter, workingDir string, params map[string]interface{}) (string, error) {
+	t.Helper()
+	ctx := context.Background()
+	ch := make(chan tools.StreamEvent, 256)
+	sw := tools.NewChannelStreamWriter(ch)
+
+	go func() {
+		defer close(ch)
+		if err := adapter.Execute(ctx, workingDir, params, sw); err != nil {
+			sw.WriteError(err)
+		}
+	}()
+
+	result := tools.CollectToolResult(ch)
+	if !result.Success {
+		return result.Content, fmt.Errorf("%s", result.Error)
+	}
+	return result.Content, nil
 }

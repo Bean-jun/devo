@@ -13,6 +13,7 @@ export const STATUS_LABELS: Record<string, string> = {
   processing: '处理中',
   awaiting_approval: '等待审批',
   paused: '已暂停',
+  cancelled: '已取消',
   completed: '已完成',
   archived: '已归档',
 }
@@ -24,6 +25,7 @@ export const STATUS_COLORS: Record<string, string> = {
   processing: '#0071e3',
   awaiting_approval: '#ff9500',
   paused: '#aeaeb2',
+  cancelled: '#ff3b30',
   completed: '#34c759',
   archived: '#86868b',
 }

@@ -100,47 +100,27 @@ func TestSSEReceiveEvents(t *testing.T) {
 	}
 	store.Create(sess)
 
-	req, _ := http.NewRequest("GET", server.URL+"/api/v1/sessions/sess-test-1/events", nil)
-	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("SSE connect failed: %v", err)
-	}
-	defer resp.Body.Close()
+	eventCh := make(chan string, 32)
+	errCh := make(chan error, 1)
 
-	postBody := map[string]string{"content": "Hello SSE"}
-	jsonBody, _ := json.Marshal(postBody)
-	postResp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/messages", "application/json", bytes.NewReader(jsonBody))
-	if err != nil {
-		t.Fatalf("POST message failed: %v", err)
-	}
-	postResp.Body.Close()
-
-	if postResp.StatusCode != http.StatusAccepted {
-		t.Errorf("expected 202, got %d", postResp.StatusCode)
-	}
-
-	reader := bufio.NewReader(resp.Body)
-	events := make(map[string]bool)
-	expectedEvents := []string{"thinking", "message_complete", "session_state_change"}
-	deadline := time.After(2 * time.Second)
-
-readLoop:
-	for {
-		if len(events) >= len(expectedEvents) {
-			break
+	go func() {
+		req, _ := http.NewRequest("GET", server.URL+"/api/v1/sessions/sess-test-1/events", nil)
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			errCh <- err
+			return
 		}
-		select {
-		case <-deadline:
-			break readLoop
-		default:
+		defer resp.Body.Close()
+
+		reader := bufio.NewReader(resp.Body)
+		for {
 			line, err := reader.ReadString('\n')
 			if err != nil {
-				if err == io.EOF {
-					break readLoop
+				if err != io.EOF {
+					errCh <- err
 				}
-				t.Logf("read error: %v", err)
-				break readLoop
+				return
 			}
 			line = strings.TrimSpace(line)
 			if line == "" {
@@ -152,9 +132,53 @@ readLoop:
 					Type string `json:"type"`
 				}
 				if json.Unmarshal([]byte(dataStr), &wrapper) == nil {
-					events[wrapper.Type] = true
+					eventCh <- wrapper.Type
 				}
 			}
+		}
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	postBody := map[string]string{"content": "Hello SSE"}
+	jsonBody, _ := json.Marshal(postBody)
+	postResp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/messages", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("POST message failed: %v", err)
+	}
+	postResp.Body.Close()
+
+	if postResp.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", postResp.StatusCode)
+	}
+
+	events := make(map[string]bool)
+	expectedEvents := []string{"thinking", "message_complete", "session_state_change"}
+	deadline := time.After(3 * time.Second)
+
+	allExpected := func() bool {
+		for _, e := range expectedEvents {
+			if !events[e] {
+				return false
+			}
+		}
+		return true
+	}
+
+readLoop:
+	for {
+		if allExpected() {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Log("deadline reached")
+			break readLoop
+		case err := <-errCh:
+			t.Logf("read error: %v", err)
+			break readLoop
+		case evtType := <-eventCh:
+			events[evtType] = true
 		}
 	}
 

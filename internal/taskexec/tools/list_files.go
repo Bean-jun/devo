@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,7 +45,13 @@ func (t *ListFilesTool) ParamsSchema() map[string]interface{} {
 	}
 }
 
-func (t *ListFilesTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
+func (t *ListFilesTool) Execute(ctx context.Context, workingDir string, params map[string]interface{}, w StreamWriter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	path, _ := params["path"].(string)
 	if path == "" {
 		path = "."
@@ -52,16 +59,16 @@ func (t *ListFilesTool) Execute(workingDir string, params map[string]interface{}
 
 	safePath, err := pathsec.CheckPath(workingDir, path)
 	if err != nil {
-		return "", fmt.Errorf("path security check failed")
+		return fmt.Errorf("path security check failed")
 	}
 
 	info, err := os.Stat(safePath)
 	if err != nil {
-		return "", fmt.Errorf("path not found or not accessible: %s", path)
+		return fmt.Errorf("path not found or not accessible: %s", path)
 	}
 
 	if !info.IsDir() {
-		return "", fmt.Errorf("not a directory: %s", path)
+		return fmt.Errorf("not a directory: %s", path)
 	}
 
 	maxDepth := 1
@@ -76,26 +83,33 @@ func (t *ListFilesTool) Execute(workingDir string, params map[string]interface{}
 
 	absWorkDir, err := filepath.Abs(workingDir)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve working directory")
+		return fmt.Errorf("failed to resolve working directory")
 	}
 
 	var result strings.Builder
 	count := 0
 
 	gi := pathsec.LoadGitignore(workingDir)
-	err = walkDir(&result, absWorkDir, safePath, ".", maxDepth, 0, maxFiles, &count, gi)
+	err = walkDirStream(ctx, &result, absWorkDir, safePath, ".", maxDepth, 0, maxFiles, &count, gi, w)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	if count >= maxFiles {
 		result.WriteString(fmt.Sprintf("\n... (output truncated at %d entries)", maxFiles))
 	}
 
-	return result.String(), nil
+	w.WriteDone(true, result.String())
+	return nil
 }
 
-func walkDir(result *strings.Builder, absWorkDir, currentPath, displayPrefix string, maxDepth, currentDepth, maxFiles int, count *int, gi *pathsec.Gitignore) error {
+func walkDirStream(ctx context.Context, result *strings.Builder, absWorkDir, currentPath, displayPrefix string, maxDepth, currentDepth, maxFiles int, count *int, gi *pathsec.Gitignore, w StreamWriter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	if currentDepth > maxDepth {
 		return nil
 	}
@@ -131,21 +145,31 @@ func walkDir(result *strings.Builder, absWorkDir, currentPath, displayPrefix str
 	})
 
 	for _, e := range sorted {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		if *count >= maxFiles {
 			return nil
 		}
 
+		line := ""
 		if e.isDir {
-			result.WriteString(fmt.Sprintf("%s%s/\n", strings.Repeat("  ", currentDepth), e.name))
+			line = fmt.Sprintf("%s%s/\n", strings.Repeat("  ", currentDepth), e.name)
 		} else {
-			result.WriteString(fmt.Sprintf("%s%s\n", strings.Repeat("  ", currentDepth), e.name))
+			line = fmt.Sprintf("%s%s\n", strings.Repeat("  ", currentDepth), e.name)
 		}
+		result.WriteString(line)
 		*count++
 
 		if e.isDir && currentDepth < maxDepth {
 			subPath := filepath.Join(currentPath, e.name)
 			subDisplay := filepath.Join(displayPrefix, e.name)
-			walkDir(result, absWorkDir, subPath, subDisplay, maxDepth, currentDepth+1, maxFiles, count, gi)
+			if err := walkDirStream(ctx, result, absWorkDir, subPath, subDisplay, maxDepth, currentDepth+1, maxFiles, count, gi, w); err != nil {
+				return err
+			}
 		}
 	}
 

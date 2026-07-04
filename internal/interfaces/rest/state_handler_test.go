@@ -39,7 +39,7 @@ func TestCancel_FromProcessing(t *testing.T) {
 	}
 
 	sessGot, _ := store.Get("sess-test-1")
-	if sessGot.CancelRequested {
+	if !sessGot.CancelRequested {
 		t.Error("CancelRequested should be true after cancel")
 	}
 }

@@ -122,6 +122,54 @@ describe('ChatStore', () => {
     })
   })
 
+  describe('updateToolProgress', () => {
+    it('should update tool stage and status', () => {
+      const store = useChatStore()
+
+      store.appendToolCallMessage(mockToolCallPending)
+      store.updateToolProgress('tool-001', 'running')
+
+      const msg = store.messages[0]
+      expect(msg.toolCall?.status).toBe('executing')
+      expect(msg.toolCall?.stage).toBe('running')
+    })
+
+    it('should update stage for existing executing tool', () => {
+      const store = useChatStore()
+
+      store.appendToolCallMessage(mockToolCallPending)
+      store.updateToolProgress('tool-001', 'starting')
+      store.updateToolProgress('tool-001', 'running')
+
+      const msg = store.messages[0]
+      expect(msg.toolCall?.stage).toBe('running')
+    })
+  })
+
+  describe('appendToolStreamChunk', () => {
+    it('should append streaming chunks', () => {
+      const store = useChatStore()
+
+      store.appendToolCallMessage(mockToolCallPending)
+      store.appendToolStreamChunk('tool-001', 'Line 1\n')
+      store.appendToolStreamChunk('tool-001', 'Line 2\n')
+
+      const msg = store.messages[0]
+      expect(msg.toolCall?.status).toBe('executing')
+      expect(msg.toolCall?.streamingOutput).toBe('Line 1\nLine 2\n')
+    })
+
+    it('should handle empty initial streamingOutput', () => {
+      const store = useChatStore()
+
+      store.appendToolCallMessage(mockToolCallPending)
+      store.appendToolStreamChunk('tool-001', 'Hello')
+
+      const msg = store.messages[0]
+      expect(msg.toolCall?.streamingOutput).toBe('Hello')
+    })
+  })
+
   describe('clearMessages', () => {
     it('should clear all messages', () => {
       const store = useChatStore()

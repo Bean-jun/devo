@@ -26,7 +26,6 @@ const isProcessing = computed(() => sessionStore.isProcessing)
 async function handleSend(text: string) {
   if (!sessionStore.currentSession) return
   chatStore.appendUserMessage(text)
-  scrollToBottom(false)
 
   try {
     const res = await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/messages`, {
@@ -174,7 +173,7 @@ async function handleExecuteCommand(text: string) {
           const data = await res.json().catch(() => ({}))
           throw new Error(data.message || `HTTP ${res.status}`)
         }
-        sessionStore.updateSessionState(sid, 'idle')
+        sessionStore.updateSessionState(sid, 'cancelled')
         uiStore.showToast('info', '操作已取消')
       } catch (e: any) {
         uiStore.showToast('error', e.message || '取消失败')

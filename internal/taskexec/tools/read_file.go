@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,36 +36,43 @@ func (t *ReadFileTool) ParamsSchema() map[string]interface{} {
 	}
 }
 
-func (t *ReadFileTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
+func (t *ReadFileTool) Execute(ctx context.Context, workingDir string, params map[string]interface{}, w StreamWriter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	path, ok := params["path"].(string)
 	if !ok || path == "" {
-		return "", fmt.Errorf("missing required parameter: path")
+		return fmt.Errorf("missing required parameter: path")
 	}
 
 	safePath, err := pathsec.CheckPath(workingDir, path)
 	if err != nil {
-		return "", fmt.Errorf("path security check failed")
+		return fmt.Errorf("path security check failed")
 	}
 
 	gi := pathsec.LoadGitignore(workingDir)
 	relPath, _ := filepath.Rel(workingDir, safePath)
 	if gi.IsIgnored(relPath, false) {
-		return "", fmt.Errorf("file is excluded by .gitignore: %s", path)
+		return fmt.Errorf("file is excluded by .gitignore: %s", path)
 	}
 
 	info, err := os.Stat(safePath)
 	if err != nil {
-		return "", fmt.Errorf("file not found or not accessible: %s", path)
+		return fmt.Errorf("file not found or not accessible: %s", path)
 	}
 
 	if info.IsDir() {
-		return "", fmt.Errorf("path is a directory, not a file: %s", path)
+		return fmt.Errorf("path is a directory, not a file: %s", path)
 	}
 
 	data, err := os.ReadFile(safePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read file: %s", path)
+		return fmt.Errorf("failed to read file: %s", path)
 	}
 
-	return string(data), nil
+	w.WriteDone(true, string(data))
+	return nil
 }

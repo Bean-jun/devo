@@ -38,6 +38,7 @@ function handleKeydown(e: KeyboardEvent) {
     commandStore.select()
   } else if (e.key === 'Escape') {
     e.preventDefault()
+    e.stopPropagation()
     commandStore.close()
   }
 }

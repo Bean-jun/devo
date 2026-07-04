@@ -20,8 +20,7 @@ import (
 )
 
 type ToolExecutor interface {
-	Execute(workingDir string, toolName string, params map[string]interface{}) (*tools.ToolResult, error)
-	ExecuteAsync(ctx context.Context, workingDir string, toolName string, params map[string]interface{}, onProgress func(tools.ToolProgress)) (*tools.ToolResult, error)
+	Execute(ctx context.Context, workingDir string, toolName string, params map[string]interface{}) (<-chan tools.StreamEvent, error)
 	GetTool(name string) (tools.Tool, bool)
 	ListTools() []tools.Tool
 }

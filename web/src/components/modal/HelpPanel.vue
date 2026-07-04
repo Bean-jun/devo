@@ -11,14 +11,12 @@ const shortcuts = [
   { key: 'Enter', desc: '发送消息' },
   { key: 'Shift + Enter', desc: '换行' },
   { key: 'Shift + ↑/↓', desc: '切换输入历史' },
-  { key: 'Escape', desc: '关闭弹窗/面板' },
+  { key: 'Escape', desc: '暂停/取消当前操作（智能判断）' },
   { key: 'Ctrl + K', desc: '打开命令面板' },
   { key: 'F2', desc: '重命名当前会话' },
+  { key: 'Alt + Y', desc: '切换 YOLO 模式' },
   { key: 'Y', desc: '批准操作（审批弹窗中）' },
   { key: 'N', desc: '拒绝操作（审批弹窗中）' },
-  { key: 'Ctrl + Shift + P', desc: '暂停/恢复当前会话' },
-  { key: 'Ctrl + Shift + R', desc: '恢复当前会话' },
-  { key: 'Ctrl + Shift + C', desc: '取消当前操作' },
 ]
 
 const commands = [
@@ -35,6 +33,7 @@ const commands = [
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
+    e.stopPropagation()
     uiStore.setActiveModal(null)
   }
 }

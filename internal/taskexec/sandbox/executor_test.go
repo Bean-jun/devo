@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"context"
 	"runtime"
 	"strings"
 	"testing"
@@ -10,7 +11,7 @@ import (
 func TestNativeExecutor_ExecuteSync(t *testing.T) {
 	executor := NewExecutor()
 
-	result, err := executor.Execute("", "echo hello", 30, ExecModeSync)
+	result, err := executor.Execute(context.Background(), "", "echo hello", 30, ExecModeSync)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -44,7 +45,7 @@ func TestNativeExecutor_ExecuteSync_Timeout(t *testing.T) {
 		cmd = "ping -n 10 127.0.0.1"
 	}
 
-	result, err := executor.Execute("", cmd, 1, ExecModeSync)
+	result, err := executor.Execute(context.Background(), "", cmd, 1, ExecModeSync)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -62,7 +63,7 @@ func TestNativeExecutor_ExecuteSync_NonZeroExit(t *testing.T) {
 		cmd = "cmd /c exit 1"
 	}
 
-	result, err := executor.Execute("", cmd, 30, ExecModeSync)
+	result, err := executor.Execute(context.Background(), "", cmd, 30, ExecModeSync)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -79,7 +80,7 @@ func TestNativeExecutor_ExecuteAsync_Windows(t *testing.T) {
 
 	executor := NewExecutor()
 
-	result, err := executor.Execute("", "start /B timeout 5", 30, ExecModeAsync)
+	result, err := executor.Execute(context.Background(), "", "start /B timeout 5", 30, ExecModeAsync)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestNativeExecutor_ExecuteAsync_Unix(t *testing.T) {
 
 	executor := NewExecutor()
 
-	result, err := executor.Execute("", "sleep 30 &", 5, ExecModeAsync)
+	result, err := executor.Execute(context.Background(), "", "sleep 30 &", 5, ExecModeAsync)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -298,7 +299,7 @@ func TestNativeExecutor_StderrCapture(t *testing.T) {
 		cmd = "dir nonexistent 2>&1"
 	}
 
-	result, err := executor.Execute("", cmd, 30, ExecModeSync)
+	result, err := executor.Execute(context.Background(), "", cmd, 30, ExecModeSync)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -320,7 +321,7 @@ func TestNativeExecutor_WorkingDirectory(t *testing.T) {
 		cmd = "pwd"
 	}
 
-	result, err := executor.Execute(tmpDir, cmd, 30, ExecModeSync)
+	result, err := executor.Execute(context.Background(), tmpDir, cmd, 30, ExecModeSync)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}

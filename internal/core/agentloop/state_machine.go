@@ -138,6 +138,52 @@ func (sm *StateMachine) Run(ctx context.Context, lc *LoopContext) {
 			nextState = LoopStateIdle
 		}
 
+		if nextState == LoopStatePaused {
+			lc.EventBus.Publish("loop.state_change", map[string]any{
+				"old_state": string(currentState),
+				"new_state": string(LoopStatePaused),
+			})
+			lc.EventBus.Publish("loop.paused", map[string]any{
+				"session_id": lc.SessionID,
+				"paused_at":  string(currentState),
+				"reason":     "handler_requested",
+			})
+
+			select {
+			case <-lc.ResumeCh:
+				currentState = lc.PausedInState
+				lc.EventBus.Publish("loop.state_change", map[string]any{
+					"old_state": string(LoopStatePaused),
+					"new_state": string(currentState),
+				})
+				continue
+			case <-lc.CancelCh:
+				lc.EventBus.Publish("loop.state_change", map[string]any{
+					"old_state": string(LoopStatePaused),
+					"new_state": string(LoopStateCancelled),
+				})
+				lc.EventBus.Publish("loop.cancelled", map[string]any{
+					"session_id":   lc.SessionID,
+					"cancelled_at": string(LoopStatePaused),
+					"reason":       "user_requested",
+				})
+				return
+			}
+		}
+
+		if nextState == LoopStateCancelled {
+			lc.EventBus.Publish("loop.state_change", map[string]any{
+				"old_state": string(currentState),
+				"new_state": string(LoopStateCancelled),
+			})
+			lc.EventBus.Publish("loop.cancelled", map[string]any{
+				"session_id":   lc.SessionID,
+				"cancelled_at": string(currentState),
+				"reason":       "handler_requested",
+			})
+			return
+		}
+
 		lc.EventBus.Publish("loop.state_change", map[string]any{
 			"old_state": string(currentState),
 			"new_state": string(nextState),

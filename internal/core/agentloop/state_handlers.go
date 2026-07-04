@@ -394,20 +394,12 @@ func (l *Loop) executeSingleTool(ctx context.Context, lc *LoopContext, tc sessio
 		l.pathLockManager.Lock(lockPath)
 	}
 
-	toolResult, execErr := l.toolExecutor.ExecuteAsync(ctx, sess.WorkingDirectory, tc.ToolName, tc.Params, func(progress tools.ToolProgress) {
-		lc.EventBus.Publish("tool_progress", map[string]any{
-			"tool_name": tc.ToolName,
-			"stage":     progress.Stage,
-			"message":   progress.Message,
-			"progress":  progress.Progress,
-		})
-	})
-
-	if lockPath != "" {
-		l.pathLockManager.Unlock(lockPath)
-	}
+	eventCh, execErr := l.toolExecutor.Execute(ctx, sess.WorkingDirectory, tc.ToolName, tc.Params)
 
 	if execErr != nil {
+		if lockPath != "" {
+			l.pathLockManager.Unlock(lockPath)
+		}
 		toolResult := &tools.ToolResult{
 			ToolCallID: tc.ID,
 			Success:    false,
@@ -427,6 +419,26 @@ func (l *Loop) executeSingleTool(ctx context.Context, lc *LoopContext, tc sessio
 			return LoopStateIdle, nil
 		}
 		return LoopStateToolExecuting, nil
+	}
+
+	toolResult := tools.CollectToolResult(eventCh, func(evt tools.StreamEvent) {
+		switch evt.Type {
+		case tools.StreamEventMeta:
+			lc.EventBus.Publish("tool_progress", map[string]any{
+				"tool_name": tc.ToolName,
+				"stage":     evt.Stage,
+				"message":   evt.Message,
+			})
+		case tools.StreamEventChunk:
+			lc.EventBus.Publish("tool_chunk", map[string]any{
+				"tool_name": tc.ToolName,
+				"data":      evt.Data,
+			})
+		}
+	})
+
+	if lockPath != "" {
+		l.pathLockManager.Unlock(lockPath)
 	}
 
 	l.recordChildPID(lc.SessionID, tc.ToolName, toolResult)
@@ -658,23 +670,15 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 				l.pathLockManager.Lock(lockPath)
 			}
 
-			toolResult, execErr := l.toolExecutor.ExecuteAsync(gctx, sess.WorkingDirectory, tc.ToolName, tc.Params, func(progress tools.ToolProgress) {
-				lc.EventBus.Publish("tool_progress", map[string]any{
-					"tool_name": tc.ToolName,
-					"stage":     progress.Stage,
-					"message":   progress.Message,
-					"progress":  progress.Progress,
-				})
-			})
-
-			if lockPath != "" {
-				l.pathLockManager.Unlock(lockPath)
-			}
+			eventCh, execErr := l.toolExecutor.Execute(gctx, sess.WorkingDirectory, tc.ToolName, tc.Params)
 
 			mu.Lock()
 			defer mu.Unlock()
 
 			if execErr != nil {
+				if lockPath != "" {
+					l.pathLockManager.Unlock(lockPath)
+				}
 				toolResult := &tools.ToolResult{
 					ToolCallID: tc.ID,
 					Success:    false,
@@ -694,6 +698,26 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 					tooManyTools = true
 				}
 				return nil
+			}
+
+			toolResult := tools.CollectToolResult(eventCh, func(evt tools.StreamEvent) {
+				switch evt.Type {
+				case tools.StreamEventMeta:
+					lc.EventBus.Publish("tool_progress", map[string]any{
+						"tool_name": tc.ToolName,
+						"stage":     evt.Stage,
+						"message":   evt.Message,
+					})
+				case tools.StreamEventChunk:
+					lc.EventBus.Publish("tool_chunk", map[string]any{
+						"tool_name": tc.ToolName,
+						"data":      evt.Data,
+					})
+				}
+			})
+
+			if lockPath != "" {
+				l.pathLockManager.Unlock(lockPath)
 			}
 
 			l.recordChildPID(lc.SessionID, tc.ToolName, toolResult)

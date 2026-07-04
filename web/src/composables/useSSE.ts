@@ -17,10 +17,20 @@ export function useSSE() {
     statusHandler = fn
   }
 
-  function connect(sessionId: string): void {
-    if (eventSource.value) {
-      disconnect()
+  function closeConnection(): void {
+    if (reconnectTimer.value) {
+      clearTimeout(reconnectTimer.value)
+      reconnectTimer.value = null
     }
+    if (eventSource.value) {
+      eventSource.value.close()
+      eventSource.value = null
+    }
+    isConnected.value = false
+  }
+
+  function connect(sessionId: string): void {
+    closeConnection()
 
     const url = `${API_BASE}/sessions/${sessionId}/events`
     const es = new EventSource(url)
@@ -72,16 +82,8 @@ export function useSSE() {
   }
 
   function disconnect(): void {
-    if (reconnectTimer.value) {
-      clearTimeout(reconnectTimer.value)
-      reconnectTimer.value = null
-    }
+    closeConnection()
     reconnectAttempt.value = 5
-    if (eventSource.value) {
-      eventSource.value.close()
-      eventSource.value = null
-    }
-    isConnected.value = false
     handlers.clear()
   }
 
@@ -101,7 +103,6 @@ export function useSSE() {
 
   onUnmounted(() => {
     disconnect()
-    handlers.clear()
   })
 
   return {

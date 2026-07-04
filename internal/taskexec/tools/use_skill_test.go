@@ -70,35 +70,38 @@ func TestUseSkillTool_Execute_Success(t *testing.T) {
 	mgr, _ := setupTestSkillsManager(t)
 	tool := NewUseSkillTool(mgr)
 
-	result, err := tool.Execute("/tmp", map[string]interface{}{
+	result, err := executeTool(t, tool, "/tmp", map[string]interface{}{
 		"skill_name": "Python Expert",
 	})
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
-	if !strings.Contains(result, "[Skill Loaded]") {
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
+	if !strings.Contains(result.Content, "[Skill Loaded]") {
 		t.Error("expected '[Skill Loaded]' in result")
 	}
-	if !strings.Contains(result, "Python Expert") {
+	if !strings.Contains(result.Content, "Python Expert") {
 		t.Error("expected 'Python Expert' in result")
 	}
-	if !strings.Contains(result, "[Instructions]") {
+	if !strings.Contains(result.Content, "[Instructions]") {
 		t.Error("expected '[Instructions]' section in result")
 	}
-	if !strings.Contains(result, "Always use type hints") {
+	if !strings.Contains(result.Content, "Always use type hints") {
 		t.Error("expected skill instructions in result")
 	}
-	if !strings.Contains(result, "[Available Resources]") {
+	if !strings.Contains(result.Content, "[Available Resources]") {
 		t.Error("expected '[Available Resources]' section in result")
 	}
-	if !strings.Contains(result, "scripts/helper.py") {
+	if !strings.Contains(result.Content, "scripts/helper.py") {
 		t.Error("expected 'scripts/helper.py' in resources")
 	}
-	if !strings.Contains(result, "references/style-guide.md") {
+	if !strings.Contains(result.Content, "references/style-guide.md") {
 		t.Error("expected 'references/style-guide.md' in resources")
 	}
-	if !strings.Contains(result, "assets/template.py") {
+	if !strings.Contains(result.Content, "assets/template.py") {
 		t.Error("expected 'assets/template.py' in resources")
 	}
 }
@@ -107,15 +110,18 @@ func TestUseSkillTool_Execute_NotFound(t *testing.T) {
 	mgr, _ := setupTestSkillsManager(t)
 	tool := NewUseSkillTool(mgr)
 
-	_, err := tool.Execute("/tmp", map[string]interface{}{
+	result, err := executeTool(t, tool, "/tmp", map[string]interface{}{
 		"skill_name": "NonExistentSkill",
 	})
 
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for non-existent skill")
 	}
-	if !strings.Contains(err.Error(), "skill not found") {
-		t.Errorf("expected 'skill not found' error, got: %v", err)
+	if !strings.Contains(result.Error, "skill not found") {
+		t.Errorf("expected 'skill not found' error, got: %v", result.Error)
 	}
 }
 
@@ -123,9 +129,12 @@ func TestUseSkillTool_Execute_MissingParam(t *testing.T) {
 	mgr, _ := setupTestSkillsManager(t)
 	tool := NewUseSkillTool(mgr)
 
-	_, err := tool.Execute("/tmp", map[string]interface{}{})
+	result, err := executeTool(t, tool, "/tmp", map[string]interface{}{})
 
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for missing skill_name parameter")
 	}
 }
@@ -134,11 +143,14 @@ func TestUseSkillTool_Execute_EmptySkillName(t *testing.T) {
 	mgr, _ := setupTestSkillsManager(t)
 	tool := NewUseSkillTool(mgr)
 
-	_, err := tool.Execute("/tmp", map[string]interface{}{
+	result, err := executeTool(t, tool, "/tmp", map[string]interface{}{
 		"skill_name": "",
 	})
 
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for empty skill_name")
 	}
 }
@@ -147,26 +159,32 @@ func TestUseSkillTool_Execute_Deduplication(t *testing.T) {
 	mgr, _ := setupTestSkillsManager(t)
 	tool := NewUseSkillTool(mgr)
 
-	result1, err := tool.Execute("/tmp", map[string]interface{}{
+	result1, err := executeTool(t, tool, "/tmp", map[string]interface{}{
 		"skill_name": "Python Expert",
 	})
 	if err != nil {
 		t.Fatalf("first call: %v", err)
 	}
-	if !strings.Contains(result1, "[Instructions]") {
+	if !result1.Success {
+		t.Fatalf("expected success, got error: %s", result1.Error)
+	}
+	if !strings.Contains(result1.Content, "[Instructions]") {
 		t.Error("first call should include instructions")
 	}
 
-	result2, err := tool.Execute("/tmp", map[string]interface{}{
+	result2, err := executeTool(t, tool, "/tmp", map[string]interface{}{
 		"skill_name": "Python Expert",
 	})
 	if err != nil {
 		t.Fatalf("second call: %v", err)
 	}
-	if strings.Contains(result2, "[Instructions]") {
+	if !result2.Success {
+		t.Fatalf("expected success, got error: %s", result2.Error)
+	}
+	if strings.Contains(result2.Content, "[Instructions]") {
 		t.Error("second call should not include instructions (already loaded)")
 	}
-	if !strings.Contains(result2, "already loaded") {
+	if !strings.Contains(result2.Content, "already loaded") {
 		t.Error("second call should indicate skill is already loaded")
 	}
 }
@@ -179,15 +197,18 @@ func TestUseSkillTool_Execute_Disabled(t *testing.T) {
 		t.Fatalf("DisableSkill: %v", err)
 	}
 
-	_, err := tool.Execute("/tmp", map[string]interface{}{
+	result, err := executeTool(t, tool, "/tmp", map[string]interface{}{
 		"skill_name": "Python Expert",
 	})
 
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for disabled skill")
 	}
-	if !strings.Contains(err.Error(), "disabled") {
-		t.Errorf("expected 'disabled' error, got: %v", err)
+	if !strings.Contains(result.Error, "disabled") {
+		t.Errorf("expected 'disabled' error, got: %v", result.Error)
 	}
 }
 
@@ -195,18 +216,21 @@ func TestUseSkillTool_Reset(t *testing.T) {
 	mgr, _ := setupTestSkillsManager(t)
 	tool := NewUseSkillTool(mgr)
 
-	tool.Execute("/tmp", map[string]interface{}{
+	executeTool(t, tool, "/tmp", map[string]interface{}{
 		"skill_name": "Python Expert",
 	})
 	tool.Reset()
 
-	result, err := tool.Execute("/tmp", map[string]interface{}{
+	result, err := executeTool(t, tool, "/tmp", map[string]interface{}{
 		"skill_name": "Python Expert",
 	})
 	if err != nil {
 		t.Fatalf("after reset: %v", err)
 	}
-	if !strings.Contains(result, "[Instructions]") {
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
+	if !strings.Contains(result.Content, "[Instructions]") {
 		t.Error("after reset, instructions should be included again")
 	}
 }
@@ -225,17 +249,20 @@ func TestUseSkillTool_Execute_NoResources(t *testing.T) {
 	}
 
 	tool := NewUseSkillTool(mgr)
-	result, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"skill_name": "Simple Skill",
 	})
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
-	if strings.Contains(result, "[Available Resources]") {
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
+	if strings.Contains(result.Content, "[Available Resources]") {
 		t.Error("should not contain '[Available Resources]' when no resources present")
 	}
-	if !strings.Contains(result, "Just instructions") {
+	if !strings.Contains(result.Content, "Just instructions") {
 		t.Error("expected instructions in result")
 	}
 }

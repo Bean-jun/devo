@@ -58,6 +58,7 @@ async function handleCreate() {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
+    e.stopPropagation()
     uiStore.setActiveModal(null)
     return
   }

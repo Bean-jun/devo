@@ -94,11 +94,16 @@ func (m *Manager) Append(typ MemoryType, workingDir, key, content string, source
 		return nil, fmt.Errorf("append memory: %w", err)
 	}
 
+	combinedContent, err := m.store.GetSection(typ, fileKey, key)
+	if err != nil {
+		combinedContent = content
+	}
+
 	return &Memory{
 		ID:      generateMemoryID(key),
 		Type:    typ,
 		Key:     key,
-		Content: content,
+		Content: combinedContent,
 		Source:  source,
 	}, nil
 }

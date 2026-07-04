@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,7 +13,7 @@ func TestWriteFileTool_CreateNewFile(t *testing.T) {
 
 	tool := &WriteFileTool{}
 
-	result, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path":    "newfile.txt",
 		"content": "Hello, World!",
 	})
@@ -20,9 +21,12 @@ func TestWriteFileTool_CreateNewFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
 
-	if !strings.Contains(result, "created") {
-		t.Errorf("expected result to contain 'created', got: %s", result)
+	if !strings.Contains(result.Content, "created") {
+		t.Errorf("expected result to contain 'created', got: %s", result.Content)
 	}
 
 	data, err := os.ReadFile(filepath.Join(tmpDir, "newfile.txt"))
@@ -41,7 +45,7 @@ func TestWriteFileTool_OverwriteExistingFile(t *testing.T) {
 
 	tool := &WriteFileTool{}
 
-	result, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path":    "existing.txt",
 		"content": "new content",
 	})
@@ -49,9 +53,12 @@ func TestWriteFileTool_OverwriteExistingFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
 
-	if !strings.Contains(result, "updated") {
-		t.Errorf("expected result to contain 'updated', got: %s", result)
+	if !strings.Contains(result.Content, "updated") {
+		t.Errorf("expected result to contain 'updated', got: %s", result.Content)
 	}
 
 	data, err := os.ReadFile(testFile)
@@ -73,14 +80,14 @@ func TestWriteFileTool_OperationType(t *testing.T) {
 	opType := tool.OperationType(tmpDir, map[string]interface{}{
 		"path": "newfile.txt",
 	})
-	if opType != OpFileWriteNew {
+	if opType != string(OpFileWriteNew) {
 		t.Errorf("expected OpFileWriteNew, got %s", opType)
 	}
 
 	opType = tool.OperationType(tmpDir, map[string]interface{}{
 		"path": "existing.txt",
 	})
-	if opType != OpFileWriteOverwrite {
+	if opType != string(OpFileWriteOverwrite) {
 		t.Errorf("expected OpFileWriteOverwrite, got %s", opType)
 	}
 }
@@ -89,12 +96,15 @@ func TestWriteFileTool_PathOutsideWorkDir(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tool := &WriteFileTool{}
-	_, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path":    "../../etc/passwd",
 		"content": "malicious",
 	})
 
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for path traversal")
 	}
 }
@@ -104,15 +114,21 @@ func TestWriteFileTool_MissingParams(t *testing.T) {
 
 	tool := &WriteFileTool{}
 
-	_, err := tool.Execute(tmpDir, map[string]interface{}{})
-	if err == nil {
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for missing path parameter")
 	}
 
-	_, err = tool.Execute(tmpDir, map[string]interface{}{
+	result, err = executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path": "test.txt",
 	})
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for missing content parameter")
 	}
 }
@@ -122,13 +138,16 @@ func TestWriteFileTool_NestedDirectory(t *testing.T) {
 
 	tool := &WriteFileTool{}
 
-	_, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path":    "subdir/nested/file.txt",
 		"content": "nested content",
 	})
 
 	if err != nil {
 		t.Fatalf("expected no error for nested dir creation, got: %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
 	}
 
 	data, err := os.ReadFile(filepath.Join(tmpDir, "subdir", "nested", "file.txt"))
@@ -147,7 +166,7 @@ func TestEditFileTool_ReplaceSuccess(t *testing.T) {
 
 	tool := &EditFileTool{}
 
-	result, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path":    "app.go",
 		"mode":    "replace",
 		"old_str": `fmt.Println("Hello")`,
@@ -157,9 +176,12 @@ func TestEditFileTool_ReplaceSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
 
-	if !strings.Contains(result, "successfully edited") {
-		t.Errorf("expected result to contain 'successfully edited', got: %s", result)
+	if !strings.Contains(result.Content, "successfully edited") {
+		t.Errorf("expected result to contain 'successfully edited', got: %s", result.Content)
 	}
 
 	data, err := os.ReadFile(testFile)
@@ -182,19 +204,22 @@ func TestEditFileTool_ReplaceNotUnique(t *testing.T) {
 
 	tool := &EditFileTool{}
 
-	_, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path":    "duplicate.txt",
 		"mode":    "replace",
 		"old_str": "hello",
 		"new_str": "hi",
 	})
 
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for non-unique old_str")
 	}
 
-	if !strings.Contains(err.Error(), "matches") {
-		t.Errorf("expected error to mention 'matches', got: %v", err)
+	if !strings.Contains(result.Error, "matches") {
+		t.Errorf("expected error to mention 'matches', got: %v", result.Error)
 	}
 }
 
@@ -205,14 +230,17 @@ func TestEditFileTool_ReplaceNotFound(t *testing.T) {
 
 	tool := &EditFileTool{}
 
-	_, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path":    "test.txt",
 		"mode":    "replace",
 		"old_str": "nonexistent",
 		"new_str": "new",
 	})
 
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for old_str not found")
 	}
 }
@@ -231,7 +259,7 @@ func TestEditFileTool_PatchSuccess(t *testing.T) {
 +updated_line2
  line3`
 
-	result, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path":  "file.txt",
 		"mode":  "patch",
 		"patch": patch,
@@ -240,9 +268,12 @@ func TestEditFileTool_PatchSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
 
-	if !strings.Contains(result, "successfully patched") {
-		t.Errorf("expected result to contain 'successfully patched', got: %s", result)
+	if !strings.Contains(result.Content, "successfully patched") {
+		t.Errorf("expected result to contain 'successfully patched', got: %s", result.Content)
 	}
 
 	data, err := os.ReadFile(testFile)
@@ -271,7 +302,7 @@ func TestEditFileTool_PatchAddLine(t *testing.T) {
  line2
 +line3`
 
-	result, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path":  "file.txt",
 		"mode":  "patch",
 		"patch": patch,
@@ -280,8 +311,11 @@ func TestEditFileTool_PatchAddLine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
+	if !result.Success {
+		t.Fatalf("expected success, got error: %s", result.Error)
+	}
 
-	t.Logf("patch result: %s", result)
+	t.Logf("patch result: %s", result.Content)
 
 	data, err := os.ReadFile(testFile)
 	if err != nil {
@@ -298,14 +332,17 @@ func TestEditFileTool_PathOutsideWorkDir(t *testing.T) {
 
 	tool := &EditFileTool{}
 
-	_, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path":    "../../etc/passwd",
 		"mode":    "replace",
 		"old_str": "test",
 		"new_str": "hacked",
 	})
 
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for path traversal")
 	}
 }
@@ -315,12 +352,15 @@ func TestEditFileTool_UnknownMode(t *testing.T) {
 
 	tool := &EditFileTool{}
 
-	_, err := tool.Execute(tmpDir, map[string]interface{}{
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path": "test.txt",
 		"mode": "unknown",
 	})
 
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for unknown mode")
 	}
 }
@@ -330,15 +370,21 @@ func TestEditFileTool_MissingParams(t *testing.T) {
 
 	tool := &EditFileTool{}
 
-	_, err := tool.Execute(tmpDir, map[string]interface{}{})
-	if err == nil {
+	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for missing path")
 	}
 
-	_, err = tool.Execute(tmpDir, map[string]interface{}{
+	result, err = executeTool(t, tool, tmpDir, map[string]interface{}{
 		"path": "test.txt",
 	})
-	if err == nil {
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
 		t.Fatal("expected error for missing mode")
 	}
 }
@@ -349,7 +395,7 @@ func TestRegistry_WriteFileTool(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	result, err := reg.Execute(tmpDir, "write_file", map[string]interface{}{
+	eventCh, err := reg.Execute(context.Background(), tmpDir, "write_file", map[string]interface{}{
 		"path":    "test.txt",
 		"content": "hello from registry",
 	})
@@ -357,8 +403,9 @@ func TestRegistry_WriteFileTool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
+	result := CollectToolResult(eventCh, nil)
 	if !result.Success {
-		t.Error("expected successful result")
+		t.Errorf("expected successful result, got error: %s", result.Error)
 	}
 	if !strings.Contains(result.Content, "created") {
 		t.Errorf("expected 'created' in result, got: %s", result.Content)
@@ -377,7 +424,7 @@ func TestRegistry_EditFileTool(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("original"), 0644)
 
-	result, err := reg.Execute(tmpDir, "edit_file", map[string]interface{}{
+	eventCh, err := reg.Execute(context.Background(), tmpDir, "edit_file", map[string]interface{}{
 		"path":    "test.txt",
 		"mode":    "replace",
 		"old_str": "original",
@@ -387,8 +434,9 @@ func TestRegistry_EditFileTool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
+	result := CollectToolResult(eventCh, nil)
 	if !result.Success {
-		t.Error("expected successful result")
+		t.Errorf("expected successful result, got error: %s", result.Error)
 	}
 
 	data, _ := os.ReadFile(filepath.Join(tmpDir, "test.txt"))

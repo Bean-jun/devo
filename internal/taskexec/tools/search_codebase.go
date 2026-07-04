@@ -1,11 +1,13 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"devo/internal/taskexec/pathsec"
 )
@@ -41,10 +43,10 @@ func (t *SearchCodebaseTool) ParamsSchema() map[string]interface{} {
 	}
 }
 
-func (t *SearchCodebaseTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
+func (t *SearchCodebaseTool) Execute(ctx context.Context, workingDir string, params map[string]interface{}, w StreamWriter) error {
 	pattern, ok := params["pattern"].(string)
 	if !ok || pattern == "" {
-		return "", fmt.Errorf("missing required parameter: pattern")
+		return fmt.Errorf("missing required parameter: pattern")
 	}
 
 	searchPath := "."
@@ -54,14 +56,14 @@ func (t *SearchCodebaseTool) Execute(workingDir string, params map[string]interf
 
 	safePath, err := pathsec.CheckPath(workingDir, searchPath)
 	if err != nil {
-		return "", fmt.Errorf("path security check failed")
+		return fmt.Errorf("path security check failed")
 	}
 
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		re, err = regexp.Compile(regexp.QuoteMeta(pattern))
 		if err != nil {
-			return "", fmt.Errorf("invalid search pattern: %s", pattern)
+			return fmt.Errorf("invalid search pattern: %s", pattern)
 		}
 	}
 
@@ -71,9 +73,18 @@ func (t *SearchCodebaseTool) Execute(workingDir string, params map[string]interf
 	var results []string
 	absWorkDir, _ := filepath.Abs(workingDir)
 
+	searchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	err = filepath.Walk(safePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
+		}
+
+		select {
+		case <-searchCtx.Done():
+			return searchCtx.Err()
+		default:
 		}
 
 		if info.IsDir() {
@@ -112,26 +123,35 @@ func (t *SearchCodebaseTool) Execute(workingDir string, params map[string]interf
 				return filepath.SkipAll
 			}
 			if re.MatchString(line) {
-				results = append(results, fmt.Sprintf("%s:%d: %s", relPath, i+1, strings.TrimSpace(line)))
+				match := fmt.Sprintf("%s:%d: %s", relPath, i+1, strings.TrimSpace(line))
+				results = append(results, match)
+				w.WriteChunk(match + "\n")
 			}
 		}
 
 		return nil
 	})
 
-	if err != nil {
-		return "", fmt.Errorf("search failed: %v", err)
+	if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+		if err == filepath.SkipAll {
+			err = nil
+		}
+		if err != nil {
+			return fmt.Errorf("search failed: %v", err)
+		}
 	}
 
 	if len(results) == 0 {
-		return "No matches found.", nil
+		w.WriteDone(true, "No matches found.")
+		return nil
 	}
 
 	if len(results) >= maxResults {
 		results = append(results, fmt.Sprintf("... (results truncated at %d matches)", maxResults))
 	}
 
-	return strings.Join(results, "\n"), nil
+	w.WriteDone(true, strings.Join(results, "\n"))
+	return nil
 }
 
 func isBinaryFile(info os.FileInfo) bool {

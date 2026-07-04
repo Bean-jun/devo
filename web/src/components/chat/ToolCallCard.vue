@@ -73,6 +73,7 @@ function escapeHtml(text: string): string {
       <div class="tool-left">
         <span class="tool-icon">{{ statusIcon[toolCall.status] ?? '🔧' }}</span>
         <span class="tool-name" data-test="tool-name">{{ toolCall.name }}</span>
+        <span v-if="toolCall.stage && toolCall.status === 'executing'" class="tool-stage" data-test="tool-stage">{{ toolCall.stage }}</span>
         <span v-if="toolCall.riskLevel" class="tool-risk" :style="{ color: RISK_COLORS[toolCall.riskLevel] }">
           {{ RISK_LABELS[toolCall.riskLevel] }}
         </span>
@@ -81,6 +82,11 @@ function escapeHtml(text: string): string {
         <span v-if="toolCall.duration" class="tool-duration">{{ formatDuration(toolCall.duration) }}</span>
         <span class="tool-chevron">{{ showParams ? '▾' : '▸' }}</span>
       </div>
+    </div>
+
+    <div v-if="toolCall.streamingOutput && toolCall.status === 'executing'" class="tool-streaming" data-test="tool-streaming">
+      <div class="tool-section-title">实时输出</div>
+      <pre class="tool-streaming-content">{{ toolCall.streamingOutput }}</pre>
     </div>
 
     <div v-if="showParams" class="tool-params">
@@ -98,7 +104,6 @@ function escapeHtml(text: string): string {
         </div>
         <div v-if="toolCall.result.error" class="result-error">{{ toolCall.result.error }}</div>
 
-        <!-- Diff 对比展示（edit_file / write_file） -->
         <div v-if="toolCall.result.diff" class="diff-section">
           <div class="diff-header">变更对比</div>
           <pre class="diff-content"><code v-html="renderDiff(toolCall.result.diff as string)"></code></pre>
@@ -180,6 +185,16 @@ function escapeHtml(text: string): string {
   background: var(--color-bg-tertiary);
 }
 
+.tool-stage {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: #fff;
+  text-transform: uppercase;
+}
+
 .tool-right {
   display: flex;
   align-items: center;
@@ -195,6 +210,26 @@ function escapeHtml(text: string): string {
 .tool-chevron {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
+}
+
+.tool-streaming {
+  border-top: 1px solid var(--color-border-light);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.tool-streaming-content {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--color-bg-secondary);
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  margin: 0;
 }
 
 .tool-params,

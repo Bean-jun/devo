@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -73,10 +75,16 @@ func (t *ExecPythonTool) PreCheck(params map[string]interface{}) error {
 	return nil
 }
 
-func (t *ExecPythonTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
+func (t *ExecPythonTool) Execute(ctx context.Context, workingDir string, params map[string]interface{}, w StreamWriter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	code, ok := params["code"].(string)
 	if !ok || code == "" {
-		return "", fmt.Errorf("missing required parameter: code")
+		return fmt.Errorf("missing required parameter: code")
 	}
 
 	code = strings.TrimSpace(code)
@@ -86,33 +94,69 @@ func (t *ExecPythonTool) Execute(workingDir string, params map[string]interface{
 		timeoutSeconds = int(ts)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	execCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "python", "-c", code)
+	cmd := exec.CommandContext(execCtx, "python", "-u", "-c", code)
 	cmd.Dir = workingDir
-
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
 
 	if runtime.GOOS == "windows" {
 		cmd.SysProcAttr = getPythonSysProcAttr()
 	}
 
-	err := cmd.Run()
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("create stdout pipe: %w", err)
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("create stderr pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("start python: %w", err)
+	}
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		scanner := bufio.NewScanner(stdoutPipe)
+		for scanner.Scan() {
+			line := scanner.Text()
+			stdoutBuf.WriteString(line + "\n")
+			w.WriteChunk(line + "\n")
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		scanner := bufio.NewScanner(stderrPipe)
+		for scanner.Scan() {
+			line := scanner.Text()
+			stderrBuf.WriteString(line + "\n")
+			w.WriteChunk("[stderr] " + line + "\n")
+		}
+	}()
+
+	wg.Wait()
+	err = cmd.Wait()
 
 	timedOut := false
 	exitCode := 0
 
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+		if execCtx.Err() == context.DeadlineExceeded {
 			timedOut = true
+			exitCode = -1
+		} else if ctx.Err() != nil {
 			exitCode = -1
 		} else if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
-			return "", fmt.Errorf("python execution failed: %w", err)
+			return fmt.Errorf("python execution failed: %w", err)
 		}
 	}
 
@@ -120,8 +164,9 @@ func (t *ExecPythonTool) Execute(workingDir string, params map[string]interface{
 	stderr := decodePythonOutput(stderrBuf.Bytes())
 
 	if timedOut {
-		return fmt.Sprintf("Python execution timed out after %d seconds.\nExit code: %d\nStdout:\n%s\nStderr:\n%s",
-			timeoutSeconds, exitCode, stdout, stderr), nil
+		w.WriteDone(false, fmt.Sprintf("Python execution timed out after %d seconds.\nExit code: %d\nStdout:\n%s\nStderr:\n%s",
+			timeoutSeconds, exitCode, stdout, stderr))
+		return nil
 	}
 
 	output := fmt.Sprintf("Exit code: %d\nStdout:\n%s", exitCode, stdout)
@@ -129,7 +174,8 @@ func (t *ExecPythonTool) Execute(workingDir string, params map[string]interface{
 		output += fmt.Sprintf("\nStderr:\n%s", stderr)
 	}
 
-	return output, nil
+	w.WriteDone(true, output)
+	return nil
 }
 
 func decodePythonOutput(data []byte) string {

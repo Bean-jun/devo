@@ -14,7 +14,7 @@ export default defineConfig({
     ['json', { outputFile: './test-results/results.json' }],
   ],
   use: {
-    baseURL: 'http://localhost:8080',
+    baseURL: 'http://localhost:8081',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'on-first-retry',
@@ -29,10 +29,5 @@ export default defineConfig({
       use: { ...devices['Desktop Firefox'] },
     },
   ],
-  webServer: {
-    command: 'cd .. && go run ./cmd/devo --web --port 8080',
-    port: 8080,
-    timeout: 15_000,
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: undefined,
 })

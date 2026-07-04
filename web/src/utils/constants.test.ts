@@ -40,6 +40,7 @@ describe('constants', () => {
       expect(STATUS_LABELS.processing).toBe('处理中')
       expect(STATUS_LABELS.awaiting_approval).toBe('等待审批')
       expect(STATUS_LABELS.paused).toBe('已暂停')
+      expect(STATUS_LABELS.cancelled).toBe('已取消')
       expect(STATUS_LABELS.completed).toBe('已完成')
       expect(STATUS_LABELS.archived).toBe('已归档')
     })
@@ -50,6 +51,7 @@ describe('constants', () => {
       expect(STATUS_COLORS.idle).toBeTruthy()
       expect(STATUS_COLORS.processing).toBeTruthy()
       expect(STATUS_COLORS.awaiting_approval).toBeTruthy()
+      expect(STATUS_COLORS.cancelled).toBe('#ff3b30')
     })
   })
 

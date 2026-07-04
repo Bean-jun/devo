@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -44,23 +45,30 @@ func (t *UseSkillTool) ParamsSchema() map[string]interface{} {
 	}
 }
 
-func (t *UseSkillTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
+func (t *UseSkillTool) Execute(ctx context.Context, workingDir string, params map[string]interface{}, w StreamWriter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	skillName, ok := params["skill_name"].(string)
 	if !ok || skillName == "" {
-		return "", fmt.Errorf("missing required parameter: skill_name")
+		return fmt.Errorf("missing required parameter: skill_name")
 	}
 
 	if t.loaded[skillName] {
-		return fmt.Sprintf("Skill '%s' is already loaded. Its instructions are already in the conversation context.", skillName), nil
+		w.WriteDone(true, fmt.Sprintf("Skill '%s' is already loaded. Its instructions are already in the conversation context.", skillName))
+		return nil
 	}
 
 	skill, err := t.manager.GetSkill(skillName)
 	if err != nil {
-		return "", fmt.Errorf("skill not found: %s. Make sure the skill name matches exactly one of the available skills.", skillName)
+		return fmt.Errorf("skill not found: %s. Make sure the skill name matches exactly one of the available skills.", skillName)
 	}
 
 	if !skill.Enabled {
-		return "", fmt.Errorf("skill '%s' is currently disabled", skillName)
+		return fmt.Errorf("skill '%s' is currently disabled", skillName)
 	}
 
 	t.loaded[skillName] = true
@@ -104,7 +112,8 @@ func (t *UseSkillTool) Execute(workingDir string, params map[string]interface{})
 		}
 	}
 
-	return result.String(), nil
+	w.WriteDone(true, result.String())
+	return nil
 }
 
 func (t *UseSkillTool) Reset() {

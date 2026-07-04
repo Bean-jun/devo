@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -33,6 +34,8 @@ type ExecResult struct {
 	PID        int    `json:"pid"`
 }
 
+type OutputCallback func(line string, isStderr bool)
+
 type NativeExecutor struct {
 	mu sync.Mutex
 }
@@ -41,7 +44,11 @@ func NewExecutor() *NativeExecutor {
 	return &NativeExecutor{}
 }
 
-func (e *NativeExecutor) Execute(workingDir, command string, timeoutSeconds int, mode ExecMode) (*ExecResult, error) {
+func (e *NativeExecutor) Execute(ctx context.Context, workingDir, command string, timeoutSeconds int, mode ExecMode) (*ExecResult, error) {
+	return e.ExecuteStreaming(ctx, workingDir, command, timeoutSeconds, mode, nil)
+}
+
+func (e *NativeExecutor) ExecuteStreaming(ctx context.Context, workingDir, command string, timeoutSeconds int, mode ExecMode, onOutput OutputCallback) (*ExecResult, error) {
 	if timeoutSeconds <= 0 {
 		timeoutSeconds = 30
 	}
@@ -50,9 +57,9 @@ func (e *NativeExecutor) Execute(workingDir, command string, timeoutSeconds int,
 
 	switch actualMode {
 	case ExecModeAsync:
-		return e.executeAsync(workingDir, command, timeoutSeconds)
+		return e.executeAsync(ctx, workingDir, command, timeoutSeconds)
 	default:
-		return e.executeSync(workingDir, command, timeoutSeconds)
+		return e.executeSyncStreaming(ctx, workingDir, command, timeoutSeconds, onOutput)
 	}
 }
 
@@ -66,35 +73,84 @@ func (e *NativeExecutor) resolveMode(mode ExecMode, command string) ExecMode {
 	return ExecModeSync
 }
 
-func (e *NativeExecutor) executeSync(workingDir, command string, timeoutSeconds int) (*ExecResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+func (e *NativeExecutor) executeSyncStreaming(ctx context.Context, workingDir, command string, timeoutSeconds int, onOutput OutputCallback) (*ExecResult, error) {
+	execCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
 	shell, shellArgs := getShellCommand(command)
 
-	cmd := exec.CommandContext(ctx, shell, shellArgs...)
+	cmd := exec.CommandContext(execCtx, shell, shellArgs...)
 	cmd.Dir = workingDir
 
 	e.setPlatformAttrs(cmd)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
 
-	err := cmd.Run()
+	var runErr error
 
-	pid := cmd.Process.Pid
+	if onOutput != nil {
+		stdoutPipe, err := cmd.StdoutPipe()
+		if err != nil {
+			return nil, fmt.Errorf("create stdout pipe: %w", err)
+		}
+		stderrPipe, err := cmd.StderrPipe()
+		if err != nil {
+			return nil, fmt.Errorf("create stderr pipe: %w", err)
+		}
+
+		if err := cmd.Start(); err != nil {
+			return nil, fmt.Errorf("start command: %w", err)
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			scanner := newLineScanner(stdoutPipe)
+			for scanner.Scan() {
+				line := scanner.Text()
+				stdoutBuf.WriteString(line + "\n")
+				onOutput(line, false)
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			scanner := newLineScanner(stderrPipe)
+			for scanner.Scan() {
+				line := scanner.Text()
+				stderrBuf.WriteString(line + "\n")
+				onOutput(line, true)
+			}
+		}()
+
+		wg.Wait()
+		runErr = cmd.Wait()
+	} else {
+		cmd.Stdout = &stdoutBuf
+		cmd.Stderr = &stderrBuf
+		runErr = cmd.Run()
+	}
+
+	pid := 0
+	if cmd.Process != nil {
+		pid = cmd.Process.Pid
+	}
 	timedOut := false
 	exitCode := 0
 
-	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+	if runErr != nil {
+		if execCtx.Err() == context.DeadlineExceeded {
 			timedOut = true
 			exitCode = -1
-		} else if exitErr, ok := err.(*exec.ExitError); ok {
+		} else if ctx.Err() != nil {
+			timedOut = false
+			exitCode = -1
+		} else if exitErr, ok := runErr.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
-			return nil, fmt.Errorf("command execution failed: %w", err)
+			return nil, fmt.Errorf("command execution failed: %w", runErr)
 		}
 	}
 
@@ -108,10 +164,16 @@ func (e *NativeExecutor) executeSync(workingDir, command string, timeoutSeconds 
 	}, nil
 }
 
-func (e *NativeExecutor) executeAsync(workingDir, command string, timeoutSeconds int) (*ExecResult, error) {
+func newLineScanner(r io.Reader) *bufioScanner {
+	return bufio.NewScanner(r)
+}
+
+type bufioScanner = bufio.Scanner
+
+func (e *NativeExecutor) executeAsync(ctx context.Context, workingDir, command string, timeoutSeconds int) (*ExecResult, error) {
 	shell, shellArgs := getShellCommand(command)
 
-	cmd := exec.Command(shell, shellArgs...)
+	cmd := exec.CommandContext(ctx, shell, shellArgs...)
 	cmd.Dir = workingDir
 
 	e.setPlatformAttrs(cmd)
@@ -129,7 +191,10 @@ func (e *NativeExecutor) executeAsync(workingDir, command string, timeoutSeconds
 		return nil, fmt.Errorf("start command: %w", err)
 	}
 
-	pid := cmd.Process.Pid
+	pid := 0
+	if cmd.Process != nil {
+		pid = cmd.Process.Pid
+	}
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	var wg sync.WaitGroup

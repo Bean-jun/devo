@@ -11,6 +11,13 @@ export const mockToolCallPending: ToolCall = {
   riskLevel: 'medium',
 }
 
+export const mockToolCallExecuting: ToolCall = {
+  ...mockToolCallPending,
+  status: 'executing',
+  stage: 'running',
+  streamingOutput: 'Writing file...\n',
+}
+
 export const mockToolCallSuccess: ToolCall = {
   ...mockToolCallPending,
   status: 'success',

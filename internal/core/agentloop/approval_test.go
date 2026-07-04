@@ -821,6 +821,8 @@ func TestApprovalRequest_WriteFileDiff(t *testing.T) {
 	if !ok {
 		t.Fatal("timed out waiting for session_state_change (completed)")
 	}
+
+	time.Sleep(50 * time.Millisecond)
 }
 
 type editApprovalMockClient struct {

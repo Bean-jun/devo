@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"context"
 	"testing"
 
 	"devo/internal/taskexec/tools"
@@ -16,8 +17,8 @@ func (m *mockTool) Name() string                         { return m.name }
 func (m *mockTool) Description() string                  { return m.description }
 func (m *mockTool) RiskLevel() tools.RiskLevel           { return tools.RiskLevelNone }
 func (m *mockTool) ParamsSchema() map[string]interface{} { return m.params }
-func (m *mockTool) Execute(workingDir string, params map[string]interface{}) (string, error) {
-	return "ok", nil
+func (m *mockTool) Execute(ctx context.Context, workingDir string, params map[string]interface{}, w tools.StreamWriter) error {
+	return nil
 }
 
 func TestBuildToolDefs_Empty(t *testing.T) {

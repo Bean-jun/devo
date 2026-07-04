@@ -78,4 +78,37 @@ describe('useKeyboard', () => {
 
     expect(handler).not.toHaveBeenCalled()
   })
+
+  it('should handle alt key requirement', () => {
+    const handler = vi.fn()
+    const shortcuts = [{ key: 'y', alt: true, handler }]
+
+    mountWithKeyboard(shortcuts)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', altKey: true }))
+
+    expect(handler).toHaveBeenCalled()
+  })
+
+  it('should not trigger when alt not pressed', () => {
+    const handler = vi.fn()
+    const shortcuts = [{ key: 'y', alt: true, handler }]
+
+    mountWithKeyboard(shortcuts)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', altKey: false }))
+
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('should not trigger when ctrl pressed but not required', () => {
+    const handler = vi.fn()
+    const shortcuts = [{ key: 'Escape', handler }]
+
+    mountWithKeyboard(shortcuts)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', ctrlKey: true }))
+
+    expect(handler).not.toHaveBeenCalled()
+  })
 })

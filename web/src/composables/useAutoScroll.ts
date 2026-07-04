@@ -1,4 +1,4 @@
-import { ref, nextTick } from 'vue'
+import { ref } from 'vue'
 import { AUTO_SCROLL_THRESHOLD } from '@/utils/constants'
 
 export function useAutoScroll() {
@@ -13,16 +13,14 @@ export function useAutoScroll() {
   }
 
   function scrollToBottom(smooth = true): void {
-    nextTick(() => {
-      const el = containerRef.value
-      if (!el) return
-      el.scrollTo({
-        top: el.scrollHeight,
-        behavior: smooth ? 'smooth' : 'auto',
-      })
-      isUserScrolledUp.value = false
-      showScrollToBottom.value = false
+    const el = containerRef.value
+    if (!el) return
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: smooth ? 'smooth' : 'auto',
     })
+    isUserScrolledUp.value = false
+    showScrollToBottom.value = false
   }
 
   function onScroll(): void {

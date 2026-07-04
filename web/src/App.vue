@@ -28,6 +28,8 @@ const mcpStore = useMcpStore()
 const { detectMode, isVscodeMode } = usePlatform()
 const { startTransition } = useThemeTransition()
 
+;(window as any).__chatStore = chatStore
+
 const initialized = ref(false)
 
 watch(
@@ -156,7 +158,10 @@ function connectSSE(sessionId: string) {
       })
     }
     if (sessionStore.currentSession) {
-      sessionStore.updateSessionState(sessionStore.currentSession.id, 'idle')
+      const currentState = sessionStore.currentSession.state?.toLowerCase()
+      if (currentState !== 'cancelled') {
+        sessionStore.updateSessionState(sessionStore.currentSession.id, 'idle')
+      }
     }
   })
 
@@ -192,11 +197,25 @@ function connectSSE(sessionId: string) {
 
   onEvent('tool_progress', (data: any) => {
     const toolName = data.tool_name || ''
+    const stage = data.stage || ''
     const msgs = chatStore.messages
     for (let i = msgs.length - 1; i >= 0; i--) {
       const msg = msgs[i]
-      if (msg.toolCall && msg.toolCall.name === toolName && msg.toolCall.status === 'pending') {
-        chatStore.updateToolCallStatus(msg.toolCall.id, 'executing')
+      if (msg.toolCall && msg.toolCall.name === toolName && (msg.toolCall.status === 'pending' || msg.toolCall.status === 'executing')) {
+        chatStore.updateToolProgress(msg.toolCall.id, stage)
+        break
+      }
+    }
+  })
+
+  onEvent('tool_chunk', (data: any) => {
+    const toolName = data.tool_name || ''
+    const chunk = data.data || ''
+    const msgs = chatStore.messages
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const msg = msgs[i]
+      if (msg.toolCall && msg.toolCall.name === toolName && (msg.toolCall.status === 'pending' || msg.toolCall.status === 'executing')) {
+        chatStore.appendToolStreamChunk(msg.toolCall.id, chunk)
         break
       }
     }
@@ -235,11 +254,12 @@ function connectSSE(sessionId: string) {
 
   onEvent('session_state_change', (data: any) => {
     if (sessionStore.currentSession) {
-      const newState = data.new_state || 'idle'
-      sessionStore.updateSessionState(sessionStore.currentSession.id, newState)
+      let newState = data.new_state || 'idle'
       if (data.reason === 'cancelled') {
-        chatStore.appendSystemMessage('操作已取消')
-      } else if (data.reason === 'tool_limit_reached') {
+        newState = 'cancelled'
+      }
+      sessionStore.updateSessionState(sessionStore.currentSession.id, newState)
+      if (data.reason === 'tool_limit_reached') {
         chatStore.appendSystemMessage('已达到工具调用上限，输入新消息继续')
       } else if (data.reason === 'error') {
         chatStore.appendSystemMessage('发生错误，请重试')
@@ -295,6 +315,55 @@ function connectSSE(sessionId: string) {
   })
 }
 
+async function pauseSession() {
+  const session = sessionStore.currentSession
+  if (!session) return
+  if (!sessionStore.canPause) {
+    uiStore.showToast('error', `当前状态为 ${session.state}，无法暂停`)
+    return
+  }
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${session.id}/pause`, { method: 'POST' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || '暂停失败')
+    }
+    sessionStore.updateSessionState(session.id, 'paused')
+    uiStore.showToast('info', '会话已暂停')
+  } catch (e: any) {
+    uiStore.showToast('error', e.message || '暂停失败')
+  }
+}
+
+async function cancelSession() {
+  const session = sessionStore.currentSession
+  if (!session) return
+  if (!sessionStore.canCancel) {
+    return
+  }
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${session.id}/cancel`, { method: 'POST' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || '取消失败')
+    }
+    sessionStore.updateSessionState(session.id, 'cancelled')
+    uiStore.showToast('info', '操作已取消')
+  } catch (e: any) {
+    uiStore.showToast('error', e.message || '取消失败')
+  }
+}
+
+async function toggleYolo() {
+  try {
+    await sessionStore.toggleYolo()
+    const label = sessionStore.yoloEnabled ? 'YOLO 模式已开启' : 'YOLO 模式已关闭'
+    uiStore.showToast('success', label)
+  } catch {
+    uiStore.showToast('error', 'YOLO 切换失败')
+  }
+}
+
 useKeyboard([
   {
     key: 'k',
@@ -306,104 +375,29 @@ useKeyboard([
   {
     key: 'Escape',
     handler: () => {
-      if (commandStore.isOpen) commandStore.close()
-      else if (uiStore.activeModal) uiStore.setActiveModal(null)
-    },
-  },
-  {
-    key: 'p',
-    ctrl: true,
-    shift: true,
-    handler: async () => {
-      if (!sessionStore.currentSession) return
-      if (sessionStore.isPaused) {
-        if (!sessionStore.canResume) {
-          uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession.state}，无法恢复`)
-          return
-        }
-        try {
-          const res = await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/resume`, {
-            method: 'POST',
-          })
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}))
-            throw new Error(data.message || '恢复失败')
-          }
-          sessionStore.updateSessionState(sessionStore.currentSession.id, 'tool_executing')
-          uiStore.showToast('info', '会话已恢复')
-        } catch (e: any) {
-          uiStore.showToast('error', e.message || '恢复失败')
-        }
-      } else {
-        if (!sessionStore.canPause) {
-          uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession.state}，无法暂停`)
-          return
-        }
-        try {
-          const res = await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/pause`, {
-            method: 'POST',
-          })
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}))
-            throw new Error(data.message || '暂停失败')
-          }
-          sessionStore.updateSessionState(sessionStore.currentSession.id, 'paused')
-          uiStore.showToast('info', '会话已暂停')
-        } catch (e: any) {
-          uiStore.showToast('error', e.message || '暂停失败')
-        }
-      }
-    },
-  },
-  {
-    key: 'r',
-    ctrl: true,
-    shift: true,
-    handler: async () => {
-      if (!sessionStore.currentSession) return
-      if (!sessionStore.canResume) {
-        uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession.state}，无法恢复`)
+      if (commandStore.isOpen) {
+        commandStore.close()
         return
       }
-      try {
-        const res = await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/resume`, {
-          method: 'POST',
-        })
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
-          throw new Error(data.message || '恢复失败')
-        }
-        sessionStore.updateSessionState(sessionStore.currentSession.id, 'tool_executing')
-        uiStore.showToast('info', '会话已恢复')
-      } catch (e: any) {
-        uiStore.showToast('error', e.message || '恢复失败')
+      if (uiStore.activeModal) {
+        uiStore.setActiveModal(null)
+        return
+      }
+      if (!sessionStore.currentSession) return
+      const state = sessionStore.currentSession.state?.toLowerCase()
+      if (state === 'tool_executing') {
+        pauseSession()
+      } else if (state === 'paused') {
+        cancelSession()
+      } else if (state === 'thinking' || state === 'processing' || state === 'awaiting_approval') {
+        cancelSession()
       }
     },
   },
   {
-    key: 'c',
-    ctrl: true,
-    shift: true,
-    handler: async () => {
-      if (!sessionStore.currentSession) return
-      if (!sessionStore.canCancel) {
-        uiStore.showToast('error', `当前状态为 ${sessionStore.currentSession.state}，无法取消`)
-        return
-      }
-      try {
-        const res = await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/cancel`, {
-          method: 'POST',
-        })
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
-          throw new Error(data.message || '取消失败')
-        }
-        sessionStore.updateSessionState(sessionStore.currentSession.id, 'idle')
-        uiStore.showToast('info', '操作已取消')
-      } catch (e: any) {
-        uiStore.showToast('error', e.message || '取消失败')
-      }
-    },
+    key: 'y',
+    alt: true,
+    handler: () => toggleYolo(),
   },
 ])
 </script>

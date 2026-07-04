@@ -51,7 +51,8 @@ function confirmDelete() {
   confirmError.value = ''
 }
 
-function cancelDelete() {
+function cancelDelete(e?: Event) {
+  e?.stopPropagation()
   deleteTarget.value = null
   confirmInput.value = ''
   confirmError.value = ''
@@ -69,7 +70,8 @@ async function confirmSessionDelete() {
   sessionDeleteTarget.value = null
 }
 
-function cancelSessionDelete() {
+function cancelSessionDelete(e?: Event) {
+  e?.stopPropagation()
   sessionDeleteTarget.value = null
 }
 
@@ -125,7 +127,8 @@ async function confirmNewSession() {
   router.push('/chat')
 }
 
-function cancelNewSession() {
+function cancelNewSession(e?: Event) {
+  e?.stopPropagation()
   showNewSessionDialog.value = false
 }
 </script>

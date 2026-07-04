@@ -1,32 +1,54 @@
 package rest
 
 import (
+	"devo/internal/core/agentloop"
+	"devo/internal/core/approval"
+	"devo/internal/core/concurrency"
+	"devo/internal/core/memory"
+	"devo/internal/core/session"
+	"devo/internal/taskexec/llmclient"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"devo/internal/core/session"
 )
 
-func TestGetFiles_SuccessFile(t *testing.T) {
-	server, store := setupTestServer()
-	defer server.Close()
+func setupTestServerWithProjectDir(dir string) (*httptest.Server, *session.InMemoryStore) {
+	store := session.NewInMemoryStore()
+	llm := llmclient.NewMockClient()
+	loop := agentloop.New(store, llm)
+	tmpDir, err := os.MkdirTemp("", "devo-test-*")
+	if err != nil {
+		panic(err)
+	}
+	memStore, err := memory.NewFileStore(tmpDir)
+	if err != nil {
+		panic(err)
+	}
+	pathLock := concurrency.NewPathLockManager()
+	approvalMgr := approval.NewManager()
+	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
+	loop.SetMemoryManager(memManager)
+	handler := NewHandler(store, loop, memManager, "0.0.1")
+	handler.SetProjectDir(dir)
 
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	return httptest.NewServer(mux), store
+}
+
+func TestGetFiles_SuccessFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	expectedContent := "Hello, this is test content."
 	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte(expectedContent), 0644)
 
-	sess := &session.Session{
-		ID:               "sess-1",
-		Title:            "Test",
-		WorkingDirectory: tmpDir,
-		State:            session.StateIdle,
-	}
-	store.Create(sess)
+	server, _ := setupTestServerWithProjectDir(tmpDir)
+	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/v1/sessions/sess-1/files?path=test.txt")
+	resp, err := http.Get(server.URL + "/api/v1/files?path=test.txt")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -51,23 +73,15 @@ func TestGetFiles_SuccessFile(t *testing.T) {
 }
 
 func TestGetFiles_SuccessDirectory(t *testing.T) {
-	server, store := setupTestServer()
-	defer server.Close()
-
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "a.txt"), []byte("content"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "b.txt"), []byte("content"), 0644)
 	os.Mkdir(filepath.Join(tmpDir, "subdir"), 0755)
 
-	sess := &session.Session{
-		ID:               "sess-1",
-		Title:            "Test",
-		WorkingDirectory: tmpDir,
-		State:            session.StateIdle,
-	}
-	store.Create(sess)
+	server, _ := setupTestServerWithProjectDir(tmpDir)
+	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/v1/sessions/sess-1/files")
+	resp, err := http.Get(server.URL + "/api/v1/files")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -108,19 +122,11 @@ func TestGetFiles_SuccessDirectory(t *testing.T) {
 }
 
 func TestGetFiles_PathOutsideWorkDir(t *testing.T) {
-	server, store := setupTestServer()
+	tmpDir := t.TempDir()
+	server, _ := setupTestServerWithProjectDir(tmpDir)
 	defer server.Close()
 
-	tmpDir := t.TempDir()
-	sess := &session.Session{
-		ID:               "sess-1",
-		Title:            "Test",
-		WorkingDirectory: tmpDir,
-		State:            session.StateIdle,
-	}
-	store.Create(sess)
-
-	resp, err := http.Get(server.URL + "/api/v1/sessions/sess-1/files?path=../../etc/passwd")
+	resp, err := http.Get(server.URL + "/api/v1/files?path=../../etc/passwd")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -132,19 +138,11 @@ func TestGetFiles_PathOutsideWorkDir(t *testing.T) {
 }
 
 func TestGetFiles_PathNotFound(t *testing.T) {
-	server, store := setupTestServer()
+	tmpDir := t.TempDir()
+	server, _ := setupTestServerWithProjectDir(tmpDir)
 	defer server.Close()
 
-	tmpDir := t.TempDir()
-	sess := &session.Session{
-		ID:               "sess-1",
-		Title:            "Test",
-		WorkingDirectory: tmpDir,
-		State:            session.StateIdle,
-	}
-	store.Create(sess)
-
-	resp, err := http.Get(server.URL + "/api/v1/sessions/sess-1/files?path=nonexistent.txt")
+	resp, err := http.Get(server.URL + "/api/v1/files?path=nonexistent.txt")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -155,39 +153,16 @@ func TestGetFiles_PathNotFound(t *testing.T) {
 	}
 }
 
-func TestGetFiles_SessionNotFound(t *testing.T) {
-	server, _ := setupTestServer()
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/api/v1/sessions/nonexistent/files")
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("expected 404 Not Found for non-existent session, got %d", resp.StatusCode)
-	}
-}
-
 func TestGetFiles_Subdirectory(t *testing.T) {
-	server, store := setupTestServer()
-	defer server.Close()
-
 	tmpDir := t.TempDir()
 	os.Mkdir(filepath.Join(tmpDir, "dir1"), 0755)
 	os.Mkdir(filepath.Join(tmpDir, "dir1/dir2"), 0755)
 	os.WriteFile(filepath.Join(tmpDir, "dir1/dir2/file.txt"), []byte("nested"), 0644)
 
-	sess := &session.Session{
-		ID:               "sess-1",
-		Title:            "Test",
-		WorkingDirectory: tmpDir,
-		State:            session.StateIdle,
-	}
-	store.Create(sess)
+	server, _ := setupTestServerWithProjectDir(tmpDir)
+	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/v1/sessions/sess-1/files?path=dir1/dir2")
+	resp, err := http.Get(server.URL + "/api/v1/files?path=dir1/dir2")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
