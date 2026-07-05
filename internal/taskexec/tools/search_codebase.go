@@ -38,6 +38,30 @@ func (t *SearchCodebaseTool) ParamsSchema() map[string]interface{} {
 				"type":        "string",
 				"description": "搜索路径（相对于工作目录），默认为工作目录",
 			},
+			"file_pattern": map[string]interface{}{
+				"type":        "string",
+				"description": "限制搜索的文件类型，如 '*.go'、'*.{ts,js}'，默认为所有文件",
+			},
+			"output_mode": map[string]interface{}{
+				"type":        "string",
+				"description": "输出模式：'content'（显示匹配行）、'files_with_matches'（只显示文件名）、'count'（显示匹配数），默认 'content'",
+			},
+			"case_sensitive": map[string]interface{}{
+				"type":        "boolean",
+				"description": "是否区分大小写，默认 false（不区分）",
+			},
+			"context_lines": map[string]interface{}{
+				"type":        "integer",
+				"description": "匹配行前后各显示 N 行上下文，默认 0",
+			},
+			"max_results": map[string]interface{}{
+				"type":        "integer",
+				"description": "最大匹配结果数，默认 50",
+			},
+			"head_limit": map[string]interface{}{
+				"type":        "integer",
+				"description": "限制输出总行数（含 context_lines），0 表示不限制",
+			},
 		},
 		"required": []string{"pattern"},
 	}
@@ -59,19 +83,62 @@ func (t *SearchCodebaseTool) Execute(ctx context.Context, workingDir string, par
 		return fmt.Errorf("path security check failed")
 	}
 
-	re, err := regexp.Compile(pattern)
+	outputMode := "content"
+	if m, ok := params["output_mode"].(string); ok && m != "" {
+		outputMode = m
+	}
+
+	filePattern, _ := params["file_pattern"].(string)
+
+	caseSensitive := false
+	if cs, ok := params["case_sensitive"].(bool); ok {
+		caseSensitive = cs
+	}
+
+	contextLines := 0
+	if cl, ok := params["context_lines"].(float64); ok {
+		contextLines = int(cl)
+	}
+	if cl, ok := params["context_lines"].(int); ok {
+		contextLines = cl
+	}
+
+	maxResults := 50
+	if mr, ok := params["max_results"].(float64); ok {
+		maxResults = int(mr)
+	}
+	if mr, ok := params["max_results"].(int); ok {
+		maxResults = mr
+	}
+
+	headLimit := 0
+	if hl, ok := params["head_limit"].(float64); ok {
+		headLimit = int(hl)
+	}
+	if hl, ok := params["head_limit"].(int); ok {
+		headLimit = hl
+	}
+
+	effectivePattern := pattern
+	if !caseSensitive {
+		effectivePattern = "(?i)" + pattern
+	}
+
+	re, err := regexp.Compile(effectivePattern)
 	if err != nil {
 		re, err = regexp.Compile(regexp.QuoteMeta(pattern))
 		if err != nil {
 			return fmt.Errorf("invalid search pattern: %s", pattern)
 		}
+		w.WriteMeta("Pattern treated as literal string (regex compilation failed)")
 	}
 
 	gi := pathsec.LoadGitignore(workingDir)
 
-	maxResults := 50
 	var results []string
+	var outputLines []string
 	absWorkDir, _ := filepath.Abs(workingDir)
+	fileMatchCounts := make(map[string]int)
 
 	searchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -99,7 +166,14 @@ func (t *SearchCodebaseTool) Execute(ctx context.Context, workingDir string, par
 			return nil
 		}
 
-		if len(results) >= maxResults {
+		if filePattern != "" {
+			matched, err := filepath.Match(filePattern, info.Name())
+			if err != nil || !matched {
+				return nil
+			}
+		}
+
+		if outputMode != "files_with_matches" && len(results) >= maxResults {
 			return filepath.SkipAll
 		}
 
@@ -118,15 +192,56 @@ func (t *SearchCodebaseTool) Execute(ctx context.Context, workingDir string, par
 		}
 
 		lines := strings.Split(string(data), "\n")
+		fileHasMatch := false
+
 		for i, line := range lines {
-			if len(results) >= maxResults {
-				return filepath.SkipAll
-			}
 			if re.MatchString(line) {
-				match := fmt.Sprintf("%s:%d: %s", relPath, i+1, strings.TrimSpace(line))
-				results = append(results, match)
-				w.WriteChunk(match + "\n")
+				fileHasMatch = true
+				fileMatchCounts[relPath]++
+
+				if outputMode == "count" {
+					continue
+				}
+
+				if outputMode == "files_with_matches" {
+					if fileMatchCounts[relPath] == 1 {
+						results = append(results, relPath)
+					}
+					continue
+				}
+
+				if len(results) >= maxResults {
+					return filepath.SkipAll
+				}
+
+				if contextLines > 0 {
+					start := i - contextLines
+					if start < 0 {
+						start = 0
+					}
+					end := i + contextLines + 1
+					if end > len(lines) {
+						end = len(lines)
+					}
+
+					for j := start; j < end; j++ {
+						marker := "  "
+						if j == i {
+							marker = "> "
+						}
+						entry := fmt.Sprintf("%s:%d:%s%s", relPath, j+1, marker, strings.TrimSpace(lines[j]))
+						outputLines = append(outputLines, entry)
+					}
+				} else {
+					match := fmt.Sprintf("%s:%d: %s", relPath, i+1, strings.TrimSpace(line))
+					results = append(results, match)
+					outputLines = append(outputLines, match)
+				}
 			}
+		}
+
+		if outputMode == "files_with_matches" && fileHasMatch {
+			return nil
 		}
 
 		return nil
@@ -141,12 +256,33 @@ func (t *SearchCodebaseTool) Execute(ctx context.Context, workingDir string, par
 		}
 	}
 
+	if outputMode == "count" {
+		var countResults []string
+		for file, count := range fileMatchCounts {
+			if count > 0 {
+				countResults = append(countResults, fmt.Sprintf("%s: %d matches", file, count))
+			}
+		}
+		results = countResults
+		outputLines = countResults
+	}
+
+	if outputMode == "content" && contextLines > 0 {
+		results = outputLines
+	}
+
+	if headLimit > 0 && len(outputLines) > headLimit {
+		outputLines = outputLines[:headLimit]
+		outputLines = append(outputLines, fmt.Sprintf("... (output truncated at %d lines)", headLimit))
+		results = outputLines
+	}
+
 	if len(results) == 0 {
 		w.WriteDone(true, "No matches found.")
 		return nil
 	}
 
-	if len(results) >= maxResults {
+	if len(results) >= maxResults && outputMode == "content" && contextLines == 0 {
 		results = append(results, fmt.Sprintf("... (results truncated at %d matches)", maxResults))
 	}
 

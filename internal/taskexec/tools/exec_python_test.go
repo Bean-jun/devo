@@ -1,14 +1,13 @@
 package tools
 
 import (
-	"os/exec"
 	"strings"
 	"testing"
 )
 
 func isPythonAvailable() bool {
-	_, err := exec.LookPath("python")
-	return err == nil
+	tool := NewExecPythonTool()
+	return tool.pythonBin != ""
 }
 
 func TestExecPythonTool_SimpleExpression(t *testing.T) {

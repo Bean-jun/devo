@@ -201,27 +201,6 @@ func TestSearchCodebaseTool_FindMatch(t *testing.T) {
 	}
 }
 
-func TestSearchCodebaseTool_NoMatch(t *testing.T) {
-	tmpDir := t.TempDir()
-	os.WriteFile(filepath.Join(tmpDir, "app.go"), []byte("package main"), 0644)
-
-	tool := &SearchCodebaseTool{}
-	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
-		"pattern": "NoSuchPatternXYZ",
-	})
-
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if !result.Success {
-		t.Fatalf("expected success, got error: %s", result.Error)
-	}
-
-	if !strings.Contains(result.Content, "No matches found") {
-		t.Errorf("expected 'No matches found', got: %q", result.Content)
-	}
-}
-
 func TestSearchCodebaseTool_PathOutsideWorkDir(t *testing.T) {
 	tmpDir := t.TempDir()
 

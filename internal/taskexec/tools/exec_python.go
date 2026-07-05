@@ -17,7 +17,26 @@ import (
 	"golang.org/x/text/transform"
 )
 
-type ExecPythonTool struct{}
+type ExecPythonTool struct {
+	pythonBin string
+}
+
+var pythonSearchOrder = []string{"python3", "python", "python3.12", "python3.11", "python3.10"}
+
+func NewExecPythonTool() *ExecPythonTool {
+	return &ExecPythonTool{
+		pythonBin: detectPython(),
+	}
+}
+
+func detectPython() string {
+	for _, name := range pythonSearchOrder {
+		if _, err := exec.LookPath(name); err == nil {
+			return name
+		}
+	}
+	return ""
+}
 
 func (t *ExecPythonTool) Name() string {
 	return "exec_python"
@@ -97,7 +116,11 @@ func (t *ExecPythonTool) Execute(ctx context.Context, workingDir string, params 
 	execCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(execCtx, "python", "-u", "-c", code)
+	if t.pythonBin == "" {
+		return fmt.Errorf("python not found: none of %v are available in PATH", pythonSearchOrder)
+	}
+
+	cmd := exec.CommandContext(execCtx, t.pythonBin, "-u", "-c", code)
 	cmd.Dir = workingDir
 
 	if runtime.GOOS == "windows" {

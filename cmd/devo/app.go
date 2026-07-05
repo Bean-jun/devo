@@ -112,12 +112,13 @@ func (a *App) initRegistry() {
 }
 
 func (a *App) initTools() {
+	a.toolRegistry.Register(&tools.GlobTool{})
 	a.toolRegistry.Register(&tools.ReadFileTool{})
 	a.toolRegistry.Register(&tools.ListFilesTool{})
 	a.toolRegistry.Register(&tools.SearchCodebaseTool{})
 	a.toolRegistry.Register(&tools.WriteFileTool{})
 	a.toolRegistry.Register(&tools.EditFileTool{})
-	a.toolRegistry.Register(&tools.ExecPythonTool{})
+	a.toolRegistry.Register(tools.NewExecPythonTool())
 	a.toolRegistry.Register(tools.NewExecuteCommandTool())
 	a.toolRegistry.Register(tools.NewUseSkillTool(a.skillsMgr))
 	a.mcpMgr.RegisterTools(a.toolRegistry)
