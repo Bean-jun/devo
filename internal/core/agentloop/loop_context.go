@@ -18,6 +18,7 @@ type LoopContext struct {
 	LLMResult     *llmclient.CompleteResult
 
 	PendingToolCall   *session.ToolCall
+	PendingToolCalls  []session.ToolCall
 	PendingToolResult *tools.ToolResult
 	ApprovalCh        chan ApprovalDecision
 

@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { computed, watch, nextTick } from 'vue'
+import { computed, watch, nextTick, ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import { useSessionStore } from '@/stores/session'
+import { useUiStore } from '@/stores/ui'
+import { useVirtualScroll } from '@/composables/useVirtualScroll'
 import type { Message } from '@/types/message'
 import MessageBubble from './MessageBubble.vue'
 import ToolCallCard from './ToolCallCard.vue'
 import ToolCallGroup from './ToolCallGroup.vue'
 import ThinkingIndicator from './ThinkingIndicator.vue'
-
-const props = defineProps<{
-  scrollToBottom: (smooth?: boolean) => void
-}>()
+import VirtualMessageItem from './VirtualMessageItem.vue'
 
 const chatStore = useChatStore()
+const sessionStore = useSessionStore()
+const uiStore = useUiStore()
+
+const yoloMode = computed(() => sessionStore.yoloEnabled)
 
 const allMessages = computed(() => chatStore.messages)
 
@@ -22,10 +26,6 @@ const visibleMessages = computed(() =>
   })
 )
 
-/**
- * 将连续的 tool 消息分组，非 tool 消息保持独立
- * 返回 (Message | Message[])[] 数组
- */
 const groupedMessages = computed(() => {
   const result: (Message | Message[])[] = []
   let toolGroup: Message[] = []
@@ -46,7 +46,6 @@ const groupedMessages = computed(() => {
     }
   }
 
-  // 处理末尾的 tool 组
   if (toolGroup.length > 0) {
     if (toolGroup.length === 1) {
       result.push(toolGroup[0])
@@ -58,22 +57,121 @@ const groupedMessages = computed(() => {
   return result
 })
 
+const STREAMING_SENTINEL = Symbol('streaming')
+
+const isStreaming = computed(() => chatStore.isStreaming)
+
+const displayItems = computed(() => {
+  const items: (Message | Message[] | typeof STREAMING_SENTINEL)[] = [...groupedMessages.value]
+  if (isStreaming.value) {
+    items.push(STREAMING_SENTINEL)
+  }
+  return items
+})
+
+const itemCount = computed(() => displayItems.value.length)
+
+const {
+  containerRef,
+  visibleRange,
+  totalHeight,
+  offsetY,
+  scrollToIndex,
+  updateItemHeight,
+} = useVirtualScroll(itemCount, { estimateHeight: 200, bufferSize: 5 })
+
+const showScrollToBottom = ref(false)
+const isNearBottom = ref(true)
+
+function checkNearBottom(): void {
+  const el = containerRef.value
+  if (!el) return
+  isNearBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+  showScrollToBottom.value = !isNearBottom.value
+}
+
+function scrollToBottom(smooth = true): void {
+  const lastIdx = itemCount.value - 1
+  if (lastIdx < 0) return
+  scrollToIndex(lastIdx, smooth)
+  showScrollToBottom.value = false
+  isNearBottom.value = true
+}
+
+function scrollToMessage(messageId: string): void {
+  const idx = displayItems.value.findIndex((item) => {
+    if (item === STREAMING_SENTINEL) return false
+    if (Array.isArray(item)) return item[0].id === messageId
+    return item.id === messageId
+  })
+  if (idx >= 0) {
+    scrollToIndex(idx)
+  }
+}
+
+function getItemKey(index: number): string {
+  const item = displayItems.value[index]
+  if (!item) return `empty-${index}`
+  if (item === STREAMING_SENTINEL) return 'streaming-indicator'
+  if (Array.isArray(item)) return item[0].id
+  return item.id
+}
+
+const lastScrollLength = ref(0)
+
 watch(
-  () => [chatStore.messages.length, chatStore.streamingContent],
-  () => {
-    nextTick(() => {
-      requestAnimationFrame(() => {
-        props.scrollToBottom(false)
+  () => chatStore.messages.length,
+  (newLen) => {
+    if (newLen !== lastScrollLength.value) {
+      lastScrollLength.value = newLen
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          scrollToBottom(false)
+        })
       })
-    })
+    }
   },
-  { deep: false }
+  { immediate: false }
 )
+
+let scrollThrottleTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(
+  () => chatStore.streamingContent,
+  () => {
+    if (scrollThrottleTimer) return
+    scrollThrottleTimer = setTimeout(() => {
+      scrollThrottleTimer = null
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          if (isNearBottom.value) {
+            scrollToBottom(false)
+          }
+        })
+      })
+    }, 100)
+  },
+  { immediate: false }
+)
+
+function onScroll(): void {
+  checkNearBottom()
+}
+
+defineExpose({
+  scrollToBottom,
+  scrollToMessage,
+})
 </script>
 
 <template>
-  <div class="message-list">
-    <div v-if="allMessages.length === 0 && !chatStore.isStreaming" class="empty-state">
+  <div
+    ref="containerRef"
+    class="message-list-container"
+    @scroll="onScroll"
+    @click.self="uiStore.requestFocusInput()"
+  >
+    <div v-if="allMessages.length === 0 && !isStreaming" class="empty-state">
       <pre class="ascii-banner">
 ██████╗ ███████╗██╗   ██╗ ██████╗ 
 ██╔══██╗██╔════╝██║   ██║██╔═══██╗
@@ -88,21 +186,85 @@ watch(
       </div>
     </div>
 
-    <template v-for="item in groupedMessages" :key="Array.isArray(item) ? item[0].id : item.id">
-      <ToolCallGroup v-if="Array.isArray(item)" :messages="item" />
-      <MessageBubble v-else-if="item.role !== 'tool'" :message="item" />
-      <ToolCallCard v-else-if="item.toolCall" :tool-call="item.toolCall" />
-    </template>
+    <div
+      v-else
+      class="message-list-viewport"
+      :style="{ height: totalHeight + 'px' }"
+    >
+      <div class="message-list-content" :style="{ paddingTop: offsetY + 'px' }">
+        <template
+          v-for="idx in visibleRange.end - visibleRange.start + 1"
+          :key="getItemKey(visibleRange.start + idx - 1)"
+        >
+          <VirtualMessageItem
+            :index="visibleRange.start + idx - 1"
+            :on-height-change="updateItemHeight"
+          >
+            <template v-if="displayItems[visibleRange.start + idx - 1] === STREAMING_SENTINEL">
+              <ThinkingIndicator />
+            </template>
+            <template
+              v-else-if="Array.isArray(displayItems[visibleRange.start + idx - 1])"
+            >
+              <ToolCallGroup
+                :messages="(displayItems[visibleRange.start + idx - 1] as Message[])"
+                :yolo-mode="yoloMode"
+                :data-message-id="(displayItems[visibleRange.start + idx - 1] as Message[])[0].id"
+                data-role="tool-group"
+              />
+            </template>
+            <template
+              v-else-if="(displayItems[visibleRange.start + idx - 1] as Message).role === 'tool' && (displayItems[visibleRange.start + idx - 1] as Message).toolCall"
+            >
+              <ToolCallCard
+                :tool-call="(displayItems[visibleRange.start + idx - 1] as Message).toolCall!"
+                :yolo-mode="yoloMode"
+                :data-message-id="(displayItems[visibleRange.start + idx - 1] as Message).id"
+                data-role="tool"
+              />
+            </template>
+            <template v-else>
+              <MessageBubble
+                :message="(displayItems[visibleRange.start + idx - 1] as Message)"
+                v-memo="[(displayItems[visibleRange.start + idx - 1] as Message).content, (displayItems[visibleRange.start + idx - 1] as Message).role]"
+                :data-message-id="(displayItems[visibleRange.start + idx - 1] as Message).id"
+                :data-role="(displayItems[visibleRange.start + idx - 1] as Message).role"
+              />
+            </template>
+          </VirtualMessageItem>
+        </template>
+      </div>
+    </div>
 
-    <ThinkingIndicator v-if="chatStore.isStreaming" />
+    <button
+      v-if="showScrollToBottom"
+      class="scroll-to-bottom"
+      @click="scrollToBottom(true)"
+    >
+      ↓ 回到底部
+    </button>
   </div>
 </template>
 
 <style scoped>
-.message-list {
+.message-list-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  padding: var(--space-lg) 0;
+}
+
+.message-list-viewport {
+  position: relative;
+  width: 100%;
+}
+
+.message-list-content {
   max-width: 800px;
   margin: 0 auto;
-  padding: 0 var(--space-lg);
+  padding-left: var(--space-lg);
+  padding-right: var(--space-lg);
 }
 
 .empty-state {
@@ -153,5 +315,24 @@ kbd {
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
+}
+
+.scroll-to-bottom {
+  position: sticky;
+  bottom: var(--space-md);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+  animation: slideInUp var(--transition-fast) ease;
+}
+
+.scroll-to-bottom:hover {
+  background: var(--color-accent-hover);
 }
 </style>

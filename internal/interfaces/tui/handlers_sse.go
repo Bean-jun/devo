@@ -135,8 +135,10 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 	case "approval_auto":
 		summary, _ := msg.Data["summary"].(string)
 		policyLevel, _ := msg.Data["policy_level"].(string)
-		notice := fmt.Sprintf("已根据信任策略（%s）自动批准：%s", policyLevel, summary)
-		a.chatView.MessageView.AddSystemNotice(notice)
+		if policyLevel != "yolo" {
+			notice := fmt.Sprintf("🔓 已自动批准 %s（策略：%s）", summary, policyLevel)
+			a.chatView.MessageView.AddSystemNotice(notice)
+		}
 
 	case "token_usage":
 		var in, out, total, ctxTokens int

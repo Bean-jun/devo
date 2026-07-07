@@ -22,11 +22,17 @@ function ensureInitialized(): void {
   )
 }
 
+const MAX_CACHE_SIZE = 300
+const markdownCache = new Map<string, string>()
+
 /**
- * 渲染 Markdown 为 HTML
+ * 渲染 Markdown 为 HTML（带缓存）
  * 将所有 <pre><code> 块包裹在带有语言标签的容器中
  */
 export function renderMarkdown(content: string): string {
+  const cached = markdownCache.get(content)
+  if (cached !== undefined) return cached
+
   ensureInitialized()
 
   let html = marked.parse(content, { breaks: true }) as string
@@ -36,5 +42,17 @@ export function renderMarkdown(content: string): string {
     '<pre data-lang="$1"><code class="hljs language-$1">'
   )
 
+  if (markdownCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = markdownCache.keys().next().value
+    if (firstKey !== undefined) {
+      markdownCache.delete(firstKey)
+    }
+  }
+  markdownCache.set(content, html)
+
   return html
+}
+
+export function clearMarkdownCache(): void {
+  markdownCache.clear()
 }

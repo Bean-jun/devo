@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useSessionStore } from '@/stores/session'
-import { useAutoScroll } from '@/composables/useAutoScroll'
-import { API_BASE } from '@/utils/constants'
 import { useUiStore } from '@/stores/ui'
+import { API_BASE } from '@/utils/constants'
 import { useCommand } from '@/composables/useCommand'
 import MessageList from './MessageList.vue'
 import InputArea from './InputArea.vue'
+import FloatingNavPanel from './FloatingNavPanel.vue'
 
 const chatStore = useChatStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
-const { containerRef, showScrollToBottom, scrollToBottom, onScroll } = useAutoScroll()
 const { openPalette } = useCommand()
+
+const messageListRef = ref<InstanceType<typeof MessageList> | null>(null)
+
+function handleScrollToMessage(messageId: string): void {
+  messageListRef.value?.scrollToMessage(messageId)
+}
 
 const isDisabled = computed(() =>
   sessionStore.isProcessing ||
@@ -194,21 +199,12 @@ async function handleExecuteCommand(text: string) {
 
 <template>
   <div v-if="sessionStore.currentSession" class="chat-panel" data-test="chat-panel">
-    <div
-      ref="containerRef"
-      class="message-area"
-      @scroll="onScroll"
-      @click.self="uiStore.requestFocusInput()"
-    >
-      <MessageList :scroll-to-bottom="scrollToBottom" />
-
-      <button
-        v-if="showScrollToBottom"
-        class="scroll-to-bottom"
-        @click="scrollToBottom()"
-      >
-        ↓ 回到底部
-      </button>
+    <div class="chat-body">
+      <MessageList ref="messageListRef" />
+      <FloatingNavPanel
+        v-if="chatStore.messages.length > 0"
+        :scroll-to-message="handleScrollToMessage"
+      />
     </div>
 
     <InputArea
@@ -237,6 +233,14 @@ async function handleExecuteCommand(text: string) {
   overflow: hidden;
 }
 
+.chat-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+  padding-bottom: var(--space-md);
+}
+
 .chat-empty {
   flex: 1;
   display: flex;
@@ -261,32 +265,5 @@ async function handleExecuteCommand(text: string) {
 
 .chat-empty-desc {
   font-size: 13px;
-}
-
-.message-area {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  position: relative;
-  padding: var(--space-lg) 0;
-}
-
-.scroll-to-bottom {
-  position: sticky;
-  bottom: var(--space-md);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: var(--space-xs) var(--space-md);
-  background: var(--color-accent);
-  color: var(--color-text-inverse);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  box-shadow: var(--shadow-md);
-  z-index: 10;
-  animation: slideInUp var(--transition-fast) ease;
-}
-
-.scroll-to-bottom:hover {
-  background: var(--color-accent-hover);
 }
 </style>

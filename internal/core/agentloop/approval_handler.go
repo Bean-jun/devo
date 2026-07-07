@@ -1,7 +1,9 @@
 package agentloop
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"devo/internal/core/approval"
 	"devo/internal/core/config"
@@ -172,5 +174,198 @@ func (l *Loop) determineRiskLevel(tool tools.Tool) approval.RiskLevel {
 		return approval.RiskMedium
 	default:
 		return approval.RiskMedium
+	}
+}
+
+func (l *Loop) awaitingApprovalHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
+	if lc.PendingToolCall == nil {
+		return LoopStateError, fmt.Errorf("awaiting approval but no pending tool call")
+	}
+
+	tc := *lc.PendingToolCall
+
+	sess, err := l.store.Get(lc.SessionID)
+	if err != nil {
+		return LoopStateError, fmt.Errorf("get session: %w", err)
+	}
+
+	tool, ok := l.toolExecutor.GetTool(tc.ToolName)
+	if !ok {
+		return LoopStateError, fmt.Errorf("tool not found: %s", tc.ToolName)
+	}
+
+	opType := l.determineOperationType(tool, sess.WorkingDirectory, tc.Params)
+	details, err := l.buildApprovalDetails(tool, sess.WorkingDirectory, opType, tc.Params)
+	if err != nil {
+		rejectionMsg := session.Message{
+			ID:         session.GenerateID("msg"),
+			Role:       session.RoleTool,
+			Content:    "错误: " + err.Error(),
+			ToolCallID: tc.ID,
+			CreatedAt:  time.Now(),
+		}
+		l.store.AddMessage(lc.SessionID, rejectionMsg)
+		lc.EventBus.Publish("tool_result", map[string]any{
+			"tool_call_id": tc.ID,
+			"tool_name":    tc.ToolName,
+			"success":      false,
+			"summary":      fmt.Sprintf("error: %v", err),
+		})
+		lc.PendingToolCall = nil
+		lc.PendingToolCalls = nil
+		lc.PendingToolResult = nil
+		return LoopStatePreparing, nil
+	}
+
+	riskLevel := l.determineRiskLevel(tool)
+	req := l.approvalManager.CreateRequest(lc.SessionID, tc.ID, approval.OperationType(opType), riskLevel, details)
+
+	timeoutSeconds := 300
+	if sess.ApprovalTimeoutSeconds > 0 {
+		timeoutSeconds = sess.ApprovalTimeoutSeconds
+	}
+	timeoutAt := time.Now().Add(time.Duration(timeoutSeconds) * time.Second)
+	l.approvalManager.SetTimeout(req.ID, timeoutAt)
+
+	ch := make(chan ApprovalDecision, 1)
+	l.mu.Lock()
+	l.approvalChannels[req.ID] = ch
+	l.mu.Unlock()
+
+	defer func() {
+		l.mu.Lock()
+		delete(l.approvalChannels, req.ID)
+		l.mu.Unlock()
+	}()
+
+	sess.State = session.StateAwaitingApproval
+	sess.LastActiveAt = time.Now()
+	l.store.Update(sess)
+
+	lc.EventBus.Publish("session_state_change", map[string]any{
+		"old_state": session.StateToolExecuting.ToSnakeCase(),
+		"new_state": session.StateAwaitingApproval.ToSnakeCase(),
+		"reason":    "awaiting_approval",
+	})
+
+	lc.EventBus.Publish("approval_required", map[string]any{
+		"approval_id":    req.ID,
+		"operation_type": string(req.OperationType),
+		"risk_level":     string(req.RiskLevel),
+		"details":        req.Details,
+	})
+
+	timeoutCh := time.After(time.Duration(timeoutSeconds) * time.Second)
+
+	select {
+	case decision := <-ch:
+		if decision.Decision == "approve" {
+			sess, err := l.store.Get(lc.SessionID)
+			if err == nil {
+				sess.State = session.StateToolExecuting
+				sess.LastActiveAt = time.Now()
+				l.store.Update(sess)
+			}
+
+			lc.EventBus.Publish("session_state_change", map[string]any{
+				"old_state": session.StateAwaitingApproval.ToSnakeCase(),
+				"new_state": session.StateToolExecuting.ToSnakeCase(),
+				"reason":    "approval_granted",
+			})
+
+			lc.PendingToolCall = nil
+			if len(lc.PendingToolCalls) > 0 && lc.PendingToolCalls[0].ID == tc.ID {
+				lc.PendingToolCalls = lc.PendingToolCalls[1:]
+			}
+			nextState, err := l.executeSingleTool(ctx, lc, tc)
+			if err != nil {
+				return LoopStateError, err
+			}
+			if nextState == LoopStateIdle {
+				return LoopStateIdle, nil
+			}
+			return LoopStateToolExecuting, nil
+		}
+
+		sess, err := l.store.Get(lc.SessionID)
+		if err == nil {
+			sess.State = session.StateToolExecuting
+			sess.LastActiveAt = time.Now()
+			l.store.Update(sess)
+		}
+
+		lc.EventBus.Publish("session_state_change", map[string]any{
+			"old_state": session.StateAwaitingApproval.ToSnakeCase(),
+			"new_state": session.StateToolExecuting.ToSnakeCase(),
+			"reason":    "approval_denied",
+		})
+
+		rejectionMsg := l.rejectionMessage(tc)
+		l.store.AddMessage(lc.SessionID, rejectionMsg)
+		lc.EventBus.Publish("tool_result", map[string]any{
+			"tool_call_id": tc.ID,
+			"tool_name":    tc.ToolName,
+			"success":      false,
+			"summary":      "操作被用户拒绝",
+		})
+
+		lc.PendingToolCall = nil
+		lc.PendingToolCalls = nil
+		lc.PendingToolResult = nil
+		return LoopStatePreparing, nil
+
+	case <-lc.CancelCh:
+		l.approvalManager.ResolveWithSource(req.ID, approval.StatusRejected, approval.SourceUser)
+
+		sess, err := l.store.Get(lc.SessionID)
+		if err == nil {
+			sess.State = session.StateToolExecuting
+			sess.LastActiveAt = time.Now()
+			l.store.Update(sess)
+		}
+
+		lc.EventBus.Publish("approval_resolved", map[string]any{
+			"approval_id": req.ID,
+			"decision":    "reject",
+			"source":      "cancelled",
+		})
+
+		lc.EventBus.Publish("session_state_change", map[string]any{
+			"old_state": session.StateAwaitingApproval.ToSnakeCase(),
+			"new_state": session.StateToolExecuting.ToSnakeCase(),
+			"reason":    "approval_cancelled",
+		})
+
+		lc.PendingToolCall = nil
+		lc.PendingToolCalls = nil
+		lc.PendingToolResult = nil
+		return LoopStateCancelled, nil
+
+	case <-timeoutCh:
+		l.approvalManager.ResolveWithSource(req.ID, approval.StatusRejected, approval.SourceTimeout)
+
+		sess, err := l.store.Get(lc.SessionID)
+		if err == nil {
+			sess.State = session.StateToolExecuting
+			sess.LastActiveAt = time.Now()
+			l.store.Update(sess)
+		}
+
+		lc.EventBus.Publish("approval_resolved", map[string]any{
+			"approval_id": req.ID,
+			"decision":    "reject",
+			"source":      "timeout",
+		})
+
+		lc.EventBus.Publish("session_state_change", map[string]any{
+			"old_state": session.StateAwaitingApproval.ToSnakeCase(),
+			"new_state": session.StateToolExecuting.ToSnakeCase(),
+			"reason":    "approval_timeout",
+		})
+
+		lc.PendingToolCall = nil
+		lc.PendingToolCalls = nil
+		lc.PendingToolResult = nil
+		return LoopStatePreparing, nil
 	}
 }

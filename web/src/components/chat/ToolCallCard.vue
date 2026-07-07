@@ -6,10 +6,11 @@ import { RISK_LABELS, RISK_COLORS } from '@/utils/constants'
 
 const props = defineProps<{
   toolCall: ToolCall
+  yoloMode?: boolean
 }>()
 
 const showParams = ref(false)
-const showResult = ref(true)
+const showResult = ref(!props.yoloMode)
 
 const statusIcon: Record<string, string> = {
   pending: '⏳',
@@ -73,6 +74,7 @@ function escapeHtml(text: string): string {
       <div class="tool-left">
         <span class="tool-icon">{{ statusIcon[toolCall.status] ?? '🔧' }}</span>
         <span class="tool-name" data-test="tool-name">{{ toolCall.name }}</span>
+        <span class="tool-id">{{ toolCall.id }}</span>
         <span v-if="toolCall.stage && toolCall.status === 'executing'" class="tool-stage" data-test="tool-stage">{{ toolCall.stage }}</span>
         <span v-if="toolCall.riskLevel" class="tool-risk" :style="{ color: RISK_COLORS[toolCall.riskLevel] }">
           {{ RISK_LABELS[toolCall.riskLevel] }}
@@ -175,6 +177,15 @@ function escapeHtml(text: string): string {
   font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--color-text-primary);
+}
+
+.tool-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
 }
 
 .tool-risk {

@@ -170,7 +170,7 @@ function connectSSE(sessionId: string) {
 
   onEvent('tool_call_request', (data: any) => {
     chatStore.appendToolCallMessage({
-      id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: data.tool_call_id || `tool-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       name: data.tool_name || 'unknown',
       parameters: data.params || {},
       status: 'pending',
@@ -180,6 +180,7 @@ function connectSSE(sessionId: string) {
   })
 
   onEvent('tool_result', (data: any) => {
+    const toolCallId = data.tool_call_id || ''
     const toolName = data.tool_name || ''
     const success = data.success === true
     const summary = data.summary || ''
@@ -187,7 +188,7 @@ function connectSSE(sessionId: string) {
     const msgs = chatStore.messages
     for (let i = msgs.length - 1; i >= 0; i--) {
       const msg = msgs[i]
-      if (msg.toolCall?.name === toolName) {
+      if (msg.toolCall?.id === toolCallId || (!toolCallId && msg.toolCall?.name === toolName)) {
         chatStore.updateToolCallStatus(msg.toolCall!.id, success ? 'success' : 'failed', {
           stdout: summary,
           error: success ? undefined : summary,
@@ -201,12 +202,13 @@ function connectSSE(sessionId: string) {
   })
 
   onEvent('tool_progress', (data: any) => {
+    const toolCallId = data.tool_call_id || ''
     const toolName = data.tool_name || ''
     const stage = data.stage || ''
     const msgs = chatStore.messages
     for (let i = msgs.length - 1; i >= 0; i--) {
       const msg = msgs[i]
-      if (msg.toolCall && msg.toolCall.name === toolName && (msg.toolCall.status === 'pending' || msg.toolCall.status === 'executing')) {
+      if (msg.toolCall && (msg.toolCall.id === toolCallId || (!toolCallId && msg.toolCall.name === toolName)) && (msg.toolCall.status === 'pending' || msg.toolCall.status === 'executing')) {
         chatStore.updateToolProgress(msg.toolCall.id, stage)
         break
       }
@@ -215,12 +217,13 @@ function connectSSE(sessionId: string) {
   })
 
   onEvent('tool_chunk', (data: any) => {
+    const toolCallId = data.tool_call_id || ''
     const toolName = data.tool_name || ''
     const chunk = data.data || ''
     const msgs = chatStore.messages
     for (let i = msgs.length - 1; i >= 0; i--) {
       const msg = msgs[i]
-      if (msg.toolCall && msg.toolCall.name === toolName && (msg.toolCall.status === 'pending' || msg.toolCall.status === 'executing')) {
+      if (msg.toolCall && (msg.toolCall.id === toolCallId || (!toolCallId && msg.toolCall.name === toolName)) && (msg.toolCall.status === 'pending' || msg.toolCall.status === 'executing')) {
         chatStore.appendToolStreamChunk(msg.toolCall.id, chunk)
         break
       }
@@ -249,7 +252,9 @@ function connectSSE(sessionId: string) {
   onEvent('approval_auto', (data: any) => {
     const summary = data.summary || ''
     const policy = data.policy_level || ''
-    chatStore.appendSystemMessage(`已根据信任策略（${policy}）自动批准：${summary}`)
+    if (policy !== 'yolo') {
+      chatStore.appendSystemMessage(`🔓 已自动批准 ${summary}（策略：${policy}）`)
+    }
   })
 
   onEvent('approval_resolved', (_data: any) => {

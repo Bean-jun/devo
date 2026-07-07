@@ -5,6 +5,7 @@ import ToolCallCard from './ToolCallCard.vue'
 
 const props = defineProps<{
   messages: Message[]
+  yoloMode?: boolean
 }>()
 
 const expanded = ref(false)
@@ -56,6 +57,7 @@ function toggle() {
         v-for="msg in messages"
         :key="msg.id"
         :tool-call="msg.toolCall!"
+        :yolo-mode="props.yoloMode"
       />
     </div>
   </div>

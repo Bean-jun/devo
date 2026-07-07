@@ -23,6 +23,22 @@ export function useAutoScroll() {
     showScrollToBottom.value = false
   }
 
+  function scrollToMessage(messageId: string): void {
+    const el = containerRef.value
+    if (!el) return
+    const targetEl = el.querySelector(`[data-message-id="${messageId}"]`) as HTMLElement | null
+    if (!targetEl) return
+
+    const containerRect = el.getBoundingClientRect()
+    const targetRect = targetEl.getBoundingClientRect()
+    const offset = targetRect.top - containerRect.top + el.scrollTop - 80
+
+    el.scrollTo({
+      top: offset,
+      behavior: 'smooth',
+    })
+  }
+
   function onScroll(): void {
     const nearBottom = isNearBottom()
     isUserScrolledUp.value = !nearBottom
@@ -33,6 +49,7 @@ export function useAutoScroll() {
     containerRef,
     showScrollToBottom,
     scrollToBottom,
+    scrollToMessage,
     onScroll,
     isNearBottom,
   }

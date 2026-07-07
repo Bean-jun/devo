@@ -3,10 +3,12 @@ import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { useKeyboard } from '@/composables/useKeyboard'
+import { useFps } from '@/composables/useFps'
 import { STATUS_LABELS, STATUS_COLORS } from '@/utils/constants'
 
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
+const { fps } = useFps()
 
 const isRenaming = ref(false)
 const renameValue = ref('')
@@ -160,6 +162,9 @@ const serverPort = computed(() => window.location.port)
       <span class="activity-text">{{ activityText }}</span>
     </div>
     <div class="statusbar-right">
+      <span class="fps-counter" :class="{ 'fps-low': fps < 30, 'fps-good': fps >= 55 }">
+        {{ fps }} FPS
+      </span>
       <button class="theme-toggle" :title="themeLabel" @click="toggleTheme">
         {{ themeIcon }}
       </button>
@@ -314,6 +319,23 @@ const serverPort = computed(() => window.location.port)
 .theme-toggle:hover {
   background: var(--color-bg-hover);
   border-color: var(--color-border);
+}
+
+.fps-counter {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.fps-counter.fps-good {
+  color: var(--color-success);
+}
+
+.fps-counter.fps-low {
+  color: var(--color-error);
 }
 
 .statusbar.yolo {
