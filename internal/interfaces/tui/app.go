@@ -58,9 +58,10 @@ type App struct {
 	apiBaseURL         string
 	version            string
 
-	inputHistory []string
-	historyIndex int
-	lastKeyTime  time.Time
+	inputHistory      []string
+	historyIndex      int
+	lastKeyTime       time.Time
+	pasteJustHappened bool
 
 	initStatus  string
 	initErr     error
@@ -125,6 +126,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case tea.MouseMsg:
+		// consume mouse events to prevent them from leaking as key input
+
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
@@ -226,6 +230,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.MouseMsg:
+		return a, nil
+
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
@@ -272,6 +279,7 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.syncYOLOFromTrustLevel(sess.TrustLevel)
 			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)",
 				formatTokens(sess.TokenUsage.Total), formatTokens(sess.TokenUsage.Input), formatTokens(sess.TokenUsage.Output))
+			a.updateContextUsage(sess)
 			a.ready = true
 			a.tickCount = 0
 			a.layout()
@@ -295,6 +303,7 @@ func (a *App) updateLoading(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.syncYOLOFromTrustLevel(sess.TrustLevel)
 			a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)",
 				formatTokens(sess.TokenUsage.Total), formatTokens(sess.TokenUsage.Input), formatTokens(sess.TokenUsage.Output))
+			a.updateContextUsage(sess)
 			a.ready = true
 			a.tickCount = 0
 			a.layout()
@@ -485,7 +494,7 @@ func (a *App) layout() {
 		chatWidth = 20
 	}
 
-	topHeight := 4
+	topHeight := 2
 	chatHeight := a.height - topHeight
 	if chatHeight < 10 {
 		chatHeight = 10

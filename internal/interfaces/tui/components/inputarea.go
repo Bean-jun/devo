@@ -1,15 +1,14 @@
 package components
 
 import (
+	"runtime"
 	"strings"
-	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
-
-type pasteFlushMsg struct{}
 
 type InputArea struct {
 	textarea     textarea.Model
@@ -17,20 +16,18 @@ type InputArea struct {
 	ContextUsage string
 	TokenUsage   string
 	WorkingDir   string
-
-	pasteBuf []rune
 }
 
 func NewInputArea() InputArea {
 	ta := textarea.New()
-	ta.Placeholder = "输入消息... (Enter 发送, Shift+Enter 换行, / 命令面板)"
+	ta.Placeholder = "输入消息... (Enter 发送, Ctrl+N 换行, Ctrl+V 粘贴, / 命令面板)"
 	ta.SetHeight(1)
-	ta.MaxHeight = 1
+	ta.MaxHeight = 20
 	ta.ShowLineNumbers = false
 	ta.CharLimit = 0
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.FocusedStyle.Text = lipgloss.NewStyle().Foreground(ColorText)
-	ta.FocusedStyle.Placeholder = lipgloss.NewStyle().Foreground(ColorMuted)
+	ta.FocusedStyle.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8"))
 	ta.BlurredStyle = ta.FocusedStyle
 
 	return InputArea{
@@ -70,38 +67,65 @@ func (i *InputArea) SetWidth(w int) {
 func (i *InputArea) Update(msg tea.Msg) (InputArea, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.Type == tea.KeyRunes && len(msg.Runes) > 0 {
-			if len(i.pasteBuf) == 0 {
-				i.pasteBuf = append(i.pasteBuf, msg.Runes...)
-				return *i, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
-					return pasteFlushMsg{}
-				})
+		if msg.Paste || len(msg.Runes) > 3 {
+			s := normalizePastedText(string(msg.Runes))
+			i.textarea.InsertString(s)
+			return *i, nil
+		}
+
+		switch msg.String() {
+		case "ctrl+n":
+			i.textarea.InsertString("\n")
+			return *i, nil
+
+		case "shift+enter":
+			if runtime.GOOS != "windows" {
+				i.textarea.InsertString("\n")
 			}
-			i.pasteBuf = append(i.pasteBuf, msg.Runes...)
+			return *i, nil
+
+		case "ctrl+v":
+			text, err := clipboard.ReadAll()
+			if err == nil && text != "" {
+				text = normalizePastedText(text)
+				i.textarea.InsertString(text)
+			}
 			return *i, nil
 		}
-		if (msg.Type == tea.KeyEnter || msg.Type == tea.KeyTab) && len(i.pasteBuf) > 0 {
-			i.pasteBuf = append(i.pasteBuf, '\n')
-			return *i, nil
-		}
-	case pasteFlushMsg:
-		if len(i.pasteBuf) > 0 {
-			i.textarea.InsertString(string(i.pasteBuf))
-			i.pasteBuf = nil
-		}
-		return *i, nil
 	}
 	var cmd tea.Cmd
 	i.textarea, cmd = i.textarea.Update(msg)
+
+	if isOSCLeak(i.textarea.Value()) {
+		i.textarea.Reset()
+	}
+
 	return *i, cmd
 }
 
-func (i *InputArea) IsPasteActive() bool {
-	return len(i.pasteBuf) > 0
+func isOSCLeak(s string) bool {
+	if len(s) < 5 {
+		return false
+	}
+	if strings.Contains(s, "rgb:") {
+		return true
+	}
+	if strings.HasPrefix(s, "]") {
+		return strings.Contains(s, "11;") ||
+			strings.Contains(s, "10;") ||
+			strings.Contains(s, "4;")
+	}
+	return false
+}
+
+func normalizePastedText(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	return strings.TrimRight(s, "\n")
 }
 
 func (i *InputArea) View() string {
-	borderColor := ColorBorder
+	borderColor := lipgloss.Color("#94A3B8")
 	if i.textarea.Focused() {
 		borderColor = ColorPrimary
 	}

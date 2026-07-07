@@ -12,7 +12,18 @@ import (
 )
 
 func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
+	if msg.Paste || len(msg.Runes) > 3 {
+		a.pasteJustHappened = true
+		return nil
+	}
+
 	key := msg.String()
+
+	if key != "enter" {
+		a.pasteJustHappened = false
+	} else if time.Since(a.lastKeyTime) < 80*time.Millisecond {
+		a.pasteJustHappened = true
+	}
 
 	if a.showRollbackPicker {
 		switch key {
@@ -65,13 +76,18 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			a.sessionPicker.CursorDown()
 			return nil
 		case "backspace":
-			if len(a.sessionPicker.Query) > 0 {
-				a.sessionPicker.Query = a.sessionPicker.Query[:len(a.sessionPicker.Query)-1]
+			runes := []rune(a.sessionPicker.Query)
+			if len(runes) > 0 {
+				a.sessionPicker.Query = string(runes[:len(runes)-1])
 			}
 			return nil
 		default:
-			if len(msg.Runes) == 1 && msg.Runes[0] >= ' ' {
-				a.sessionPicker.Query += string(msg.Runes[0])
+			if len(msg.Runes) > 0 {
+				for _, r := range msg.Runes {
+					if r >= ' ' {
+						a.sessionPicker.Query += string(r)
+					}
+				}
 			}
 			return nil
 		}
@@ -103,14 +119,19 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			a.commandPalette.CursorDown()
 			return nil
 		case "backspace":
-			if len(a.commandPalette.Query) > 0 {
-				a.commandPalette.Query = a.commandPalette.Query[:len(a.commandPalette.Query)-1]
+			runes := []rune(a.commandPalette.Query)
+			if len(runes) > 0 {
+				a.commandPalette.Query = string(runes[:len(runes)-1])
 				a.commandPalette.Filter()
 			}
 			return nil
 		default:
-			if len(msg.Runes) == 1 && msg.Runes[0] >= ' ' {
-				a.commandPalette.Query += string(msg.Runes[0])
+			if len(msg.Runes) > 0 {
+				for _, r := range msg.Runes {
+					if r >= ' ' {
+						a.commandPalette.Query += string(r)
+					}
+				}
 				a.commandPalette.Filter()
 			}
 			return nil
@@ -149,10 +170,11 @@ func (a *App) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		return a.toggleYOLO()
 
 	case "enter":
+		if a.pasteJustHappened {
+			a.pasteJustHappened = false
+			return nil
+		}
 		if a.chatView.InputArea.Focused() && (a.state == StateReady || a.state == StateCancelled) {
-			if a.chatView.InputArea.IsPasteActive() {
-				return nil
-			}
 			content := strings.TrimSpace(a.chatView.InputArea.Value())
 			if content != "" {
 				a.pushInputHistory(content)

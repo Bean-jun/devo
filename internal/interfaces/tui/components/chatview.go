@@ -64,7 +64,7 @@ func (c *ChatView) View() string {
 	msgView := c.MessageView.View()
 	inputView := c.InputArea.View()
 
-	spacer := ""
+	var spacer string
 	if c.Processing {
 		spacer = lipgloss.NewStyle().
 			Foreground(ColorInfo).
@@ -74,18 +74,14 @@ func (c *ChatView) View() string {
 
 	paletteView := c.CommandPaletteView
 
-	if paletteView != "" {
-		return lipgloss.JoinVertical(lipgloss.Left,
-			msgView,
-			spacer,
-			paletteView,
-			inputView,
-		)
+	parts := []string{msgView}
+	if spacer != "" {
+		parts = append(parts, spacer)
 	}
+	if paletteView != "" {
+		parts = append(parts, paletteView)
+	}
+	parts = append(parts, inputView)
 
-	return lipgloss.JoinVertical(lipgloss.Left,
-		msgView,
-		spacer,
-		inputView,
-	)
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }

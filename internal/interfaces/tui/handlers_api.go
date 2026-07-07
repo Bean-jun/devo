@@ -164,8 +164,8 @@ func (a *App) handleApprovalDecision(msg messages.ApprovalDecision) tea.Cmd {
 }
 
 func (a *App) updateContextUsage(sess *types.SessionInfo) {
-	if sess != nil && sess.TokenUsage.Input > 0 {
-		a.chatView.InputArea.ContextUsage = fmt.Sprintf("context %s", formatTokens(sess.TokenUsage.Input))
+	if sess != nil && sess.CurrentContextTokens > 0 {
+		a.chatView.InputArea.ContextUsage = fmt.Sprintf("context %s", formatTokens(sess.CurrentContextTokens))
 	}
 }
 

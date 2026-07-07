@@ -177,7 +177,7 @@ func (m *MessageViewport) SetSize(width, height int) {
 		contentWidth = 40
 	}
 	r, err := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
+		glamour.WithStandardStyle("dark"),
 		glamour.WithWordWrap(contentWidth),
 	)
 	if err == nil {
@@ -209,7 +209,10 @@ func (m *MessageViewport) renderContent() {
 
 	var lines []string
 
-	for _, msg := range m.Messages {
+	for i, msg := range m.Messages {
+		if i > 0 {
+			lines = append(lines, "")
+		}
 		switch msg.Role {
 		case "user":
 			lines = append(lines, m.renderUserMessage(msg))
@@ -242,20 +245,24 @@ func (m *MessageViewport) renderUserMessage(msg types.Message) string {
 	prefix := UserPrefixStyle.Render("You")
 	body := msg.Content
 
-	lines := strings.Split(prefix+"\n"+body, "\n")
-	maxW := m.Width - 4
+	maxW := m.Width * 3 / 4
 	if maxW < 20 {
 		maxW = 20
 	}
+	leftPad := m.Width - maxW
+
+	wrappedBody := lipgloss.NewStyle().Width(maxW).Align(lipgloss.Right).Render(body)
 
 	var result []string
-	for _, line := range lines {
-		lineLen := lipgloss.Width(line)
-		pad := maxW - lineLen
-		if pad < 0 {
-			pad = 0
-		}
-		result = append(result, strings.Repeat(" ", pad)+line)
+	prefixLen := lipgloss.Width(prefix)
+	prefixPad := maxW - prefixLen
+	if prefixPad < 0 {
+		prefixPad = 0
+	}
+	result = append(result, strings.Repeat(" ", leftPad+prefixPad)+prefix)
+
+	for _, line := range strings.Split(wrappedBody, "\n") {
+		result = append(result, strings.Repeat(" ", leftPad)+line)
 	}
 
 	return strings.Join(result, "\n")
@@ -303,7 +310,11 @@ func (m *MessageViewport) renderThinkingContent() string {
 }
 
 func (m *MessageViewport) renderSystemMessage(msg types.Message) string {
-	return SystemNoticeStyle.Render("  " + msg.Content)
+	maxW := m.Width - 4
+	if maxW < 20 {
+		maxW = 20
+	}
+	return SystemNoticeStyle.Copy().Width(maxW).Render("  " + msg.Content)
 }
 
 func (m *MessageViewport) renderToolMessage(msg types.Message) string {

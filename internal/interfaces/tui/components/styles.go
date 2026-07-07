@@ -1,6 +1,13 @@
 package components
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
+)
+
+func init() {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+}
 
 var (
 	ColorPrimary = lipgloss.Color("#A78BFA")
@@ -102,7 +109,7 @@ var (
 				Background(ColorPrimary)
 
 	InputAreaStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), false, false, true, false).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(ColorBorder).
 			Background(ColorSurface).
 			Padding(0, 1)

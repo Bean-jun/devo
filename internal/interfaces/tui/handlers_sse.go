@@ -139,7 +139,7 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 		a.chatView.MessageView.AddSystemNotice(notice)
 
 	case "token_usage":
-		var in, out, total int
+		var in, out, total, ctxTokens int
 		if si, ok := msg.Data["session_input_tokens"].(float64); ok {
 			in = int(si)
 		}
@@ -148,6 +148,9 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 		}
 		if st, ok := msg.Data["session_total_tokens"].(float64); ok {
 			total = int(st)
+		}
+		if ct, ok := msg.Data["current_context_tokens"].(float64); ok {
+			ctxTokens = int(ct)
 		}
 		if total == 0 {
 			it, _ := msg.Data["input_tokens"].(float64)
@@ -159,6 +162,9 @@ func (a *App) handleSSEEvent(msg messages.SSEEvent) tea.Cmd {
 		a.chatView.InputArea.TokenUsage = fmt.Sprintf("Tokens %s (↑%s ↓%s)",
 			formatTokens(total), formatTokens(in), formatTokens(out))
 		if a.activeSession != nil {
+			if ctxTokens > 0 {
+				a.activeSession.CurrentContextTokens = ctxTokens
+			}
 			a.updateContextUsage(a.activeSession)
 		}
 

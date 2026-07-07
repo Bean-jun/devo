@@ -187,9 +187,29 @@ func TestMessageViewport_RenderIncludesStreamingContent(t *testing.T) {
 	mv.AddStreamingChunk("Streaming text...")
 
 	view := mv.View()
+	view = stripANSI(view)
 	if !strings.Contains(view, "Streaming text...") {
-		t.Error("view should contain streaming content")
+		t.Errorf("view should contain streaming content, got: %q", view)
 	}
+}
+
+func stripANSI(s string) string {
+	var result strings.Builder
+	inEscape := false
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\x1b' {
+			inEscape = true
+			continue
+		}
+		if inEscape {
+			if s[i] == 'm' {
+				inEscape = false
+			}
+			continue
+		}
+		result.WriteByte(s[i])
+	}
+	return result.String()
 }
 
 func TestMessageViewport_RenderIncludesToolCardOutput(t *testing.T) {

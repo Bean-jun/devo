@@ -1,17 +1,18 @@
 package types
 
 type SessionInfo struct {
-	ID               string            `json:"id"`
-	Title            string            `json:"title"`
-	WorkingDirectory string            `json:"working_directory"`
-	State            string            `json:"state"`
-	CreatedAt        string            `json:"created_at"`
-	LastActiveAt     string            `json:"last_active_at"`
-	MessageCount     int               `json:"message_count"`
-	TrustLevel       string            `json:"trust_level"`
-	ApprovalPolicy   map[string]string `json:"approval_policy,omitempty"`
-	TokenUsage       TokenUsage        `json:"token_usage"`
-	MaxContextTokens int               `json:"max_context_tokens"`
+	ID                   string            `json:"id"`
+	Title                string            `json:"title"`
+	WorkingDirectory     string            `json:"working_directory"`
+	State                string            `json:"state"`
+	CreatedAt            string            `json:"created_at"`
+	LastActiveAt         string            `json:"last_active_at"`
+	MessageCount         int               `json:"message_count"`
+	TrustLevel           string            `json:"trust_level"`
+	ApprovalPolicy       map[string]string `json:"approval_policy,omitempty"`
+	TokenUsage           TokenUsage        `json:"token_usage"`
+	CurrentContextTokens int               `json:"current_context_tokens"`
+	MaxContextTokens     int               `json:"max_context_tokens"`
 }
 
 // NormalizeState converts the State field from PascalCase to snake_case.
