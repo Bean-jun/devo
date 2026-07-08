@@ -198,6 +198,11 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 			sess.LastActiveAt = time.Now()
 			l.store.Update(sess)
 		}
+
+		lc.EventBus.Publish("loop.completed_with_reason", map[string]any{
+			"session_id": sessionID,
+			"reason":     lc.TerminationReason,
+		})
 	}()
 
 	return nil

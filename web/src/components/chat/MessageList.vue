@@ -154,6 +154,20 @@ watch(
   { immediate: false }
 )
 
+let didInitialScroll = false
+
+watch(
+  itemCount,
+  (newCount) => {
+    if (newCount > 0 && !didInitialScroll) {
+      didInitialScroll = true
+      nextTick(() => {
+        scrollToBottom(false)
+      })
+    }
+  }
+)
+
 function onScroll(): void {
   checkNearBottom()
 }

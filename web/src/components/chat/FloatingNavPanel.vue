@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 
 const props = defineProps<{
@@ -18,6 +18,16 @@ const navItems = computed(() => {
 })
 
 const activeId = ref<string | null>(null)
+
+watch(
+  () => navItems.value.length,
+  (len) => {
+    if (len > 0) {
+      activeId.value = navItems.value[len - 1].id
+    }
+  },
+  { immediate: true }
+)
 
 function handleClick(itemId: string): void {
   activeId.value = itemId

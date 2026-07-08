@@ -17,6 +17,7 @@
   | 'skill_solidified'
   | 'memory_updated'
   | 'mcp_tool_discovered'
+  | 'loop.completed_with_reason'
   | 'error'
 
 export interface SSEEvent {

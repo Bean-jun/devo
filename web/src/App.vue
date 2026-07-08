@@ -13,6 +13,7 @@ import { useKeyboard } from '@/composables/useKeyboard'
 import { useCommand } from '@/composables/useCommand'
 import { usePlatform } from '@/composables/usePlatform'
 import { useThemeTransition } from '@/composables/useThemeTransition'
+import { useAudio } from '@/composables/useAudio'
 import { API_BASE } from '@/utils/constants'
 import VscodeLayout from '@/layouts/VscodeLayout.vue'
 import BrowserLayout from '@/layouts/BrowserLayout.vue'
@@ -27,6 +28,7 @@ const memoryStore = useMemoryStore()
 const mcpStore = useMcpStore()
 const { detectMode, isVscodeMode } = usePlatform()
 const { startTransition } = useThemeTransition()
+const { playCompletedSound } = useAudio()
 
 ;(window as any).__chatStore = chatStore
 
@@ -323,6 +325,12 @@ function connectSSE(sessionId: string) {
       description: t.description || '',
       input_schema: t.input_schema || t.parameters || {},
     })))
+  })
+
+  onEvent('loop.completed_with_reason', (data: any) => {
+    if (data.reason === 'completed') {
+      playCompletedSound()
+    }
   })
 
   onEvent('error', (data: any) => {

@@ -29,4 +29,7 @@ type LoopContext struct {
 	ResumeCh chan struct{}
 
 	PausedInState LoopState
+
+	// TerminationReason 记录 loop 最终结束的原因
+	TerminationReason string
 }

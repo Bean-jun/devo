@@ -264,5 +264,7 @@ func (l *Loop) textResponseHandler(ctx context.Context, lc *LoopContext) (LoopSt
 
 	lc.EventBus.Publish("loop.loop_completed", nil)
 
+	lc.TerminationReason = "completed"
+
 	return LoopStateIdle, nil
 }
