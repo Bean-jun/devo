@@ -51,10 +51,9 @@ func (l *Loop) Rollback(sessionID string, targetMessageID string) (*RollbackResu
 		if targetIdx+1 < len(msgs) && msgs[targetIdx+1].Role == session.RoleTool {
 			adjusted = true
 			adjustmentReason = fmt.Sprintf(
-				"目标消息是一条包含工具调用的助手消息，其后存在对应的工具结果（消息ID: %s），回滚点已自动后移至工具结果之后，以保留完整的工具调用回合。",
+				"目标消息是一条包含工具调用的助手消息，其后存在对应的工具结果（消息ID: %s），回滚时将一并删除该工具结果，以保持工具调用回合的完整性。",
 				msgs[targetIdx+1].ID,
 			)
-			actualRollbackMessageID = msgs[targetIdx+1].ID
 		}
 	}
 
@@ -62,14 +61,10 @@ func (l *Loop) Rollback(sessionID string, targetMessageID string) (*RollbackResu
 		if targetIdx > 0 && msgs[targetIdx-1].Role == session.RoleAssistant && len(msgs[targetIdx-1].ToolCalls) > 0 {
 			adjusted = true
 			adjustmentReason = fmt.Sprintf(
-				"目标消息是一条工具结果消息，其前存在对应的工具调用请求（消息ID: %s），回滚点已自动前移至工具调用请求之前，以删除不完整的工具调用回合。",
+				"目标消息是一条工具结果消息，其前存在对应的工具调用请求（消息ID: %s），回滚点已自动前移至工具调用请求处，以删除不完整的工具调用回合。",
 				msgs[targetIdx-1].ID,
 			)
-			if targetIdx > 1 {
-				actualRollbackMessageID = msgs[targetIdx-2].ID
-			} else {
-				actualRollbackMessageID = msgs[targetIdx-1].ID
-			}
+			actualRollbackMessageID = msgs[targetIdx-1].ID
 		}
 	}
 
@@ -160,7 +155,7 @@ func (l *Loop) checkFileConsistency(sessionID string, rollbackMessageID string, 
 }
 
 func buildRollbackSystemMessage(targetID string, rollbackTime time.Time, adjusted bool, reason string) string {
-	base := fmt.Sprintf("用户于 %s 将对话回滚至消息 %s。", rollbackTime.Format(time.RFC3339), targetID)
+	base := fmt.Sprintf("用户于 %s 将对话回滚至消息 %s 之前（该消息及之后的消息均被删除）。", rollbackTime.Format(time.RFC3339), targetID)
 	if adjusted && reason != "" {
 		base += " " + reason
 	}

@@ -370,9 +370,9 @@ func (s *InMemoryStore) DeleteMessagesAfter(sessionID string, messageID string) 
 		return 0, ErrMessageNotFound
 	}
 
-	deletedCount := len(sess.Messages) - cutoffIdx - 1
+	deletedCount := len(sess.Messages) - cutoffIdx
 	if deletedCount > 0 {
-		sess.Messages = sess.Messages[:cutoffIdx+1]
+		sess.Messages = sess.Messages[:cutoffIdx]
 		sess.MessageCount = len(sess.Messages)
 	}
 

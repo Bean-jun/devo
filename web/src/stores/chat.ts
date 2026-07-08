@@ -157,7 +157,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function rollbackTo(messageIndex: number): void {
     if (messageIndex < 0 || messageIndex >= messages.value.length) return
-    messages.value = messages.value.slice(0, messageIndex + 1)
+    messages.value = messages.value.slice(0, messageIndex)
   }
 
   async function fetchMessages(sessionId: string): Promise<void> {

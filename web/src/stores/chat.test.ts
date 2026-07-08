@@ -193,8 +193,8 @@ describe('ChatStore', () => {
 
       store.rollbackTo(1)
 
-      expect(store.messages).toHaveLength(2)
-      expect(store.messages[1].content).toBe('B')
+      expect(store.messages).toHaveLength(1)
+      expect(store.messages[0].content).toBe('A')
     })
 
     it('should not rollback beyond message count', () => {

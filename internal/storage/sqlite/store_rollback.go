@@ -30,7 +30,7 @@ func (s *GormStore) DeleteMessagesAfter(sessionID string, messageID string) (int
 		return 0, session.ErrMessageNotFound
 	}
 
-	result := s.db.Where("session_id = ? AND seq > ?", sessionID, target.Seq).Delete(&MessageModel{})
+	result := s.db.Where("session_id = ? AND seq >= ?", sessionID, target.Seq).Delete(&MessageModel{})
 	if result.Error != nil {
 		return 0, result.Error
 	}
