@@ -93,8 +93,7 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 		switch evt.Type {
 		case "token":
 			lc.EventBus.Publish("streaming_token", map[string]any{
-				"token":            evt.Token,
-				"accumulated_text": evt.FullText,
+				"token": evt.Token,
 			})
 		case "done":
 			lc.LLMResult = &llmclient.CompleteResult{
@@ -109,20 +108,23 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 				l.tokenMeter.RecordStep(lc.SessionID, lc.StepSeq, evt.TokenUsage)
 				lc.TotalStepTokens += evt.TokenUsage.TotalTokens
 
-				sess, _ := l.store.Get(lc.SessionID)
-				lc.EventBus.Publish("token_usage", map[string]any{
-					"step":                   lc.StepSeq,
-					"input_tokens":           evt.TokenUsage.InputTokens,
-					"output_tokens":          evt.TokenUsage.OutputTokens,
-					"session_total_tokens":   sess.TokenUsage.Total,
-					"session_input_tokens":   sess.TokenUsage.Input,
-					"session_output_tokens":  sess.TokenUsage.Output,
-					"current_context_tokens": sess.CurrentContextTokens,
-				})
+				sess, err := l.store.Get(lc.SessionID)
+				if err != nil {
+					log.Printf("[DEBUG] thinkingHandler: get session for token_usage failed: %v", err)
+				} else {
+					lc.EventBus.Publish("token_usage", map[string]any{
+						"step":                   lc.StepSeq,
+						"input_tokens":           evt.TokenUsage.InputTokens,
+						"output_tokens":          evt.TokenUsage.OutputTokens,
+						"session_total_tokens":   sess.TokenUsage.Total,
+						"session_input_tokens":   sess.TokenUsage.Input,
+						"session_output_tokens":  sess.TokenUsage.Output,
+						"current_context_tokens": sess.CurrentContextTokens,
+					})
+				}
 			}
 
 			lc.EventBus.Publish("streaming_complete", map[string]any{
-				"full_text":     evt.FullText,
 				"tool_calls":    evt.ToolCalls,
 				"finish_reason": evt.FinishReason,
 			})

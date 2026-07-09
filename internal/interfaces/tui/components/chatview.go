@@ -27,6 +27,9 @@ func (c *ChatView) SetSize(width, height int) {
 
 	inputHeight := 4
 	msgHeight := height - inputHeight
+	if c.Processing {
+		msgHeight--
+	}
 	if msgHeight < 5 {
 		msgHeight = 5
 	}

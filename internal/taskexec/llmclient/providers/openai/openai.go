@@ -277,6 +277,7 @@ func (c *Client) parseSSEStream(ctx context.Context, body io.Reader, callback ll
 	var fullTextBuilder strings.Builder
 	var accumulatedToolCalls []accumulatedToolCall
 	var usage *tokenmeter.TokenUsage
+	var finishReason string
 
 	for scanner.Scan() {
 		select {
@@ -312,7 +313,10 @@ func (c *Client) parseSSEStream(ctx context.Context, body io.Reader, callback ll
 		}
 
 		delta := chunk.Choices[0].Delta
-		finishReason := chunk.Choices[0].FinishReason
+		choiceFinishReason := chunk.Choices[0].FinishReason
+		if choiceFinishReason != "" {
+			finishReason = choiceFinishReason
+		}
 
 		if delta.Content != "" {
 			fullTextBuilder.WriteString(delta.Content)
@@ -339,39 +343,38 @@ func (c *Client) parseSSEStream(ctx context.Context, body io.Reader, callback ll
 				acc.Arguments += tc.Function.Arguments
 			}
 		}
+	}
 
-		if finishReason != "" {
-			fullText := fullTextBuilder.String()
-			toolCalls := make([]session.ToolCall, 0, len(accumulatedToolCalls))
-			for _, acc := range accumulatedToolCalls {
-				if acc.ID == "" {
-					continue
-				}
-				var params map[string]interface{}
-				if acc.Arguments != "" {
-					if err := json.Unmarshal([]byte(acc.Arguments), &params); err != nil {
-						params = map[string]interface{}{"_raw": acc.Arguments}
-					}
-				}
-				if params == nil {
-					params = make(map[string]interface{})
-				}
-				toolCalls = append(toolCalls, session.ToolCall{
-					ID:       acc.ID,
-					ToolName: acc.Name,
-					Params:   params,
-				})
+	if finishReason != "" {
+		fullText := fullTextBuilder.String()
+		toolCalls := make([]session.ToolCall, 0, len(accumulatedToolCalls))
+		for _, acc := range accumulatedToolCalls {
+			if acc.ID == "" {
+				continue
 			}
-
-			callback(llmclient.StreamEvent{
-				Type:         "done",
-				FullText:     fullText,
-				ToolCalls:    toolCalls,
-				FinishReason: finishReason,
-				TokenUsage:   usage,
+			var params map[string]interface{}
+			if acc.Arguments != "" {
+				if err := json.Unmarshal([]byte(acc.Arguments), &params); err != nil {
+					params = map[string]interface{}{"_raw": acc.Arguments}
+				}
+			}
+			if params == nil {
+				params = make(map[string]interface{})
+			}
+			toolCalls = append(toolCalls, session.ToolCall{
+				ID:       acc.ID,
+				ToolName: acc.Name,
+				Params:   params,
 			})
-			return nil
 		}
+
+		callback(llmclient.StreamEvent{
+			Type:         "done",
+			FullText:     fullText,
+			ToolCalls:    toolCalls,
+			FinishReason: finishReason,
+			TokenUsage:   usage,
+		})
 	}
 
 	if err := scanner.Err(); err != nil {

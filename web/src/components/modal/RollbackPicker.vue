@@ -11,6 +11,7 @@ const uiStore = useUiStore()
 const sessionStore = useSessionStore()
 
 const selectedIndex = ref(0)
+const isLoading = ref(false)
 
 const isOpen = computed(() => uiStore.activeModal === 'rollback-picker')
 
@@ -22,9 +23,19 @@ const userMessages = computed(() => {
   return msgs
 })
 
-watch(isOpen, (val) => {
-  if (val && userMessages.value.length > 0) {
-    selectedIndex.value = userMessages.value[0].originalIndex
+watch(isOpen, async (val) => {
+  if (val && sessionStore.currentSession) {
+    isLoading.value = true
+    try {
+      await chatStore.fetchMessages(sessionStore.currentSession.id)
+    } catch {
+      uiStore.showToast('error', '加载消息失败')
+    } finally {
+      isLoading.value = false
+    }
+    if (userMessages.value.length > 0) {
+      selectedIndex.value = userMessages.value[0].originalIndex
+    }
   }
 })
 
@@ -100,7 +111,10 @@ function handleKeydown(e: KeyboardEvent) {
       </div>
 
       <div class="timeline">
-        <div v-if="userMessages.length === 0" class="timeline-empty">
+        <div v-if="isLoading" class="timeline-empty">
+          加载中...
+        </div>
+        <div v-else-if="userMessages.length === 0" class="timeline-empty">
           暂无消息可回滚
         </div>
         <div
