@@ -782,7 +782,7 @@ func initialModel() model {
 		Expanded: true,
 	})
 	cv.MessageView.AddToolCard(ToolCardData{
-		ToolName: "execute_command",
+		ToolName: "exec_python",
 		Params:   `{"command": "echo 你好世界"}`,
 		Result:   "你好世界",
 		Success:  true,

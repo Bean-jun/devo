@@ -119,7 +119,6 @@ func (a *App) initTools() {
 	a.toolRegistry.Register(&tools.WriteFileTool{})
 	a.toolRegistry.Register(&tools.EditFileTool{})
 	a.toolRegistry.Register(tools.NewExecPythonTool())
-	a.toolRegistry.Register(tools.NewExecuteCommandTool())
 	a.toolRegistry.Register(tools.NewUseSkillTool(a.skillsMgr))
 	a.mcpMgr.RegisterTools(a.toolRegistry)
 }

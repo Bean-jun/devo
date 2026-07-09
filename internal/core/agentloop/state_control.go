@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"devo/internal/core/session"
+	"devo/internal/pkg/process"
 )
 
 func (l *Loop) Pause(sessionID string) error {
@@ -116,7 +117,7 @@ func (l *Loop) Cancel(sessionID string) error {
 	bgPIDs := sess.BackgroundPIDs
 
 	if childPID != nil {
-		killChildProcess(*childPID)
+		process.KillProcessGroup(*childPID)
 	}
 	if len(bgPIDs) > 0 {
 		killAllBackgroundPIDs(bgPIDs)
@@ -176,7 +177,7 @@ func (l *Loop) Complete(sessionID string) error {
 		bgPIDs := sess.BackgroundPIDs
 
 		if childPID != nil {
-			killChildProcess(*childPID)
+			process.KillProcessGroup(*childPID)
 		}
 		if len(bgPIDs) > 0 {
 			killAllBackgroundPIDs(bgPIDs)

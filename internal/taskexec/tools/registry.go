@@ -20,7 +20,7 @@ const (
 	OpFileWriteNew       = "file_write_new"
 	OpFileWriteOverwrite = "file_write_overwrite"
 	OpFileEdit           = "file_edit"
-	OpExecuteCommand     = "execute_command"
+	OpExecPython         = "exec_python"
 )
 
 type StreamEventType string

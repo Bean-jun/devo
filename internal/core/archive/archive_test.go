@@ -175,7 +175,7 @@ func TestAppendToolResult(t *testing.T) {
 		t.Fatalf("append successful tool result: %v", err)
 	}
 
-	if err := am.AppendToolResult(sess.ID, "execute_command", false, "command failed"); err != nil {
+	if err := am.AppendToolResult(sess.ID, "exec_python", false, "command failed"); err != nil {
 		t.Fatalf("append failed tool result: %v", err)
 	}
 
@@ -523,7 +523,7 @@ func TestRenderArchiveToolMessages(t *testing.T) {
 
 	msgs := []session.Message{
 		{ID: "msg-1", Role: session.RoleAssistant, Content: "", ToolCalls: []session.ToolCall{
-			{ID: "tc-1", ToolName: "execute_command", Params: map[string]interface{}{"command": "ls"}},
+			{ID: "tc-1", ToolName: "exec_python", Params: map[string]interface{}{"code": "print('hello')"}},
 		}, CreatedAt: time.Now()},
 		{ID: "msg-2", Role: session.RoleTool, Content: "files: a.txt, b.txt", ToolCallID: "tc-1", CreatedAt: time.Now()},
 	}
@@ -543,10 +543,10 @@ func TestRenderArchiveToolMessages(t *testing.T) {
 	}
 
 	text := string(content)
-	if !strings.Contains(text, "[工具调用: execute_command]") {
+	if !strings.Contains(text, "[工具调用: exec_python]") {
 		t.Error("archive missing tool call in render")
 	}
-	if !strings.Contains(text, "command=ls") {
+	if !strings.Contains(text, "code=print('hello')") {
 		t.Error("archive missing tool call params in render")
 	}
 	if !strings.Contains(text, "files: a.txt, b.txt") {

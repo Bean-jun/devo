@@ -1122,9 +1122,9 @@ func (m *execCommandApprovalMockClient) Complete(ctx context.Context, messages [
 				ToolCalls: []session.ToolCall{
 					{
 						ID:       "call-1",
-						ToolName: "execute_command",
+						ToolName: "exec_python",
 						Params: map[string]interface{}{
-							"command":         "echo hello",
+							"code":            "print('hello')",
 							"timeout_seconds": float64(60),
 						},
 					},
@@ -1150,13 +1150,13 @@ func (m *execCommandApprovalMockClient) CompleteStream(ctx context.Context, mess
 	return nil
 }
 
-func TestApprovalRequest_ExecuteCommandContext(t *testing.T) {
+func TestApprovalRequest_ExecPythonContext(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	store := session.NewInMemoryStore()
 
 	toolRegistry := tools.NewRegistry()
-	toolRegistry.Register(tools.NewExecuteCommandTool())
+	toolRegistry.Register(tools.NewExecPythonTool())
 
 	loop := NewWithTools(store, &execCommandApprovalMockClient{}, toolRegistry)
 
@@ -1188,8 +1188,11 @@ func TestApprovalRequest_ExecuteCommandContext(t *testing.T) {
 		t.Fatal("expected details to be a map")
 	}
 
-	if details["command"] != "echo hello" {
-		t.Errorf("expected command 'echo hello', got %v", details["command"])
+	if details["code"] != "print('hello')" {
+		t.Errorf("expected code 'print('hello')', got %v", details["code"])
+	}
+	if details["timeout_seconds"] != float64(60) {
+		t.Errorf("expected timeout_seconds 60, got %v", details["timeout_seconds"])
 	}
 
 	cmdCtx, ok := details["command_context"].(map[string]any)
@@ -1203,12 +1206,9 @@ func TestApprovalRequest_ExecuteCommandContext(t *testing.T) {
 	if cmdCtx["invocation"] == nil {
 		t.Error("expected invocation in command_context")
 	}
-	if cmdCtx["timeout_seconds"] != 60 {
-		t.Errorf("expected timeout_seconds 60, got %v", cmdCtx["timeout_seconds"])
-	}
 
-	if mode, ok := cmdCtx["mode"].(string); !ok || (mode != "sync" && mode != "async" && mode != "auto") {
-		t.Errorf("expected valid mode, got %v", cmdCtx["mode"])
+	if mode, ok := cmdCtx["mode"].(string); !ok || (mode != "sync" && mode != "background") {
+		t.Errorf("expected valid mode (sync/background), got %v", cmdCtx["mode"])
 	}
 
 	t.Logf("command_context: %+v", cmdCtx)

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"devo/internal/core/session"
+	"devo/internal/pkg/process"
 )
 
 func TestProcessMessageNotIdle(t *testing.T) {
@@ -643,10 +644,10 @@ func TestFullStateFlowIdleToArchived(t *testing.T) {
 	}
 }
 
-func TestKillChildProcess(t *testing.T) {
-	killChildProcess(-1)
-	killChildProcess(0)
-	killChildProcess(99999999)
+func TestKillProcessGroup(t *testing.T) {
+	process.KillProcessGroup(-1)
+	process.KillProcessGroup(0)
+	process.KillProcessGroup(99999999)
 }
 
 func TestCancelClearsChildPID(t *testing.T) {

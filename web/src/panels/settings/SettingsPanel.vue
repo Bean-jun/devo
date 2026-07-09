@@ -26,7 +26,7 @@ const APPROVAL_OPERATIONS = [
   { key: 'file_write_new', label: '新建文件', icon: '📝', risk: 'high', defaultLevel: 'always_ask' },
   { key: 'file_write_overwrite', label: '覆盖文件', icon: '📝', risk: 'high', defaultLevel: 'always_ask' },
   { key: 'file_edit', label: '编辑文件', icon: '✏️', risk: 'high', defaultLevel: 'always_ask' },
-  { key: 'execute_command', label: '执行命令', icon: '⚡', risk: 'high', defaultLevel: 'always_ask' },
+  { key: 'exec_python', label: '执行Python', icon: '⚡', risk: 'high', defaultLevel: 'always_ask' },
   { key: 'memory_update', label: '更新记忆', icon: '🧠', risk: 'low', defaultLevel: 'auto_approve' },
   { key: 'solidify_skill', label: '固化技能', icon: '🔧', risk: 'low', defaultLevel: 'auto_approve' },
 ]

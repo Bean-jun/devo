@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"devo/internal/core/session"
+	"devo/internal/pkg/process"
 )
 
 const crashRecoverySystemMessage = "系统检测到上次服务异常中断，当前会话已重置。未完成的工具调用已丢弃，请检查文件状态。"
@@ -40,7 +41,7 @@ func (l *Loop) recoverSession(sess *session.Session) {
 	oldState := string(sess.State)
 
 	if sess.ChildPID != nil {
-		killChildProcess(*sess.ChildPID)
+		process.KillProcessGroup(*sess.ChildPID)
 	}
 	if len(sess.BackgroundPIDs) > 0 {
 		killAllBackgroundPIDs(sess.BackgroundPIDs)

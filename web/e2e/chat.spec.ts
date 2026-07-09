@@ -145,7 +145,7 @@ test.describe('Tool Streaming', () => {
       const store = (window as any).__chatStore
       store.appendToolCallMessage({
         id: 'tool-progress-001',
-        name: 'execute_command',
+        name: 'exec_python',
         parameters: { command: 'go build ./...' },
         status: 'pending',
         riskLevel: 'medium',

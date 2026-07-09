@@ -3,7 +3,6 @@ package tools
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -363,11 +362,11 @@ func TestEditFileTool_PreCheck_Valid(t *testing.T) {
 	}
 }
 
-func TestExecuteCommandTool_GetCommandContext(t *testing.T) {
-	tool := NewExecuteCommandTool()
+func TestExecPythonTool_GetCommandContext(t *testing.T) {
+	tool := NewExecPythonTool()
 
 	ctx := tool.GetCommandContext("/tmp/test", map[string]interface{}{
-		"command":         "echo hello",
+		"code":            "print('hello')",
 		"timeout_seconds": float64(60),
 	})
 
@@ -379,26 +378,20 @@ func TestExecuteCommandTool_GetCommandContext(t *testing.T) {
 	if !ok {
 		t.Fatal("expected invocation to be a string")
 	}
-	if !strings.Contains(invocation, "Go native executor") {
-		t.Errorf("expected invocation to mention Go native executor, got %v", invocation)
+	if !strings.Contains(invocation, "python") {
+		t.Errorf("expected invocation to mention python, got %v", invocation)
 	}
 
 	if ctx["timeout_seconds"] != 60 {
 		t.Errorf("expected timeout_seconds 60, got %v", ctx["timeout_seconds"])
 	}
-
-	if runtime.GOOS == "windows" {
-		if ctx["encoding"] == nil {
-			t.Error("expected encoding info on Windows")
-		}
-	}
 }
 
-func TestExecuteCommandTool_GetCommandContext_DefaultTimeout(t *testing.T) {
-	tool := NewExecuteCommandTool()
+func TestExecPythonTool_GetCommandContext_DefaultTimeout(t *testing.T) {
+	tool := NewExecPythonTool()
 
 	ctx := tool.GetCommandContext("/tmp/test", map[string]interface{}{
-		"command": "echo hello",
+		"code": "print('hello')",
 	})
 
 	if ctx["timeout_seconds"] != 30 {
@@ -412,7 +405,7 @@ func TestDiffPreviewer_Interface(t *testing.T) {
 }
 
 func TestCommandContextProvider_Interface(t *testing.T) {
-	var _ CommandContextProvider = (*ExecuteCommandTool)(nil)
+	var _ CommandContextProvider = (*ExecPythonTool)(nil)
 }
 
 func TestPreChecker_EditFileTool(t *testing.T) {

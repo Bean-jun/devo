@@ -702,7 +702,7 @@ func TestModel_ContainsMessagesAndToolCards(t *testing.T) {
 	if !strings.Contains(view, "中国語のテスト") {
 		t.Error("ChatView should contain tool card with CJK result")
 	}
-	if !strings.Contains(view, "execute_command") {
+	if !strings.Contains(view, "exec_python") {
 		t.Error("ChatView should contain second tool card")
 	}
 	if !strings.Contains(view, "中文乱码") {

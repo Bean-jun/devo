@@ -97,7 +97,7 @@ func (l *Loop) determineOperationType(tool tools.Tool, workingDir string, params
 	case tools.RiskLevelMedium:
 		return "file_write"
 	case tools.RiskLevelHigh:
-		return "execute_command"
+		return "exec_python"
 	default:
 		return "unknown"
 	}
@@ -143,9 +143,12 @@ func (l *Loop) buildApprovalDetails(tool tools.Tool, workingDir string, opType s
 			}
 		}
 
-	case "execute_command":
-		if cmd, ok := params["command"].(string); ok {
-			details["command"] = cmd
+	case "exec_python":
+		if code, ok := params["code"].(string); ok {
+			details["code"] = code
+		}
+		if mode, ok := params["mode"].(string); ok {
+			details["mode"] = mode
 		}
 		if ts, ok := params["timeout_seconds"]; ok {
 			details["timeout_seconds"] = ts

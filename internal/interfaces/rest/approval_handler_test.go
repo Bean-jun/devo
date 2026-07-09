@@ -109,8 +109,8 @@ func TestSetApprovalPolicy_Success(t *testing.T) {
 	store.Create(sess)
 
 	body := map[string]string{
-		"file_write_new":  "session_trust",
-		"execute_command": "always_ask",
+		"file_write_new": "session_trust",
+		"exec_python":    "always_ask",
 	}
 	jsonBody, _ := json.Marshal(body)
 
@@ -154,8 +154,8 @@ func TestSetApprovalPolicy_PartialUpdate(t *testing.T) {
 		WorkingDirectory: tmpDir,
 		State:            session.StateIdle,
 		ApprovalPolicy: map[string]string{
-			"file_write_new":  "always_ask",
-			"execute_command": "always_ask",
+			"file_write_new": "always_ask",
+			"exec_python":    "always_ask",
 		},
 	}
 	store.Create(sess)
@@ -178,8 +178,8 @@ func TestSetApprovalPolicy_PartialUpdate(t *testing.T) {
 	if sessGot.ApprovalPolicy["file_write_new"] != "session_trust" {
 		t.Errorf("expected file_write_new updated to session_trust, got %q", sessGot.ApprovalPolicy["file_write_new"])
 	}
-	if sessGot.ApprovalPolicy["execute_command"] != "always_ask" {
-		t.Errorf("expected execute_command to remain always_ask, got %q", sessGot.ApprovalPolicy["execute_command"])
+	if sessGot.ApprovalPolicy["exec_python"] != "always_ask" {
+		t.Errorf("expected exec_python to remain always_ask, got %q", sessGot.ApprovalPolicy["exec_python"])
 	}
 }
 

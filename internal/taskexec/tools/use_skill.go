@@ -87,7 +87,7 @@ func (t *UseSkillTool) Execute(ctx context.Context, workingDir string, params ma
 
 	if len(scripts) > 0 || len(references) > 0 || len(assets) > 0 {
 		result.WriteString("\n[Available Resources]\n")
-		result.WriteString("Use the existing tools (read_file, execute_command, etc.) to access these:\n\n")
+		result.WriteString("Use the existing tools (read_file, exec_python, etc.) to access these:\n\n")
 
 		if len(scripts) > 0 {
 			result.WriteString("Scripts:\n")

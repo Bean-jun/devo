@@ -37,6 +37,6 @@ export const mockSessions: Session[] = [
     messageCount: 8,
     tokenUsage: { input: 800, output: 400 },
     trustLevel: 'low',
-    approvalPolicy: { execute_command: 'always_ask' },
+    approvalPolicy: { exec_python: 'always_ask' },
   },
 ]

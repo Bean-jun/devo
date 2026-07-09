@@ -14,7 +14,7 @@ const (
 	OpFileWriteNew       OperationType = "file_write_new"
 	OpFileWriteOverwrite OperationType = "file_write_overwrite"
 	OpFileEdit           OperationType = "file_edit"
-	OpExecuteCommand     OperationType = "execute_command"
+	OpExecPython         OperationType = "exec_python"
 	OpMemoryUpdate       OperationType = "memory_update"
 	OpSolidifySkill      OperationType = "solidify_skill"
 )
@@ -63,7 +63,7 @@ func DefaultApprovalPolicy() map[OperationType]PolicyLevel {
 		OpFileWriteNew:       PolicyAlwaysAsk,
 		OpFileWriteOverwrite: PolicyAlwaysAsk,
 		OpFileEdit:           PolicyAlwaysAsk,
-		OpExecuteCommand:     PolicyAlwaysAsk,
+		OpExecPython:         PolicyAlwaysAsk,
 		OpMemoryUpdate:       PolicyAutoApprove,
 		OpSolidifySkill:      PolicyAutoApprove,
 	}
@@ -71,7 +71,7 @@ func DefaultApprovalPolicy() map[OperationType]PolicyLevel {
 
 func IsValidOperationType(opType string) bool {
 	switch OperationType(opType) {
-	case OpFileWriteNew, OpFileWriteOverwrite, OpFileEdit, OpExecuteCommand, OpMemoryUpdate, OpSolidifySkill:
+	case OpFileWriteNew, OpFileWriteOverwrite, OpFileEdit, OpExecPython, OpMemoryUpdate, OpSolidifySkill:
 		return true
 	}
 	return false

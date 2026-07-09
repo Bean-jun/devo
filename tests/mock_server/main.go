@@ -132,30 +132,8 @@ var toolDefs = map[string]toolDef{
 			"required": []string{"pattern"},
 		},
 	},
-	"execute_command": {
-		Description: "Execute a shell command with security filtering and timeout control",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"command": map[string]interface{}{
-					"type":        "string",
-					"description": "要执行的 shell 命令",
-				},
-				"timeout_seconds": map[string]interface{}{
-					"type":        "integer",
-					"description": "命令执行超时时间（秒），默认 30",
-				},
-				"mode": map[string]interface{}{
-					"type":        "string",
-					"description": "执行模式：sync(等待完成)、async(启动后台任务)、auto(自动检测，默认)",
-					"enum":        []string{"sync", "async", "auto"},
-				},
-			},
-			"required": []string{"command"},
-		},
-	},
 	"exec_python": {
-		Description: "Execute a Python code snippet and return the output",
+		Description: "Execute Python code and return the output. This is the ONLY runtime tool.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -163,9 +141,14 @@ var toolDefs = map[string]toolDef{
 					"type":        "string",
 					"description": "Python 代码片段，通过 python -c 执行",
 				},
+				"mode": map[string]interface{}{
+					"type":        "string",
+					"description": "执行模式：sync（默认）| background",
+					"enum":        []string{"sync", "background"},
+				},
 				"timeout_seconds": map[string]interface{}{
 					"type":        "integer",
-					"description": "执行超时时间（秒），默认 30",
+					"description": "执行超时时间（秒），sync 默认 30，background 默认 10",
 				},
 			},
 			"required": []string{"code"},
@@ -195,7 +178,6 @@ func initToolParams() {
 		"edit_file":       {"path": "mock_output.txt", "mode": "replace", "old_str": "Hello from mock server", "new_str": "Hello from mock server (updated)"},
 		"list_files":      {"path": ".", "max_depth": float64(1)},
 		"search_codebase": {"pattern": "func main"},
-		"execute_command": {"command": "powershell -Command \"for ($i=1; $i -le 5; $i++) { Write-Output ('Line '+$i+': Hello from mock server'); Start-Sleep -Seconds 1 }\"", "timeout_seconds": float64(30)},
 		"exec_python":     {"code": "import time\nfor i in range(1, 6):\n    print(f'Line {i}: Hello from mock server')\n    time.sleep(1)"},
 		"use_skill":       {"skill_name": "Go Expert"},
 	}

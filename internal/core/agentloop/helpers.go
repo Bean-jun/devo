@@ -2,36 +2,17 @@ package agentloop
 
 import (
 	"fmt"
-	"log"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"devo/internal/core/session"
+	"devo/internal/pkg/process"
 	"devo/internal/taskexec/tools"
 )
 
-func killChildProcess(pid int) {
-	if pid <= 0 {
-		return
-	}
-
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("taskkill", "/F", "/PID", fmt.Sprintf("%d", pid))
-	} else {
-		cmd = exec.Command("kill", "-9", fmt.Sprintf("%d", pid))
-	}
-
-	if err := cmd.Run(); err != nil {
-		log.Printf("failed to kill child process %d: %v", pid, err)
-	}
-}
-
 func killAllBackgroundPIDs(pids []int) {
 	for _, pid := range pids {
-		killChildProcess(pid)
+		process.KillProcessGroup(pid)
 	}
 }
 
@@ -105,7 +86,7 @@ func (l *Loop) incrementToolCallCount(sessionID string, eventBus *session.EventB
 }
 
 func (l *Loop) recordChildPID(sessionID, toolName string, tr *tools.ToolResult) {
-	if toolName != "execute_command" {
+	if toolName != "exec_python" {
 		return
 	}
 
@@ -119,10 +100,10 @@ func (l *Loop) recordChildPID(sessionID, toolName string, tr *tools.ToolResult) 
 		return
 	}
 
-	isBackground := extractBoolFromContent(tr.Content, "__DEVO_BACKGROUND__=true")
+	bgPID := extractBGPIDFromContent(tr.Content)
 
-	if isBackground {
-		sess.BackgroundPIDs = append(sess.BackgroundPIDs, pid)
+	if bgPID > 0 {
+		sess.BackgroundPIDs = append(sess.BackgroundPIDs, bgPID)
 	} else {
 		sess.ChildPID = &pid
 	}
@@ -130,9 +111,28 @@ func (l *Loop) recordChildPID(sessionID, toolName string, tr *tools.ToolResult) 
 	l.store.Update(sess)
 }
 
-func extractBoolFromContent(content, marker string) bool {
+func extractBGPIDFromContent(content string) int {
+	marker := "__DEVO_BG_PID__="
 	idx := findLastIndex(content, marker)
-	return idx >= 0
+	if idx < 0 {
+		return 0
+	}
+
+	start := idx + len(marker)
+	end := start
+	for end < len(content) && content[end] >= '0' && content[end] <= '9' {
+		end++
+	}
+
+	if end == start {
+		return 0
+	}
+
+	pid := 0
+	for i := start; i < end; i++ {
+		pid = pid*10 + int(content[i]-'0')
+	}
+	return pid
 }
 
 func extractPIDFromContent(content string) int {
@@ -175,7 +175,7 @@ func (l *Loop) getLockPath(workingDir, toolName string, params map[string]interf
 			return filepath.Join(workingDir, path)
 		}
 		return workingDir
-	case "execute_command":
+	case "exec_python":
 		return workingDir
 	default:
 		return ""

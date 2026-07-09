@@ -146,8 +146,8 @@ func TestDefaultApprovalPolicy(t *testing.T) {
 	if policy[OpFileWriteNew] != PolicyAlwaysAsk {
 		t.Errorf("expected file_write_new default to always_ask, got %s", policy[OpFileWriteNew])
 	}
-	if policy[OpExecuteCommand] != PolicyAlwaysAsk {
-		t.Errorf("expected execute_command default to always_ask, got %s", policy[OpExecuteCommand])
+	if policy[OpExecPython] != PolicyAlwaysAsk {
+		t.Errorf("expected exec_python default to always_ask, got %s", policy[OpExecPython])
 	}
 	if policy[OpMemoryUpdate] != PolicyAutoApprove {
 		t.Errorf("expected memory_update default to auto_approve, got %s", policy[OpMemoryUpdate])
@@ -158,7 +158,7 @@ func TestDefaultApprovalPolicy(t *testing.T) {
 }
 
 func TestIsValidOperationType(t *testing.T) {
-	validTypes := []string{"file_write_new", "file_write_overwrite", "file_edit", "execute_command", "memory_update", "solidify_skill"}
+	validTypes := []string{"file_write_new", "file_write_overwrite", "file_edit", "exec_python", "memory_update", "solidify_skill"}
 	for _, opType := range validTypes {
 		if !IsValidOperationType(opType) {
 			t.Errorf("expected %s to be valid", opType)
@@ -300,9 +300,9 @@ func TestResolveEffectivePolicy_SessionPolicy(t *testing.T) {
 func TestResolveEffectivePolicy_DefaultFallback(t *testing.T) {
 	mgr := NewManager()
 
-	policy := mgr.ResolveEffectivePolicy(nil, nil, OpExecuteCommand)
+	policy := mgr.ResolveEffectivePolicy(nil, nil, OpExecPython)
 	if policy != PolicyAlwaysAsk {
-		t.Errorf("expected default always_ask for execute_command, got %s", policy)
+		t.Errorf("expected default always_ask for exec_python, got %s", policy)
 	}
 
 	policy = mgr.ResolveEffectivePolicy(nil, nil, OpMemoryUpdate)
@@ -350,7 +350,7 @@ func TestResolveEffectivePolicy_FullTrustViaUserStore(t *testing.T) {
 		t.Errorf("expected full_trust from user store, got %s", policy)
 	}
 
-	policy = mgr.ResolveEffectivePolicy(nil, nil, OpExecuteCommand)
+	policy = mgr.ResolveEffectivePolicy(nil, nil, OpExecPython)
 	if policy != PolicyAlwaysAsk {
 		t.Errorf("expected always_ask for non-full-trust type, got %s", policy)
 	}

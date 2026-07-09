@@ -162,7 +162,7 @@ func TestP2_PauseDuringToolCalls(t *testing.T) {
 	mock.SetHoldDelay(3000)
 	defer mock.ResetHold()
 
-	resp, err := client.SendMessage(sessionID, "Run a slow command ${execute_command}$")
+	resp, err := client.SendMessage(sessionID, "Run a slow command ${exec_python}$")
 	if err != nil {
 		t.Fatalf("send message: %v", err)
 	}
@@ -269,7 +269,7 @@ func TestC2_CancelDuringToolCalls(t *testing.T) {
 	mock.SetHoldDelay(3000)
 	defer mock.ResetHold()
 
-	resp, err := client.SendMessage(sessionID, "Execute a command and read a file ${execute_command,read_file}$")
+	resp, err := client.SendMessage(sessionID, "Execute a command and read a file ${exec_python,read_file}$")
 	if err != nil {
 		t.Fatalf("send message: %v", err)
 	}
@@ -334,7 +334,7 @@ func TestR2_ResumeAfterPauseDuringToolCalls(t *testing.T) {
 	mock.SetHoldDelay(3000)
 	defer mock.ResetHold()
 
-	resp, err := client.SendMessage(sessionID, "Execute a slow command and read a file ${execute_command,read_file}$")
+	resp, err := client.SendMessage(sessionID, "Execute a slow command and read a file ${exec_python,read_file}$")
 	if err != nil {
 		t.Fatalf("send message: %v", err)
 	}
@@ -421,7 +421,7 @@ func TestCr2_CrashDuringToolCalls(t *testing.T) {
 	mock.SetHoldDelay(5000)
 	defer mock.ResetHold()
 
-	resp, err := client.SendMessage(sessionID, "Execute a command and read a file ${execute_command,read_file}$")
+	resp, err := client.SendMessage(sessionID, "Execute a command and read a file ${exec_python,read_file}$")
 	if err != nil {
 		t.Fatalf("send message: %v", err)
 	}

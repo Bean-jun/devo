@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"devo/internal/pkg/process"
 	"strings"
 	"testing"
 )
@@ -205,4 +206,164 @@ func TestExecPythonTool_ParamsSchema(t *testing.T) {
 	if !found {
 		t.Error("expected 'code' in required parameters")
 	}
+}
+
+func TestExecPythonTool_GetCommandContext_Sync(t *testing.T) {
+	tool := NewExecPythonTool()
+
+	ctx := tool.GetCommandContext("/tmp/test", map[string]interface{}{
+		"code":            "print('hello')",
+		"timeout_seconds": float64(60),
+	})
+
+	if ctx["working_directory"] != "/tmp/test" {
+		t.Errorf("expected working_directory /tmp/test, got %v", ctx["working_directory"])
+	}
+	if ctx["mode"] != "sync" {
+		t.Errorf("expected mode sync, got %v", ctx["mode"])
+	}
+	if ctx["timeout_seconds"] != 60 {
+		t.Errorf("expected timeout_seconds 60, got %v", ctx["timeout_seconds"])
+	}
+}
+
+func TestExecPythonTool_GetCommandContext_Background(t *testing.T) {
+	tool := NewExecPythonTool()
+
+	ctx := tool.GetCommandContext("/tmp/test", map[string]interface{}{
+		"code": "print('hello')",
+		"mode": "background",
+	})
+
+	if ctx["mode"] != "background" {
+		t.Errorf("expected mode background, got %v", ctx["mode"])
+	}
+	if ctx["timeout_seconds"] != 10 {
+		t.Errorf("expected default timeout 10 for background, got %v", ctx["timeout_seconds"])
+	}
+}
+
+func TestExecPythonTool_SubprocessEcho(t *testing.T) {
+	if !isPythonAvailable() {
+		t.Skip("python not available, skipping test")
+	}
+
+	tool := &ExecPythonTool{}
+	code := "import subprocess, sys\nr = subprocess.run(['echo', 'hello from subprocess'], capture_output=True, text=True, shell=True)\nprint(r.stdout.strip())\nsys.exit(r.returncode)"
+	result, err := executeTool(t, tool, "", map[string]interface{}{
+		"code": code,
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected success, got: %s", result.Content)
+	}
+}
+
+func TestExecPythonTool_StderrCaptured(t *testing.T) {
+	if !isPythonAvailable() {
+		t.Skip("python not available, skipping test")
+	}
+
+	tool := &ExecPythonTool{}
+	result, err := executeTool(t, tool, "", map[string]interface{}{
+		"code": "import sys; print('to stderr', file=sys.stderr); print('to stdout')",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if !result.Success {
+		t.Error("expected success")
+	}
+	if !strings.Contains(result.Content, "to stderr") {
+		t.Errorf("expected stderr content in output, got: %s", result.Content)
+	}
+	if !strings.Contains(result.Content, "to stdout") {
+		t.Errorf("expected stdout content in output, got: %s", result.Content)
+	}
+}
+
+func TestExecPythonTool_Background_Success(t *testing.T) {
+	if !isPythonAvailable() {
+		t.Skip("python not available, skipping test")
+	}
+
+	tool := &ExecPythonTool{}
+	code := `import subprocess, time, sys
+p = subprocess.Popen(["python", "-c", "import time; time.sleep(60)"], start_new_session=True)
+time.sleep(0.5)
+if p.poll() is not None:
+    print("startup failed", file=sys.stderr)
+    sys.exit(1)
+print(f"__DEVO_BG_PID__={p.pid}")
+print("background process started")
+`
+	result, err := executeTool(t, tool, "", map[string]interface{}{
+		"code": code,
+		"mode": "background",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected success, got: %s", result.Content)
+	}
+	if !strings.Contains(result.Content, "__DEVO_BG_PID__") {
+		t.Error("expected __DEVO_BG_PID__ tag in output")
+	}
+
+	bgPID := parseBGPID(result.Content)
+	if bgPID > 0 {
+		process.KillProcessGroup(bgPID)
+	}
+}
+
+func TestExecPythonTool_Background_MissingPIDMarker(t *testing.T) {
+	if !isPythonAvailable() {
+		t.Skip("python not available, skipping test")
+	}
+
+	tool := &ExecPythonTool{}
+	result, err := executeTool(t, tool, "", map[string]interface{}{
+		"code": "print('hello')",
+		"mode": "background",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result.Success {
+		t.Error("expected failure due to missing PID marker")
+	}
+	if !strings.Contains(result.Content, "__DEVO_BG_PID__") {
+		t.Error("expected mention of __DEVO_BG_PID__ in error message")
+	}
+}
+
+func TestExecPythonTool_PreCheck_Blacklisted(t *testing.T) {
+	tool := &ExecPythonTool{}
+	err := tool.PreCheck(map[string]interface{}{"code": `subprocess.run(["rm", "-rf", "/"])`})
+	if err == nil {
+		t.Error("expected error for blacklisted code")
+	}
+}
+
+func TestExecPythonTool_PreCheck_SafeCode(t *testing.T) {
+	tool := &ExecPythonTool{}
+	err := tool.PreCheck(map[string]interface{}{"code": "print('hello')"})
+	if err != nil {
+		t.Errorf("expected no error for safe code, got: %v", err)
+	}
+}
+
+func TestExecPythonTool_CommandContextProvider_Interface(t *testing.T) {
+	var _ CommandContextProvider = (*ExecPythonTool)(nil)
+}
+
+func TestExecPythonTool_PreChecker_Interface(t *testing.T) {
+	var _ PreChecker = (*ExecPythonTool)(nil)
 }

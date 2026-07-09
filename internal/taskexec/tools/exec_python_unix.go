@@ -8,7 +8,9 @@ import (
 )
 
 func getPythonSysProcAttr() *syscall.SysProcAttr {
-	return nil
+	return &syscall.SysProcAttr{
+		Setpgid: true,
+	}
 }
 
 func hideWindowForPython(cmd *exec.Cmd) {}
