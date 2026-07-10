@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useMemoryStore } from '@/stores/memory'
 import type { Memory, MemoryType } from '@/types/memory'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const memoryStore = useMemoryStore()
 
@@ -91,10 +92,10 @@ onMounted(async () => {
         <label class="form-label">类型</label>
         <div class="type-selector">
           <button class="type-btn" :class="{ active: newType === 'user' }" @click="newType = 'user'">
-            <span class="type-icon">👤</span> 用户
+            <span class="type-icon"><AppIcon name="user" :size="14" /></span> 用户
           </button>
           <button class="type-btn" :class="{ active: newType === 'project' }" @click="newType = 'project'">
-            <span class="type-icon">📁</span> 项目
+            <span class="type-icon"><AppIcon name="folder" :size="14" /></span> 项目
           </button>
         </div>
       </div>
@@ -115,7 +116,7 @@ onMounted(async () => {
     <div v-if="error" class="memory-error">{{ error }}</div>
     <div v-else-if="memoryStore.isLoading" class="memory-loading">加载中...</div>
     <div v-else-if="filteredMemories.length === 0" class="memory-empty">
-      <div class="empty-icon">🧠</div>
+      <div class="empty-icon"><AppIcon name="brain" :size="48" /></div>
       <div class="empty-text">暂无记忆</div>
       <div class="empty-hint">点击「+ 新增」添加第一条记忆</div>
     </div>

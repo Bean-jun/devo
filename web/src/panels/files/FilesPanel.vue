@@ -5,6 +5,7 @@ import { useUiStore } from '@/stores/ui'
 import { API_BASE } from '@/utils/constants'
 import { getLanguageFromExtension } from '@/utils/languageMap'
 import MonacoEditor from '@/components/editor/MonacoEditor.vue'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
@@ -314,7 +315,7 @@ onUnmounted(() => {
     <div class="files-toolbar">
       <span class="files-title">Files</span>
       <button class="reload-btn" :class="{ spinning: isLoading }" :disabled="isLoading" @click="fetchRoot" title="刷新">
-        ↻
+        <AppIcon name="arrow-clockwise" :size="16" />
       </button>
     </div>
 
@@ -341,10 +342,10 @@ onUnmounted(() => {
             class="tree-line"
             :style="{ left: (8 + (d - 1) * 22 + 8) + 'px' }"
           ></span>
-          <span v-if="node.type === 'dir'" class="file-chevron">{{ expandedPaths.has(node.path) ? '▾' : '▸' }}</span>
+          <AppIcon :name="expandedPaths.has(node.path) ? 'caret-down' : 'caret-right'" :size="12" class="file-chevron" />
           <span class="file-icon">{{ getFileIcon(node.type, node.name) }}</span>
           <span class="file-name">{{ node.name }}</span>
-          <span v-if="node.type === 'dir' && !node.loaded && expandedPaths.has(node.path)" class="file-loading-icon">⏳</span>
+          <AppIcon v-if="node.type === 'dir' && !node.loaded && expandedPaths.has(node.path)" name="hourglass" :size="12" class="file-loading-icon" />
           <span class="file-size" v-if="node.type === 'file'">{{ formatFileSize(node.size) }}</span>
         </div>
       </div>
@@ -357,7 +358,7 @@ onUnmounted(() => {
       <div v-if="selectedPath" class="file-preview" :style="{ height: previewHeight + 'px' }">
         <div class="preview-header">
           <span class="preview-title">{{ selectedPath }}</span>
-          <button class="preview-close" @click="closePreview">✕</button>
+          <button class="preview-close" @click="closePreview"><AppIcon name="x" :size="14" /></button>
         </div>
         <div class="preview-body">
           <div v-if="isLoadingContent" class="preview-loading">加载中...</div>

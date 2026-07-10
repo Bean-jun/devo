@@ -12,6 +12,7 @@ import (
 	"devo/internal/core/session"
 	"devo/internal/core/skills"
 	"devo/internal/taskexec/mcp"
+	"devo/internal/taskexec/tools"
 )
 
 type Handler struct {
@@ -20,6 +21,7 @@ type Handler struct {
 	memoryManager *memory.Manager
 	skillsManager *skills.Manager
 	mcpManager    *mcp.Manager
+	bgProcManager *tools.BackgroundProcessManager
 	version       string
 	projectDir    string
 	userConfigDir string
@@ -28,6 +30,10 @@ type Handler struct {
 
 func NewHandler(store session.SessionStore, loop *agentloop.Loop, memoryManager *memory.Manager, version string) *Handler {
 	return &Handler{store: store, loop: loop, memoryManager: memoryManager, version: version}
+}
+
+func (h *Handler) SetBgProcManager(mgr *tools.BackgroundProcessManager) {
+	h.bgProcManager = mgr
 }
 
 func (h *Handler) SetMcpManager(mgr *mcp.Manager) {

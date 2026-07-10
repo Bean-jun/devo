@@ -262,12 +262,16 @@ func convertToolCalls(toolCalls []openaiToolCall) []session.ToolCall {
 }
 
 func convertUsage(usage *openaiUsage) *tokenmeter.TokenUsage {
-	return &tokenmeter.TokenUsage{
+	tu := &tokenmeter.TokenUsage{
 		InputTokens:  usage.PromptTokens,
 		OutputTokens: usage.CompletionTokens,
 		TotalTokens:  usage.TotalTokens,
 		Source:       tokenmeter.SourceExact,
 	}
+	if usage.PromptTokensDetails != nil {
+		tu.CachedTokens = usage.PromptTokensDetails.CachedTokens
+	}
+	return tu
 }
 
 func (c *Client) parseSSEStream(ctx context.Context, body io.Reader, callback llmclient.StreamCallback) error {
@@ -454,10 +458,15 @@ type openaiChatResponse struct {
 	Usage   *openaiUsage   `json:"usage,omitempty"`
 }
 
+type openaiPromptTokensDetails struct {
+	CachedTokens int `json:"cached_tokens"`
+}
+
 type openaiUsage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens        int                        `json:"prompt_tokens"`
+	CompletionTokens    int                        `json:"completion_tokens"`
+	TotalTokens         int                        `json:"total_tokens"`
+	PromptTokensDetails *openaiPromptTokensDetails `json:"prompt_tokens_details,omitempty"`
 }
 
 type openaiChoice struct {

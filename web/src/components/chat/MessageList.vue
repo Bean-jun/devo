@@ -117,6 +117,10 @@ function getItemKey(index: number): string {
   return item.id
 }
 
+function getItem(index: number): Message | Message[] | typeof STREAMING_SENTINEL | undefined {
+  return displayItems.value[index]
+}
+
 const lastScrollLength = ref(0)
 
 watch(
@@ -185,7 +189,7 @@ defineExpose({
     @scroll="onScroll"
     @click.self="uiStore.requestFocusInput()"
   >
-    <div v-if="allMessages.length === 0 && !isStreaming" class="empty-state">
+    <div v-if="allMessages.length === 0 && !isStreaming && chatStore.initialFetchDone" class="empty-state">
       <pre class="ascii-banner">
 ██████╗ ███████╗██╗   ██╗ ██████╗ 
 ██╔══██╗██╔════╝██║   ██║██╔═══██╗
@@ -211,38 +215,39 @@ defineExpose({
           :key="getItemKey(visibleRange.start + idx - 1)"
         >
           <VirtualMessageItem
+            v-if="getItem(visibleRange.start + idx - 1) !== undefined"
             :index="visibleRange.start + idx - 1"
             :on-height-change="updateItemHeight"
           >
-            <template v-if="displayItems[visibleRange.start + idx - 1] === STREAMING_SENTINEL">
+            <template v-if="getItem(visibleRange.start + idx - 1) === STREAMING_SENTINEL">
               <ThinkingIndicator />
             </template>
             <template
-              v-else-if="Array.isArray(displayItems[visibleRange.start + idx - 1])"
+              v-else-if="Array.isArray(getItem(visibleRange.start + idx - 1))"
             >
               <ToolCallGroup
-                :messages="(displayItems[visibleRange.start + idx - 1] as Message[])"
+                :messages="(getItem(visibleRange.start + idx - 1) as Message[])"
                 :yolo-mode="yoloMode"
-                :data-message-id="(displayItems[visibleRange.start + idx - 1] as Message[])[0].id"
+                :data-message-id="(getItem(visibleRange.start + idx - 1) as Message[])[0].id"
                 data-role="tool-group"
               />
             </template>
             <template
-              v-else-if="(displayItems[visibleRange.start + idx - 1] as Message).role === 'tool' && (displayItems[visibleRange.start + idx - 1] as Message).toolCall"
+              v-else-if="(getItem(visibleRange.start + idx - 1) as Message).role === 'tool' && (getItem(visibleRange.start + idx - 1) as Message).toolCall"
             >
               <ToolCallCard
-                :tool-call="(displayItems[visibleRange.start + idx - 1] as Message).toolCall!"
+                :tool-call="(getItem(visibleRange.start + idx - 1) as Message).toolCall!"
                 :yolo-mode="yoloMode"
-                :data-message-id="(displayItems[visibleRange.start + idx - 1] as Message).id"
+                :data-message-id="(getItem(visibleRange.start + idx - 1) as Message).id"
                 data-role="tool"
               />
             </template>
             <template v-else>
               <MessageBubble
-                :message="(displayItems[visibleRange.start + idx - 1] as Message)"
-                v-memo="[(displayItems[visibleRange.start + idx - 1] as Message).content, (displayItems[visibleRange.start + idx - 1] as Message).role]"
-                :data-message-id="(displayItems[visibleRange.start + idx - 1] as Message).id"
-                :data-role="(displayItems[visibleRange.start + idx - 1] as Message).role"
+                :message="(getItem(visibleRange.start + idx - 1) as Message)"
+                v-memo="[(getItem(visibleRange.start + idx - 1) as Message).content, (getItem(visibleRange.start + idx - 1) as Message).role]"
+                :data-message-id="(getItem(visibleRange.start + idx - 1) as Message).id"
+                :data-role="(getItem(visibleRange.start + idx - 1) as Message).role"
               />
             </template>
           </VirtualMessageItem>

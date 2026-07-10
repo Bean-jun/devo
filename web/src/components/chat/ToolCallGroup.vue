@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import type { Message } from '@/types/message'
 import ToolCallCard from './ToolCallCard.vue'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const props = defineProps<{
   messages: Message[]
@@ -45,8 +46,8 @@ function toggle() {
 <template>
   <div class="tool-call-group" :class="{ expanded }">
     <div class="group-header" @click="toggle">
-      <span class="group-chevron">{{ expanded ? '▾' : '▸' }}</span>
-      <span class="group-icon">🔧</span>
+      <AppIcon :name="expanded ? 'caret-down' : 'caret-right'" :size="12" class="group-chevron" />
+      <AppIcon name="wrench" :size="16" class="group-icon" />
       <span class="group-title">{{ messages.length }} 个工具调用</span>
       <span class="group-tools">{{ toolNames.join(', ') }}</span>
       <span v-if="summaryText" class="group-summary">{{ summaryText }}</span>

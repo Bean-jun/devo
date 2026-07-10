@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { useFps } from '@/composables/useFps'
 import { useCommandStore } from '@/stores/command'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { MAX_MESSAGE_LENGTH } from '@/utils/constants'
 import { estimateTokens, formatTokenCount } from '@/utils/formatters'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const props = defineProps<{
   isDisabled: boolean
@@ -37,8 +39,8 @@ const tokenEstimate = computed(() => estimateTokens(inputText.value))
 const canSend = computed(() => inputText.value.trim().length > 0 && !props.isDisabled)
 
 const contextUsage = computed(() => {
-  const tokens = sessionStore.currentSession?.currentContextTokens
-  return formatTokenCount(tokens ?? 0)
+  const tokens = sessionStore.currentSession?.currentContextTokens ?? 0
+  return formatTokenCount(tokens)
 })
 
 const sessionTokenUsage = computed(() => {
@@ -50,6 +52,8 @@ const sessionTokenUsage = computed(() => {
 })
 
 const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
+
+const { fps } = useFps()
 
 const workingDir = computed(() => sessionStore.currentSession?.workingDirectory ?? '')
 
@@ -208,7 +212,7 @@ function autoResize() {
           aria-label="停止"
           @click="emit('stop')"
         >
-          <span class="stop-icon">■</span>
+          <AppIcon name="stop" :size="14" class="stop-icon" />
           停止
         </button>
 
@@ -224,9 +228,13 @@ function autoResize() {
       </div>
     </div>
     <div class="input-footer">
-      <span class="footer-item">context {{ contextUsage }}</span>
+      <span class="footer-item">Context </span><span class="footer-item context-warn">{{ contextUsage }}</span>
       <span class="footer-sep">·</span>
       <span class="footer-item">Tokens {{ sessionTokenUsage }}</span>
+      <span class="footer-sep">·</span>
+      <span class="fps-counter" :class="{ 'fps-low': fps < 30, 'fps-good': fps >= 55 }">
+        {{ fps }} FPS
+      </span>
       <span class="footer-sep">·</span>
       <span class="footer-item">v{{ appVersion }}</span>
       <span v-if="workingDir" class="footer-item footer-dir">{{ workingDir }}</span>
@@ -253,8 +261,11 @@ function autoResize() {
   font-size: 10px;
   font-family: var(--font-mono);
   color: var(--color-text-secondary);
-  opacity: 0.85;
   user-select: none;
+}
+
+.footer-item {
+  opacity: 0.85;
 }
 
 .footer-sep {
@@ -267,6 +278,27 @@ function autoResize() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fps-counter {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  transition: color var(--transition-fast);
+  opacity: 0.85;
+}
+
+.fps-counter.fps-good {
+  color: var(--color-success);
+}
+
+.fps-counter.fps-low {
+  color: var(--color-error);
+}
+
+.context-warn {
+  color: #ff9500 !important;
 }
 
 .input-wrapper {

@@ -5,6 +5,7 @@ import { useUiStore } from '@/stores/ui'
 import { useSessionStore } from '@/stores/session'
 import { formatTime } from '@/utils/formatters'
 import { API_BASE } from '@/utils/constants'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const chatStore = useChatStore()
 const uiStore = useUiStore()
@@ -145,7 +146,7 @@ function handleKeydown(e: KeyboardEvent) {
 
       <div class="picker-footer">
         <div v-if="selectedIndex >= 0" class="rollback-warning">
-          ⚠️ 将删除 #{{ selectedIndex + 1 }} 之后的所有消息（共 {{ chatStore.messages.length - selectedIndex - 1 }} 条），此操作不可撤销
+          <AppIcon name="warning" :size="16" class="warning-icon" /> 将删除 #{{ selectedIndex + 1 }} 之后的所有消息（共 {{ chatStore.messages.length - selectedIndex - 1 }} 条），此操作不可撤销
         </div>
         <div class="picker-actions">
           <button class="btn-cancel" @click="uiStore.setActiveModal(null)">取消</button>

@@ -28,21 +28,22 @@ import (
 )
 
 type App struct {
-	cfg          *config.Config
-	store        session.SessionStore
-	loop         *agentloop.Loop
-	handler      *rest.Handler
-	skillsMgr    *skills.Manager
-	mcpMgr       *mcp.Manager
-	memoryMgr    *memory.Manager
-	toolRegistry *tools.Registry
-	llm          llmclient.Client
-	addr         string
-	baseURL      string
-	port         int
-	devoDir      string
-	tuiMode      bool
-	webMode      bool
+	cfg           *config.Config
+	store         session.SessionStore
+	loop          *agentloop.Loop
+	handler       *rest.Handler
+	skillsMgr     *skills.Manager
+	mcpMgr        *mcp.Manager
+	memoryMgr     *memory.Manager
+	toolRegistry  *tools.Registry
+	llm           llmclient.Client
+	bgProcManager *tools.BackgroundProcessManager
+	addr          string
+	baseURL       string
+	port          int
+	devoDir       string
+	tuiMode       bool
+	webMode       bool
 }
 
 func NewApp(tuiMode, webMode bool, portFlag int) (*App, error) {
@@ -82,7 +83,6 @@ func NewApp(tuiMode, webMode bool, portFlag int) (*App, error) {
 	app.initMCP()
 	app.initTools()
 	app.initHandler()
-
 	return app, nil
 }
 
@@ -112,13 +112,17 @@ func (a *App) initRegistry() {
 }
 
 func (a *App) initTools() {
+	bgProcManager := tools.NewBackgroundProcessManager()
+	a.bgProcManager = bgProcManager
 	a.toolRegistry.Register(&tools.GlobTool{})
 	a.toolRegistry.Register(&tools.ReadFileTool{})
 	a.toolRegistry.Register(&tools.ListFilesTool{})
 	a.toolRegistry.Register(&tools.SearchCodebaseTool{})
 	a.toolRegistry.Register(&tools.WriteFileTool{})
 	a.toolRegistry.Register(&tools.EditFileTool{})
-	a.toolRegistry.Register(tools.NewExecPythonTool())
+	a.toolRegistry.Register(tools.NewExecPythonTool(a.bgProcManager))
+	a.toolRegistry.Register(tools.NewListBackgroundProcessesTool(a.bgProcManager))
+	a.toolRegistry.Register(tools.NewStopBackgroundProcessTool(a.bgProcManager))
 	a.toolRegistry.Register(tools.NewUseSkillTool(a.skillsMgr))
 	a.mcpMgr.RegisterTools(a.toolRegistry)
 }
@@ -164,6 +168,7 @@ func (a *App) initHandler() {
 	a.handler = rest.NewHandler(a.store, a.loop, a.memoryMgr, Version)
 	a.handler.SetSkillsManager(a.skillsMgr)
 	a.handler.SetLLMConfigured(a.cfg.LLM.APIKey != "")
+	a.handler.SetBgProcManager(a.bgProcManager)
 
 	wd, _ := os.Getwd()
 	a.handler.SetMcpManager(a.mcpMgr)

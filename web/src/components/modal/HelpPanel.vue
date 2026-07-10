@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useUiStore } from '@/stores/ui'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const uiStore = useUiStore()
 
@@ -44,7 +45,7 @@ function handleKeydown(e: KeyboardEvent) {
     <div class="help-panel" @click.stop>
       <div class="panel-header">
         <h3>帮助</h3>
-        <button class="btn-close" @click="uiStore.setActiveModal(null)">✕</button>
+        <button class="btn-close" @click="uiStore.setActiveModal(null)"><AppIcon name="x" :size="16" /></button>
       </div>
 
       <div class="panel-body">

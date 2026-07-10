@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useMcpStore } from '@/stores/mcp'
 import type { McpServer } from '@/types/mcp'
 import ConfirmDeleteDialog from '@/components/modal/ConfirmDeleteDialog.vue'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const mcpStore = useMcpStore()
 const error = ref<string | null>(null)
@@ -126,7 +127,7 @@ onMounted(async () => {
       <h3 class="mcp-title">MCP 服务器</h3>
       <div class="header-actions">
         <button class="reload-btn" :class="{ spinning: mcpStore.isLoading }" :disabled="mcpStore.isLoading" @click="handleRefresh" title="刷新服务器列表">
-          ↻
+          <AppIcon name="arrow-clockwise" :size="16" />
         </button>
         <button class="add-btn" @click="showAddForm = !showAddForm">
           {{ showAddForm ? '取消' : '添加' }}
@@ -210,7 +211,7 @@ onMounted(async () => {
               :disabled="mcpStore.removingServerId === server.server_id"
               @click.stop="handleRemoveServer(server)"
               :title="mcpStore.removingServerId === server.server_id ? '删除中...' : '删除服务器'"
-            >{{ mcpStore.removingServerId === server.server_id ? '...' : '✕' }}</button>
+            >{{ mcpStore.removingServerId === server.server_id ? '...' : '' }}<template v-if="!mcpStore.removingServerId || mcpStore.removingServerId !== server.server_id"><AppIcon name="x" :size="12" /></template></button>
           </div>
         </div>
 

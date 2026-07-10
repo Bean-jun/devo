@@ -363,7 +363,7 @@ func TestEditFileTool_PreCheck_Valid(t *testing.T) {
 }
 
 func TestExecPythonTool_GetCommandContext(t *testing.T) {
-	tool := NewExecPythonTool()
+	tool := NewExecPythonTool(nil)
 
 	ctx := tool.GetCommandContext("/tmp/test", map[string]interface{}{
 		"code":            "print('hello')",
@@ -388,7 +388,7 @@ func TestExecPythonTool_GetCommandContext(t *testing.T) {
 }
 
 func TestExecPythonTool_GetCommandContext_DefaultTimeout(t *testing.T) {
-	tool := NewExecPythonTool()
+	tool := NewExecPythonTool(nil)
 
 	ctx := tool.GetCommandContext("/tmp/test", map[string]interface{}{
 		"code": "print('hello')",

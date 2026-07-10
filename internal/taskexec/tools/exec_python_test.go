@@ -7,7 +7,7 @@ import (
 )
 
 func isPythonAvailable() bool {
-	tool := NewExecPythonTool()
+	tool := NewExecPythonTool(nil)
 	return tool.pythonBin != ""
 }
 
@@ -209,7 +209,7 @@ func TestExecPythonTool_ParamsSchema(t *testing.T) {
 }
 
 func TestExecPythonTool_GetCommandContext_Sync(t *testing.T) {
-	tool := NewExecPythonTool()
+	tool := NewExecPythonTool(nil)
 
 	ctx := tool.GetCommandContext("/tmp/test", map[string]interface{}{
 		"code":            "print('hello')",
@@ -228,7 +228,7 @@ func TestExecPythonTool_GetCommandContext_Sync(t *testing.T) {
 }
 
 func TestExecPythonTool_GetCommandContext_Background(t *testing.T) {
-	tool := NewExecPythonTool()
+	tool := NewExecPythonTool(nil)
 
 	ctx := tool.GetCommandContext("/tmp/test", map[string]interface{}{
 		"code": "print('hello')",

@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useSkillsStore } from '@/stores/skills'
 import type { Skill, SkillSource } from '@/types/skills'
 import ConfirmDeleteDialog from '@/components/modal/ConfirmDeleteDialog.vue'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const skillsStore = useSkillsStore()
 
@@ -117,7 +118,7 @@ onMounted(async () => {
       </div>
       <div class="toolbar-right">
         <button class="reload-btn" :class="{ spinning: skillsStore.isLoading }" :disabled="skillsStore.isLoading" @click="handleReload" title="重新扫描技能目录">
-          ↻
+          <AppIcon name="arrow-clockwise" :size="16" />
         </button>
         <button class="add-btn" @click="openInstallDialog" title="安装技能">
           添加
@@ -140,7 +141,7 @@ onMounted(async () => {
           <button class="skill-toggle" :class="{ active: skill.enabled }" @click="handleToggle(skill)">
             {{ skill.enabled ? 'ON' : 'OFF' }}
           </button>
-          <button class="skill-delete" @click="handleDelete(skill)">✕</button>
+          <button class="skill-delete" @click="handleDelete(skill)"><AppIcon name="x" :size="12" /></button>
         </div>
       </div>
     </div>

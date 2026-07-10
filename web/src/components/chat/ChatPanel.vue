@@ -5,6 +5,7 @@ import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { API_BASE } from '@/utils/constants'
 import { useCommand } from '@/composables/useCommand'
+import AppIcon from '@/components/common/AppIcon.vue'
 import MessageList from './MessageList.vue'
 import InputArea from './InputArea.vue'
 import FloatingNavPanel from './FloatingNavPanel.vue'
@@ -218,7 +219,7 @@ async function handleExecuteCommand(text: string) {
     />
   </div>
   <div v-else class="chat-empty">
-    <div class="chat-empty-icon">💬</div>
+    <AppIcon name="chat-dots" :size="48" class="chat-empty-icon" />
     <div class="chat-empty-title">请选择或新建一个会话</div>
     <div class="chat-empty-desc">在左侧选择一个已有会话，或点击 + 新建会话开始对话</div>
   </div>

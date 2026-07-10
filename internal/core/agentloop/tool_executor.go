@@ -220,7 +220,8 @@ func (l *Loop) executeSingleTool(ctx context.Context, lc *LoopContext, tc sessio
 		l.pathLockManager.Lock(lockPath)
 	}
 
-	eventCh, execErr := l.toolExecutor.Execute(ctx, sess.WorkingDirectory, tc.ToolName, tc.Params)
+	toolCtx := tools.WithSessionID(ctx, lc.SessionID)
+	eventCh, execErr := l.toolExecutor.Execute(toolCtx, sess.WorkingDirectory, tc.ToolName, tc.Params)
 
 	if execErr != nil {
 		if lockPath != "" {
@@ -403,7 +404,8 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 				l.pathLockManager.Lock(lockPath)
 			}
 
-			eventCh, execErr := l.toolExecutor.Execute(gctx, sess.WorkingDirectory, tc.ToolName, tc.Params)
+			toolGctx := tools.WithSessionID(gctx, lc.SessionID)
+			eventCh, execErr := l.toolExecutor.Execute(toolGctx, sess.WorkingDirectory, tc.ToolName, tc.Params)
 
 			mu.Lock()
 			defer mu.Unlock()

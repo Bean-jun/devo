@@ -3,12 +3,11 @@ import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { useKeyboard } from '@/composables/useKeyboard'
-import { useFps } from '@/composables/useFps'
 import { STATUS_LABELS, STATUS_COLORS } from '@/utils/constants'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
-const { fps } = useFps()
 
 const isRenaming = ref(false)
 const renameValue = ref('')
@@ -46,7 +45,7 @@ const statusLabel = computed(() => STATUS_LABELS[sessionStore.sessionStatus] ?? 
 const statusColor = computed(() => STATUS_COLORS[sessionStore.sessionStatus] ?? '#34c759')
 const isProcessing = computed(() => sessionStore.isProcessing)
 
-const themeIcon = computed(() => uiStore.theme === 'dark' ? '☀️' : '🌙')
+const themeIconName = computed(() => uiStore.theme === 'dark' ? 'sun' : 'moon')
 const themeLabel = computed(() => uiStore.theme === 'dark' ? '浅色' : '深色')
 
 async function startRename() {
@@ -114,11 +113,11 @@ const connectionStatusText = computed(() => {
   }
 })
 
-const connectionDot = computed(() => {
+const connectionColor = computed(() => {
   switch (uiStore.connectionStatus) {
-    case 'connected': return '🟢'
-    case 'connecting': return '🟡'
-    case 'disconnected': return '🔴'
+    case 'connected': return '#34c759'
+    case 'connecting': return '#ff9500'
+    case 'disconnected': return '#ff3b30'
   }
 })
 
@@ -153,7 +152,7 @@ const serverPort = computed(() => window.location.port)
         :disabled="yoloLoading"
         @click="toggleYolo"
       >
-        <span class="yolo-icon">{{ yoloLoading ? '⏳' : '🔥' }}</span>
+        <AppIcon :name="yoloLoading ? 'hourglass' : 'fire'" :size="16" :color="sessionStore.yoloEnabled ? '#ff9500' : undefined" class="yolo-icon" />
         <span class="yolo-label" :class="{ on: sessionStore.yoloEnabled }">YOLO</span>
       </button>
     </div>
@@ -162,14 +161,12 @@ const serverPort = computed(() => window.location.port)
       <span class="activity-text">{{ activityText }}</span>
     </div>
     <div class="statusbar-right">
-      <span class="fps-counter" :class="{ 'fps-low': fps < 30, 'fps-good': fps >= 55 }">
-        {{ fps }} FPS
-      </span>
       <button class="theme-toggle" :title="themeLabel" @click="toggleTheme">
-        {{ themeIcon }}
+        <AppIcon :name="themeIconName" :size="16" />
       </button>
       <span class="connection-status" :title="connectionStatusText">
-        {{ connectionDot }} {{ connectionStatusText }}
+        <AppIcon name="circle" :size="10" weight="fill" :color="connectionColor" />
+        {{ connectionStatusText }}
       </span>
       <span class="port-info" title="后端端口">:{{ serverPort }}</span>
     </div>
@@ -319,23 +316,6 @@ const serverPort = computed(() => window.location.port)
 .theme-toggle:hover {
   background: var(--color-bg-hover);
   border-color: var(--color-border);
-}
-
-.fps-counter {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  line-height: 1;
-  transition: color var(--transition-fast);
-}
-
-.fps-counter.fps-good {
-  color: var(--color-success);
-}
-
-.fps-counter.fps-low {
-  color: var(--color-error);
 }
 
 .statusbar.yolo {

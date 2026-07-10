@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useSkillsStore } from '@/stores/skills'
 import { useMcpStore } from '@/stores/mcp'
 import { API_BASE } from '@/utils/constants'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const skillsStore = useSkillsStore()
 const mcpStore = useMcpStore()
@@ -65,7 +66,7 @@ onMounted(async () => {
     <div v-else class="settings-grid">
       <section class="config-section">
         <h3 class="section-title">
-          <span class="section-icon">⚡</span>
+          <AppIcon name="lightning" :size="16" class="section-icon" />
           启用中的技能
           <span class="badge">{{ enabledSkills.length }}</span>
         </h3>
@@ -80,7 +81,7 @@ onMounted(async () => {
 
       <section class="config-section">
         <h3 class="section-title">
-          <span class="section-icon">🔌</span>
+          <AppIcon name="plug" :size="16" class="section-icon" />
           已连接的 MCP 服务器
           <span class="badge">{{ connectedServers.length }}</span>
         </h3>
@@ -95,7 +96,7 @@ onMounted(async () => {
 
       <section class="config-section">
         <h3 class="section-title">
-          <span class="section-icon">💤</span>
+          <AppIcon name="moon" :size="16" class="section-icon" />
           已禁用的技能
           <span class="badge muted">{{ disabledSkills.length }}</span>
         </h3>
@@ -110,7 +111,7 @@ onMounted(async () => {
 
       <section class="config-section">
         <h3 class="section-title">
-          <span class="section-icon">⏸</span>
+          <AppIcon name="pause" :size="16" class="section-icon" />
           未连接的 MCP 服务器
           <span class="badge muted">{{ disconnectedServers.length }}</span>
         </h3>

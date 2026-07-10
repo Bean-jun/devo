@@ -2,6 +2,8 @@ package agentloop
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"time"
@@ -122,6 +124,17 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 						"current_context_tokens": sess.CurrentContextTokens,
 					})
 				}
+
+				hash := sha256.Sum256([]byte(lc.DynamicPrompt))
+				hashStr := hex.EncodeToString(hash[:])[:12]
+				cachedTokens := evt.TokenUsage.CachedTokens
+				inputTokens := evt.TokenUsage.InputTokens
+				var hitRate float64
+				if inputTokens > 0 {
+					hitRate = float64(cachedTokens) / float64(inputTokens) * 100
+				}
+				log.Printf("[CACHE] session=%s step=%d system_hash=%s input_tokens=%d cached_tokens=%d hit_rate=%.1f%% len(system)=%d",
+					lc.SessionID, lc.StepSeq, hashStr, inputTokens, cachedTokens, hitRate, len(lc.DynamicPrompt))
 			}
 
 			lc.EventBus.Publish("streaming_complete", map[string]any{

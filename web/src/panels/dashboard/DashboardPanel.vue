@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { API_BASE } from '@/utils/constants'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const sessionStore = useSessionStore()
 
@@ -120,7 +121,7 @@ onMounted(() => { fetchAll() })
         :disabled="isSessionLoading || isProjectLoading"
         @click="fetchAll"
         title="刷新"
-      >↻</button>
+      ><AppIcon name="arrow-clockwise" :size="16" /></button>
     </div>
 
     <div class="dash-cards">

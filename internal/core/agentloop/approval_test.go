@@ -1156,7 +1156,7 @@ func TestApprovalRequest_ExecPythonContext(t *testing.T) {
 	store := session.NewInMemoryStore()
 
 	toolRegistry := tools.NewRegistry()
-	toolRegistry.Register(tools.NewExecPythonTool())
+	toolRegistry.Register(tools.NewExecPythonTool(nil))
 
 	loop := NewWithTools(store, &execCommandApprovalMockClient{}, toolRegistry)
 

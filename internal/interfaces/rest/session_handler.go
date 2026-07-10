@@ -289,6 +289,14 @@ func (h *Handler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 停止会话中所有后台进程
+	if h.bgProcManager != nil {
+		errs := h.bgProcManager.ShutdownAll(id)
+		if len(errs) > 0 {
+			log.Printf("[devo] Warning: failed to stop some background processes for session %s: %v", id, errs)
+		}
+	}
+
 	if err := h.store.DeleteSession(sess.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete session")
 		return

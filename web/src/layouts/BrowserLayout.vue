@@ -5,11 +5,13 @@ import AppSidebar from '@/components/layout/AppSidebar.vue'
 import StatusBar from '@/components/layout/StatusBar.vue'
 import RightPanel from '@/components/layout/RightPanel.vue'
 import GlobalModals from '@/components/layout/GlobalModals.vue'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const uiStore = useUiStore()
 
 const sidebarWidth = ref(240)
 const sidebarCollapsed = computed(() => uiStore.sidebarCollapsed)
+const rightPanelVisible = computed(() => uiStore.rightPanelVisible)
 const collapsedWidth = 40
 const rightPanelWidth = ref(380)
 const resizing = ref<'left' | 'right' | null>(null)
@@ -84,12 +86,25 @@ onUnmounted(() => {
         <router-view />
       </div>
     </div>
-    <div class="resize-handle" @mousedown="startResize('right')">
+    <div v-if="rightPanelVisible" class="resize-handle" @mousedown="startResize('right')">
       <div class="handle-hit"></div>
       <span class="handle-icon">║</span>
     </div>
-    <div ref="rightWrapperRef" class="right-wrapper" :style="{ width: rightPanelWidth + 'px' }">
+    <div 
+      ref="rightWrapperRef" 
+      class="right-wrapper"
+      :class="{ collapsed: !rightPanelVisible }"
+      :style="{ width: (rightPanelVisible ? rightPanelWidth : 0) + 'px' }"
+    >
       <RightPanel />
+    </div>
+    <div
+      v-if="!rightPanelVisible"
+      class="right-panel-expand-btn"
+      @click="uiStore.toggleRightPanel()"
+      title="展开面板"
+    >
+      <AppIcon name="caret-left" :size="14" class="expand-icon" />
     </div>
     <GlobalModals />
   </div>
@@ -159,5 +174,37 @@ onUnmounted(() => {
   min-height: 0;
   overflow: hidden;
   background: var(--color-bg-primary);
+}
+
+.right-wrapper.collapsed {
+  border-left: none;
+  overflow: hidden;
+}
+
+.right-panel-expand-btn {
+  width: 15px;
+  cursor: pointer;
+  background: var(--color-bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-left: 1px solid var(--color-border);
+  transition: all var(--transition-fast);
+}
+
+.expand-icon {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.right-panel-expand-btn:hover {
+  background: var(--color-accent);
+}
+
+.right-panel-expand-btn:hover .expand-icon {
+  color: white;
 }
 </style>

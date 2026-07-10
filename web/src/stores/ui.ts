@@ -75,6 +75,19 @@ function saveSidebarCollapsed(collapsed: boolean): void {
   } catch {}
 }
 
+function loadRightPanelVisible(): boolean {
+  try {
+    return localStorage.getItem('devo-rightpanel-visible') === 'true'
+  } catch {}
+  return false
+}
+
+function saveRightPanelVisible(visible: boolean): void {
+  try {
+    localStorage.setItem('devo-rightpanel-visible', String(visible))
+  } catch {}
+}
+
 export const useUiStore = defineStore('ui', () => {
   const toasts = ref<Toast[]>([])
   const activeModal = ref<ModalType>(null)
@@ -86,7 +99,7 @@ export const useUiStore = defineStore('ui', () => {
 
   const activeWorkspace = ref<string | null>(loadActiveWorkspace())
   const activeRightTab = ref<RightTabType>('files')
-  const rightPanelVisible = ref(false)
+  const rightPanelVisible = ref(loadRightPanelVisible())
   const sidebarCollapsed = ref(loadSidebarCollapsed())
 
   const activityStream = ref('')
@@ -225,15 +238,18 @@ export const useUiStore = defineStore('ui', () => {
     activeRightTab.value = tab
     if (!rightPanelVisible.value) {
       rightPanelVisible.value = true
+      saveRightPanelVisible(true)
     }
   }
 
   function toggleRightPanel(): void {
     rightPanelVisible.value = !rightPanelVisible.value
+    saveRightPanelVisible(rightPanelVisible.value)
   }
 
   function closeRightPanel(): void {
     rightPanelVisible.value = false
+    saveRightPanelVisible(false)
   }
 
   function toggleSidebar(): void {

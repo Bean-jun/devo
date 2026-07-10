@@ -10,6 +10,8 @@ export const useChatStore = defineStore('chat', () => {
   const isStreaming = ref(false)
   const streamingContent = ref('')
   const streamingMessageId = ref<string | null>(null)
+  const initialFetchDone = ref(false)
+  const fetchError = ref<string | null>(null)
 
   const lastMessage = computed(() => messages.value[messages.value.length - 1] ?? null)
   const messageCount = computed(() => messages.value.length)
@@ -153,6 +155,8 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming.value = false
     streamingContent.value = ''
     streamingMessageId.value = null
+    initialFetchDone.value = false
+    fetchError.value = null
   }
 
   function rollbackTo(messageIndex: number): void {
@@ -161,9 +165,14 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function fetchMessages(sessionId: string): Promise<void> {
+    fetchError.value = null
     try {
       const res = await fetch(`${API_BASE}/sessions/${sessionId}/messages`)
-      if (!res.ok) return
+      if (!res.ok) {
+        fetchError.value = `Failed to load messages (${res.status})`
+        initialFetchDone.value = true
+        return
+      }
       const data = await res.json()
       const list = (data.messages || []) as any[]
 
@@ -189,12 +198,16 @@ export const useChatStore = defineStore('chat', () => {
           const tc = toolCallMap.get(m.tool_call_id)!
           const content = m.content || ''
           const isError = content.startsWith('错误:') || content.includes('failed')
-          tc.status = isError ? 'failed' : 'success'
-          tc.result = {
-            success: !isError,
-            stdout: content,
-            error: isError ? content : undefined,
-          }
+          // 替换对象引用，确保 Vue 能检测到变化
+          toolCallMap.set(m.tool_call_id, {
+            ...tc,
+            status: isError ? 'failed' : 'success',
+            result: {
+              success: !isError,
+              stdout: content,
+              error: isError ? content : undefined,
+            },
+          })
         }
       }
 
@@ -217,8 +230,12 @@ export const useChatStore = defineStore('chat', () => {
 
         return baseMsg
       })
-    } catch {
-      // Ignore fetch errors
+
+      initialFetchDone.value = true
+    } catch (err) {
+      console.error('Failed to fetch messages:', err)
+      fetchError.value = (err as Error).message || 'Failed to load messages'
+      initialFetchDone.value = true
     }
   }
 
@@ -227,6 +244,8 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming,
     streamingContent,
     streamingMessageId,
+    initialFetchDone,
+    fetchError,
     lastMessage,
     messageCount,
     canRollback,

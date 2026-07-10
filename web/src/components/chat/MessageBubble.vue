@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import type { Message } from '@/types/message'
 import { formatTime } from '@/utils/formatters'
 import { renderMarkdown } from '@/utils/markdown'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const props = defineProps<{
   message: Message
@@ -63,7 +64,14 @@ async function copyContent() {
             :title="copied ? '已复制' : '复制内容'"
             @click.stop="copyContent"
           >
-            {{ copied ? '✓ 已复制' : '📋 复制' }}
+            <template v-if="copied">
+              <AppIcon name="check" :size="14" />
+              已复制
+            </template>
+            <template v-if="!copied">
+              <AppIcon name="copy" :size="14" />
+              复制
+            </template>
           </button>
           <span class="bubble-time">{{ displayTime }}</span>
         </div>

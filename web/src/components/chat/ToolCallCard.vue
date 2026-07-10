@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { ToolCall } from '@/types/tool'
 import { formatDuration } from '@/utils/formatters'
 import { RISK_LABELS, RISK_COLORS } from '@/utils/constants'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const props = defineProps<{
   toolCall: ToolCall
@@ -12,12 +13,20 @@ const props = defineProps<{
 const showParams = ref(false)
 const showResult = ref(!props.yoloMode)
 
-const statusIcon: Record<string, string> = {
-  pending: '⏳',
-  executing: '🔄',
-  success: '✅',
-  failed: '❌',
-  rejected: '🚫',
+const statusIcon = {
+  pending: 'clock',
+  executing: 'arrow-clockwise',
+  success: 'check-circle',
+  failed: 'x-circle',
+  rejected: 'prohibit',
+} as const
+
+const statusColor: Record<string, string> = {
+  pending: 'var(--color-warning)',
+  executing: 'var(--color-accent)',
+  success: 'var(--color-success)',
+  failed: 'var(--color-error)',
+  rejected: 'var(--color-text-tertiary)',
 }
 
 const statusClass: Record<string, string> = {
@@ -72,7 +81,12 @@ function escapeHtml(text: string): string {
   <div class="tool-call-card" :class="statusClass[toolCall.status]" data-test="tool-call-card">
     <div class="tool-header" @click="showParams = !showParams">
       <div class="tool-left">
-        <span class="tool-icon">{{ statusIcon[toolCall.status] ?? '🔧' }}</span>
+        <AppIcon
+          :name="statusIcon[toolCall.status] ?? 'wrench'"
+          :size="16"
+          :color="statusColor[toolCall.status]"
+          class="tool-icon"
+        />
         <span class="tool-name" data-test="tool-name">{{ toolCall.name }}</span>
         <span class="tool-id">{{ toolCall.id }}</span>
         <span v-if="toolCall.stage && toolCall.status === 'executing'" class="tool-stage" data-test="tool-stage">{{ toolCall.stage }}</span>
@@ -82,7 +96,7 @@ function escapeHtml(text: string): string {
       </div>
       <div class="tool-right">
         <span v-if="toolCall.duration" class="tool-duration">{{ formatDuration(toolCall.duration) }}</span>
-        <span class="tool-chevron">{{ showParams ? '▾' : '▸' }}</span>
+        <AppIcon :name="showParams ? 'caret-down' : 'caret-right'" :size="12" class="tool-chevron" />
       </div>
     </div>
 
@@ -96,13 +110,19 @@ function escapeHtml(text: string): string {
       <pre class="tool-json">{{ JSON.stringify(toolCall.parameters, null, 2) }}</pre>
     </div>
 
-    <div v-if="toolCall.status !== 'pending' && showResult" class="tool-result">
+    <div v-if="toolCall.status !== 'pending'" class="tool-result">
       <div class="tool-section-title" @click="showResult = !showResult">
-        结果 {{ showResult ? '▾' : '▸' }}
+        结果 <AppIcon :name="showResult ? 'caret-down' : 'caret-right'" :size="12" />
       </div>
-      <div v-if="toolCall.result" class="tool-result-content">
+      <div v-if="showResult && toolCall.result" class="tool-result-content">
         <div v-if="toolCall.result.success !== undefined" class="result-status">
-          {{ toolCall.result.success ? '✅ 成功' : '❌ 失败' }}
+          <AppIcon
+            :name="toolCall.result.success ? 'check-circle' : 'x-circle'"
+            :size="14"
+            :color="toolCall.result.success ? 'var(--color-success)' : 'var(--color-error)'"
+            class="result-status-icon"
+          />
+          {{ toolCall.result.success ? ' 成功' : ' 失败' }}
         </div>
         <div v-if="toolCall.result.error" class="result-error">{{ toolCall.result.error }}</div>
 

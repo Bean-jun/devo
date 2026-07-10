@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Toast } from '@/stores/ui'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const props = defineProps<{
   toast: Toast
@@ -9,17 +10,22 @@ const emit = defineEmits<{
   remove: []
 }>()
 
-const iconMap: Record<string, string> = {
-  success: '✅',
-  error: '❌',
-  info: 'ℹ️',
-  warning: '⚠️',
-}
+const iconMap = {
+  success: { name: 'check-circle', color: 'var(--color-success)' },
+  error: { name: 'x-circle', color: 'var(--color-error)' },
+  info: { name: 'info', color: 'var(--color-accent)' },
+  warning: { name: 'warning', color: 'var(--color-warning)' },
+} as const
 </script>
 
 <template>
   <div class="toast-item" :class="toast.type" @click="emit('remove')">
-    <span class="toast-icon">{{ iconMap[toast.type] ?? 'ℹ️' }}</span>
+    <AppIcon
+      :name="iconMap[toast.type]?.name ?? 'info'"
+      :size="16"
+      :color="iconMap[toast.type]?.color"
+      class="toast-icon"
+    />
     <span class="toast-message">{{ toast.message }}</span>
   </div>
 </template>

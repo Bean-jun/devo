@@ -102,7 +102,7 @@ watch(() => uiStore.activeWorkspace, async (ws) => {
 
 watch(
   () => sessionStore.currentSession?.id,
-  (newId, oldId) => {
+  async (newId, oldId) => {
     if (newId) {
       const url = new URL(window.location.href)
       url.searchParams.set('session', newId)
@@ -111,7 +111,7 @@ watch(
     if (newId && newId !== oldId) {
       disconnect()
       chatStore.clearMessages()
-      chatStore.fetchMessages(newId)
+      await chatStore.fetchMessages(newId)
       connectSSE(newId)
     }
   }

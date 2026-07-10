@@ -6,6 +6,7 @@ import { useSession } from '@/composables/useSession'
 import { formatDateTime } from '@/utils/formatters'
 import { STATUS_LABELS } from '@/utils/constants'
 import type { TokenUsage } from '@/types/session'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
@@ -88,7 +89,7 @@ function handleKeydown(e: KeyboardEvent) {
     <div class="session-picker" @click.stop>
       <div class="picker-header">
         <h3>会话列表</h3>
-        <button class="btn-close" @click="uiStore.setActiveModal(null)">✕</button>
+        <button class="btn-close" @click="uiStore.setActiveModal(null)"><AppIcon name="x" :size="16" /></button>
       </div>
 
       <div class="picker-search">

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
 import { useUiStore, type RightTabType } from '@/stores/ui'
+import AppIcon, { type IconName } from '@/components/common/AppIcon.vue'
 
 const uiStore = useUiStore()
 
@@ -14,16 +15,16 @@ const SettingsPanel = defineAsyncComponent(() => import('@/panels/settings/Setti
 interface TabDef {
   key: RightTabType
   label: string
-  icon: string
+  icon: IconName
 }
 
 const allTabs: TabDef[] = [
-  { key: 'files', label: 'Files', icon: '📁' },
-  { key: 'skills', label: 'Skills', icon: '⚡' },
-  { key: 'mcp', label: 'MCP', icon: '🔌' },
-  { key: 'memory', label: 'Memory', icon: '🧠' },
-  { key: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { key: 'settings', label: 'Settings', icon: '⚙' },
+  { key: 'files', label: 'Files', icon: 'folder' },
+  { key: 'skills', label: 'Skills', icon: 'lightning' },
+  { key: 'mcp', label: 'MCP', icon: 'plug' },
+  { key: 'memory', label: 'Memory', icon: 'brain' },
+  { key: 'dashboard', label: 'Dashboard', icon: 'chart-bar' },
+  { key: 'settings', label: 'Settings', icon: 'gear' },
 ]
 
 function selectTab(tab: TabDef) {
@@ -42,8 +43,11 @@ function selectTab(tab: TabDef) {
         :title="tab.label"
         @click="selectTab(tab)"
       >
-        <span class="tab-icon">{{ tab.icon }}</span>
+        <AppIcon :name="tab.icon" :size="16" class="tab-icon" />
         <span class="tab-label">{{ tab.label }}</span>
+      </button>
+      <button class="panel-collapse-btn" @click="uiStore.toggleRightPanel()" title="折叠面板">
+        <AppIcon name="caret-right" :size="14" />
       </button>
     </div>
     <div class="right-panel-body">
@@ -110,6 +114,28 @@ function selectTab(tab: TabDef) {
 
 .tab-label {
   font-size: 12px;
+}
+
+.panel-collapse-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  font-size: 10px;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.panel-collapse-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .right-panel-body {

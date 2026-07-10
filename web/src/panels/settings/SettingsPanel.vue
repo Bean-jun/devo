@@ -5,6 +5,7 @@ import { useSkillsStore } from '@/stores/skills'
 import { useMcpStore } from '@/stores/mcp'
 import { useSessionStore } from '@/stores/session'
 import { API_BASE } from '@/utils/constants'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const uiStore = useUiStore()
 const skillsStore = useSkillsStore()
@@ -22,13 +23,21 @@ interface ProjectConfig {
 const config = ref<ProjectConfig>({ skills: [], mcp: [] })
 const configLoading = ref(false)
 
-const APPROVAL_OPERATIONS = [
-  { key: 'file_write_new', label: '新建文件', icon: '📝', risk: 'high', defaultLevel: 'always_ask' },
-  { key: 'file_write_overwrite', label: '覆盖文件', icon: '📝', risk: 'high', defaultLevel: 'always_ask' },
-  { key: 'file_edit', label: '编辑文件', icon: '✏️', risk: 'high', defaultLevel: 'always_ask' },
-  { key: 'exec_python', label: '执行Python', icon: '⚡', risk: 'high', defaultLevel: 'always_ask' },
-  { key: 'memory_update', label: '更新记忆', icon: '🧠', risk: 'low', defaultLevel: 'auto_approve' },
-  { key: 'solidify_skill', label: '固化技能', icon: '🔧', risk: 'low', defaultLevel: 'auto_approve' },
+interface ApprovelOp {
+  key: string
+  label: string
+  icon: 'note' | 'pencil' | 'lightning' | 'brain' | 'wrench'
+  risk: 'high' | 'low'
+  defaultLevel: string
+}
+
+const APPROVAL_OPERATIONS: ApprovelOp[] = [
+  { key: 'file_write_new', label: '新建文件', icon: 'note', risk: 'high', defaultLevel: 'always_ask' },
+  { key: 'file_write_overwrite', label: '覆盖文件', icon: 'note', risk: 'high', defaultLevel: 'always_ask' },
+  { key: 'file_edit', label: '编辑文件', icon: 'pencil', risk: 'high', defaultLevel: 'always_ask' },
+  { key: 'exec_python', label: '执行Python', icon: 'lightning', risk: 'high', defaultLevel: 'always_ask' },
+  { key: 'memory_update', label: '更新记忆', icon: 'brain', risk: 'low', defaultLevel: 'auto_approve' },
+  { key: 'solidify_skill', label: '固化技能', icon: 'wrench', risk: 'low', defaultLevel: 'auto_approve' },
 ]
 
 const APPROVAL_LEVELS: { key: string; label: string; short: string }[] = [
@@ -178,7 +187,7 @@ onMounted(async () => {
             :class="`risk-${op.risk}`"
           >
             <div class="approval-info">
-              <span class="approval-icon">{{ op.icon }}</span>
+              <AppIcon :name="op.icon" :size="16" class="approval-icon" />
               <span class="approval-label">{{ op.label }}</span>
               <span class="risk-badge" :class="`risk-${op.risk}`">{{ RISK_LABELS[op.risk] }}</span>
               <span v-if="isDefaultPolicy(projectApprovalPolicy, op.key)" class="approval-default">默认</span>
@@ -217,7 +226,7 @@ onMounted(async () => {
             :class="`risk-${op.risk}`"
           >
             <div class="approval-info">
-              <span class="approval-icon">{{ op.icon }}</span>
+              <AppIcon :name="op.icon" :size="16" class="approval-icon" />
               <span class="approval-label">{{ op.label }}</span>
               <span class="risk-badge" :class="`risk-${op.risk}`">{{ RISK_LABELS[op.risk] }}</span>
               <span v-if="isDefaultPolicy(globalApprovalPolicy, op.key)" class="approval-default">默认</span>

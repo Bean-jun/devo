@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { API_BASE } from '@/utils/constants'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const props = defineProps<{
   collapsed: boolean
@@ -149,7 +150,7 @@ function cancelNewSession(e?: Event) {
           :title="ws.exists ? (ws.name + '\n' + ws.path) : (ws.name + '\n已移除')"
           @click="ws.exists && selectWorkspace(ws)"
         >
-          {{ ws.exists ? '📁' : '🗑' }}
+          <AppIcon :name="ws.exists ? 'folder' : 'trash'" :size="16" />
         </button>
         <div class="collapsed-separator"></div>
         <button
@@ -160,14 +161,14 @@ function cancelNewSession(e?: Event) {
           :title="sess.title"
           @click="selectSession(sess.id)"
         >
-          💬
+          <AppIcon name="chat-dots" :size="16" />
         </button>
         <button class="collapsed-icon-btn collapsed-add-btn" title="新建会话" @click="newSession">
-          +
+          <AppIcon name="plus" :size="16" />
         </button>
       </div>
       <button class="sidebar-toggle-btn" @click="uiStore.toggleSidebar()" title="展开侧边栏">
-        ▶
+        <AppIcon name="caret-right" :size="16" />
       </button>
     </template>
 
@@ -185,12 +186,12 @@ function cancelNewSession(e?: Event) {
         :disabled="!ws.exists"
         @click="ws.exists && selectWorkspace(ws)"
       >
-        <span class="sidebar-item-icon">{{ ws.exists ? '📁' : '🗑' }}</span>
+        <AppIcon :name="ws.exists ? 'folder' : 'trash'" :size="16" class="sidebar-item-icon" />
         <div class="workspace-info">
           <span class="workspace-name">{{ ws.name }}</span>
           <span class="workspace-path">{{ ws.exists ? ws.path : '已移除' }}</span>
         </div>
-        <span class="workspace-delete" @click.stop="openDeleteConfirm(ws)" title="移除">✕</span>
+        <span class="workspace-delete" @click.stop="openDeleteConfirm(ws)" title="移除"><AppIcon name="x" :size="12" /></span>
       </button>
       <div v-if="workspaces.length === 0" class="sidebar-empty">
         暂无工作区
@@ -209,9 +210,9 @@ function cancelNewSession(e?: Event) {
             :title="sess.title"
             @click="selectSession(sess.id)"
           >
-            <span class="sidebar-item-icon">💬</span>
+            <AppIcon name="chat-dots" :size="16" class="sidebar-item-icon" />
             <span class="sidebar-item-label session-title">{{ sess.title }}</span>
-            <span class="session-delete" @click.stop="openSessionDeleteConfirm(sess)" title="删除">✕</span>
+            <span class="session-delete" @click.stop="openSessionDeleteConfirm(sess)" title="删除"><AppIcon name="x" :size="12" /></span>
           </button>
         </div>
         <div v-else class="sidebar-empty">
@@ -219,12 +220,12 @@ function cancelNewSession(e?: Event) {
         </div>
       </div>
       <button class="sidebar-item sidebar-add-btn" @click="newSession">
-        <span class="sidebar-item-icon">+</span>
+        <AppIcon name="plus" :size="16" class="sidebar-item-icon" />
         <span class="sidebar-item-label">新建会话</span>
       </button>
     </div>
     <button class="sidebar-toggle-btn sidebar-toggle-expand" @click="uiStore.toggleSidebar()" title="折叠侧边栏">
-      ◀
+      <AppIcon name="caret-left" :size="16" />
     </button>
     </template>
   </nav>
@@ -232,7 +233,15 @@ function cancelNewSession(e?: Event) {
   <Teleport to="body">
     <div v-if="deleteTarget" class="confirm-overlay" @click.self="cancelDelete">
       <div class="confirm-dialog" :class="{ 'confirm-dialog-sm': !deleteTarget.exists }">
-        <h3 class="confirm-title">{{ deleteTarget.exists ? '⚠️ 删除工作区' : '移除工作区记录' }}</h3>
+        <h3 class="confirm-title">
+          <template v-if="deleteTarget.exists">
+            <AppIcon name="warning" :size="16" style="display: inline-block; vertical-align: middle; margin-right: 6px;" />
+            删除工作区
+          </template>
+          <template v-else>
+            移除工作区记录
+          </template>
+        </h3>
         <p class="confirm-desc">
           <template v-if="deleteTarget.exists">
             此操作将删除 <strong>{{ deleteTarget.name }}</strong> 下的所有会话和记录，不可恢复。
