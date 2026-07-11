@@ -50,8 +50,20 @@ describe('MobileLayout', () => {
           },
           MobileCommandSheet: {
             template: `<div data-test="command-sheet">
-              <button data-test="command-item" class="command-item" @click="$emit('select', { id: 'files' })">
+              <button data-test="command-item-files" class="command-item" @click="$emit('select', { id: 'files' })">
                 <span class="command-name">/files</span>
+              </button>
+              <button data-test="command-item-rollback" class="command-item" @click="$emit('select', { id: 'rollback', description: '回滚消息' })">
+                <span class="command-name">/rollback</span>
+              </button>
+              <button data-test="command-item-export" class="command-item" @click="$emit('select', { id: 'export', description: '导出会话' })">
+                <span class="command-name">/export</span>
+              </button>
+              <button data-test="command-item-status" class="command-item" @click="$emit('select', { id: 'status', description: '查看状态' })">
+                <span class="command-name">/status</span>
+              </button>
+              <button data-test="command-item-version" class="command-item" @click="$emit('select', { id: 'version', description: '查看版本' })">
+                <span class="command-name">/version</span>
               </button>
             </div>`,
             emits: ['close', 'select'],
@@ -94,7 +106,7 @@ describe('MobileLayout', () => {
     const wrapper = mountLayout()
 
     await wrapper.find('[data-test="mobile-command-btn"]').trigger('click')
-    await wrapper.find('[data-test="command-item"]').trigger('click')
+    await wrapper.find('[data-test="command-item-files"]').trigger('click')
 
     expect(wrapper.find('[data-test="panel-drawer"]').exists()).toBe(true)
   })
@@ -107,5 +119,64 @@ describe('MobileLayout', () => {
     await textarea.trigger('keydown', { key: 'Enter' })
 
     expect(wrapper.emitted('send')).toBeFalsy()
+  })
+
+  it('should open rollback picker when rollback command selected', async () => {
+    createSession()
+    const wrapper = mountLayout()
+    const uiStore = useUiStore()
+
+    await wrapper.find('[data-test="mobile-command-btn"]').trigger('click')
+    await wrapper.find('[data-test="command-item-rollback"]').trigger('click')
+
+    expect(uiStore.activeModal).toBe('rollback-picker')
+  })
+
+  it('should call sync-archive API when export command selected', async () => {
+    createSession()
+    const wrapper = mountLayout()
+
+    await wrapper.find('[data-test="mobile-command-btn"]').trigger('click')
+    await wrapper.find('[data-test="command-item-export"]').trigger('click')
+
+    await new Promise(r => setTimeout(r, 50))
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/sessions/s1/sync-archive'),
+      expect.objectContaining({ method: 'POST' })
+    )
+  })
+
+  it('should show status info dialog when status command selected', async () => {
+    createSession()
+    const wrapper = mountLayout()
+
+    await wrapper.find('[data-test="mobile-command-btn"]').trigger('click')
+    await wrapper.find('[data-test="command-item-status"]').trigger('click')
+
+    const title = document.querySelector('[data-test="info-dialog-title"]')
+    const content = document.querySelector('[data-test="info-dialog-content"]')
+    expect(title).not.toBeNull()
+    expect(title?.textContent).toBe('状态信息')
+    expect(content).not.toBeNull()
+    expect(content?.textContent).toContain('Context')
+    expect(content?.textContent).toContain('Tokens')
+    expect(content?.textContent).toContain('FPS')
+    expect(content?.textContent).toContain('工作区')
+  })
+
+  it('should show version info dialog when version command selected', async () => {
+    createSession()
+    const wrapper = mountLayout()
+
+    await wrapper.find('[data-test="mobile-command-btn"]').trigger('click')
+    await wrapper.find('[data-test="command-item-version"]').trigger('click')
+
+    const title = document.querySelector('[data-test="info-dialog-title"]')
+    const content = document.querySelector('[data-test="info-dialog-content"]')
+    expect(title).not.toBeNull()
+    expect(title?.textContent).toBe('版本信息')
+    expect(content).not.toBeNull()
+    expect(content?.textContent).toContain('Devo')
   })
 })

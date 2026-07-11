@@ -6,6 +6,8 @@ import { useChatStore } from '@/stores/chat'
 import { useUiStore } from '@/stores/ui'
 import { useApprovalStore } from '@/stores/approval'
 import { API_BASE } from '@/utils/constants'
+import { formatTokenCount } from '@/utils/formatters'
+import { useFps } from '@/composables/useFps'
 import type { Command } from '@/stores/command'
 import StatusBar from '@/components/layout/StatusBar.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
@@ -30,7 +32,14 @@ const showSessionPicker = ref(false)
 const showNewSessionDialog = ref(false)
 const newSessionTitle = ref('')
 
+const showInfoDialog = ref(false)
+const infoDialogTitle = ref('')
+const infoDialogContent = ref('')
+
 const isProcessing = computed(() => sessionStore.isProcessing)
+
+const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
+const { fps } = useFps()
 
 function openCommandSheet() {
   showCommandSheet.value = true
@@ -62,6 +71,16 @@ function openSessionPicker() {
 
 function closeSessionPicker() {
   showSessionPicker.value = false
+}
+
+function showInfo(title: string, content: string) {
+  infoDialogTitle.value = title
+  infoDialogContent.value = content
+  showInfoDialog.value = true
+}
+
+function closeInfoDialog() {
+  showInfoDialog.value = false
 }
 
 function handleCommandSelect(cmd: Command) {
@@ -116,8 +135,16 @@ function handleCommandSelect(cmd: Command) {
       uiStore.setActiveModal('help')
       break
     case 'export':
+      handleExport()
+      break
     case 'rollback':
-      uiStore.showToast('info', `移动端暂不支持 ${cmd.description}`)
+      uiStore.setActiveModal('rollback-picker')
+      break
+    case 'status':
+      handleStatus()
+      break
+    case 'version':
+      handleVersion()
       break
     default:
       break
@@ -220,6 +247,50 @@ async function handleCancelSession() {
   }
 }
 
+async function handleExport() {
+  const session = sessionStore.currentSession
+  if (!session) {
+    uiStore.showToast('error', '没有当前会话')
+    return
+  }
+  try {
+    const sid = session.id
+    await fetch(`${API_BASE}/sessions/${sid}/sync-archive`, { method: 'POST' })
+    const url = `${API_BASE}/sessions/${sid}/archive`
+    const filename = `${sid}.md`
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  } catch {
+    uiStore.showToast('error', '导出失败')
+  }
+}
+
+function handleStatus() {
+  const session = sessionStore.currentSession
+  const contextTokens = formatTokenCount(session?.currentContextTokens ?? 0)
+  const usage = session?.tokenUsage
+  const inputTokens = formatTokenCount(usage?.input ?? 0)
+  const outputTokens = formatTokenCount(usage?.output ?? 0)
+  const totalTokens = formatTokenCount((usage?.input ?? 0) + (usage?.output ?? 0))
+  const dir = session?.workingDirectory || '未设置'
+
+  const lines = [
+    `Context: ${contextTokens}`,
+    `Tokens: ${totalTokens} (↑${inputTokens} ↓${outputTokens})`,
+    `FPS: ${fps.value}`,
+    `工作区: ${dir}`,
+  ]
+  showInfo('状态信息', lines.join('\n'))
+}
+
+function handleVersion() {
+  showInfo('版本信息', `Devo v${appVersion}`)
+}
+
 async function handleAddWorkspace() {
   const path = prompt('请输入工作区路径：')
   if (!path) return
@@ -303,6 +374,18 @@ function handleNewSessionFromPicker() {
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showInfoDialog" class="dialog-overlay" @click.self="closeInfoDialog" data-test="info-dialog-overlay">
+        <div class="dialog-sheet" @click.stop data-test="info-dialog">
+          <div class="dialog-title" data-test="info-dialog-title">{{ infoDialogTitle }}</div>
+          <pre class="info-dialog-content" data-test="info-dialog-content">{{ infoDialogContent }}</pre>
+          <div class="dialog-actions">
+            <button class="dialog-btn-confirm" @click="closeInfoDialog" data-test="info-dialog-confirm">确认</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -371,6 +454,19 @@ function handleNewSessionFromPicker() {
 
 .new-session-mobile-input:focus {
   border-color: var(--color-accent);
+}
+
+.info-dialog-content {
+  margin: 0 0 var(--space-md) 0;
+  padding: var(--space-md);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-base);
+  font-family: var(--font-mono);
+  color: var(--color-text-primary);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .dialog-actions {

@@ -49,8 +49,6 @@ const sessionTokenUsage = computed(() => {
 
 const { fps } = useFps()
 
-const workingDir = computed(() => sessionStore.currentSession?.workingDirectory ?? '')
-
 function focusTextarea(): void {
   nextTick(() => {
     textareaRef.value?.focus()
@@ -193,9 +191,6 @@ function openCommand() {
           {{ fps }} FPS
         </span>
       </div>
-      <div v-if="workingDir" class="footer-row">
-        <span class="footer-item footer-dir">{{ workingDir }}</span>
-      </div>
     </div>
   </div>
 </template>
@@ -303,7 +298,7 @@ function openCommand() {
 
 .mobile-input-footer {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 2px;
   margin-top: var(--space-xs);
   padding: 0 var(--space-xs);
@@ -330,13 +325,6 @@ function openCommand() {
 .footer-sep {
   opacity: 0.4;
   flex-shrink: 0;
-}
-
-.footer-dir {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .fps-counter {

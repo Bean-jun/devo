@@ -135,6 +135,20 @@ export function useCommand() {
       group: 'app',
       mobileLabel: '🌙 切换主题',
     },
+    {
+      id: 'status',
+      name: '/status',
+      description: '查看当前状态信息',
+      group: 'app',
+      mobileLabel: '📊 查看状态',
+    },
+    {
+      id: 'version',
+      name: '/version',
+      description: '查看应用版本',
+      group: 'app',
+      mobileLabel: '🏷️ 查看版本',
+    },
   ]
 
   const allMobileCommands: Command[] = [

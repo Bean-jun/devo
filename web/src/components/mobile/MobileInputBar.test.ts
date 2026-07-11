@@ -174,24 +174,6 @@ describe('MobileInputBar', () => {
     expect(wrapper.find('.context-warn').exists()).toBe(true)
   })
 
-  it('should display working directory in footer', async () => {
-    const sessionStore = useSessionStore()
-    sessionStore.currentSession = {
-      id: 's1',
-      title: 'Test',
-      state: 'idle',
-      workingDirectory: '/home/user/project',
-      currentContextTokens: 0,
-      tokenUsage: { input: 0, output: 0 },
-    } as any
-
-    const wrapper = mount(MobileInputBar, {
-      props: { isDisabled: false, isProcessing: false },
-    })
-
-    expect(wrapper.text()).toContain('/home/user/project')
-  })
-
   it('should show FPS counter', () => {
     const wrapper = mount(MobileInputBar, {
       props: { isDisabled: false, isProcessing: false },
