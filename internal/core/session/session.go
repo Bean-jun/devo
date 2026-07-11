@@ -69,8 +69,6 @@ const (
 	LoopTerminationError            LoopTerminationReason = "error"
 )
 
-const DefaultToolCallLimit = 50
-
 type TokenUsage struct {
 	Input  int `json:"input"`
 	Output int `json:"output"`

@@ -2,6 +2,7 @@ package memory
 
 import (
 	"bufio"
+	"devo/internal/config"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,11 +23,7 @@ func NewFileStore(baseDir string) (*FileStore, error) {
 }
 
 func DefaultFileStore() (*FileStore, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("get home dir: %w", err)
-	}
-	return NewFileStore(filepath.Join(homeDir, ".devo", "memory"))
+	return NewFileStore(config.MemoryDir())
 }
 
 func (s *FileStore) filePath(memoryType MemoryType, fileKey string) string {

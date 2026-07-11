@@ -11,7 +11,6 @@ import (
 	"devo/internal/config"
 	"devo/internal/core/agentloop"
 	"devo/internal/core/concurrency"
-	projectconfig "devo/internal/core/config"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
 	"devo/internal/core/skills"
@@ -28,7 +27,7 @@ import (
 )
 
 type App struct {
-	cfg           *config.Config
+	cfg           *config.GlobalConfig
 	store         session.SessionStore
 	loop          *agentloop.Loop
 	handler       *rest.Handler
@@ -52,13 +51,18 @@ func NewApp(tuiMode, webMode bool, portFlag int) (*App, error) {
 		webMode: webMode,
 	}
 
-	cfg, err := config.Load()
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("[devo] Get working directory: %v", err)
+	}
+	cfg, err := config.LoadFullConfig(wd)
 	if err != nil {
 		log.Printf("[devo] Config warning: %v", err)
 	}
 	if cfg == nil {
 		cfg = &config.Config{}
 	}
+
 	app.cfg = cfg
 
 	port := portFlag
@@ -89,7 +93,7 @@ func NewApp(tuiMode, webMode bool, portFlag int) (*App, error) {
 func (a *App) initDB() error {
 	dbPath := a.cfg.DBPath
 	if dbPath == "" {
-		dbPath = defaultDBPath()
+		dbPath = config.DBPath()
 	}
 
 	db, err := gorm.Open(gormsqlite.Open(dbPath), &gorm.Config{})
@@ -177,7 +181,7 @@ func (a *App) initHandler() {
 		log.Printf("[devo] Project config init warning: %v", err)
 	}
 
-	a.devoDir = defaultDevoDir()
+	a.devoDir = config.DevoDir()
 	a.handler.SetProjectDir(wd)
 	a.handler.SetUserConfigDir(a.devoDir)
 
@@ -237,7 +241,7 @@ func (a *App) loadUserApprovalPolicy() {
 }
 
 func ensureProjectConfig(workingDir string, sm *skills.Manager, mcpMgr *mcp.Manager) error {
-	cfg, err := projectconfig.Load(workingDir)
+	cfg, err := config.LoadProjectConfig(workingDir)
 	if err != nil {
 		return err
 	}
@@ -257,7 +261,7 @@ func ensureProjectConfig(workingDir string, sm *skills.Manager, mcpMgr *mcp.Mana
 		mcpIDs = append(mcpIDs, cfg.ServerID)
 	}
 
-	_, err = projectconfig.CreateDefault(workingDir, skillNames, mcpIDs)
+	_, err = config.CreateDefaultProjectConfig(workingDir, skillNames, mcpIDs)
 	if err != nil {
 		return err
 	}

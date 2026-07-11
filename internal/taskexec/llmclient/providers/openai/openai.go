@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"devo/internal/config"
 	"devo/internal/core/session"
 	"devo/internal/core/tokenmeter"
 	"devo/internal/taskexec/llmclient"
@@ -30,15 +31,15 @@ type Client struct {
 	registry   *tools.Registry
 }
 
-func New(config Config, registry *tools.Registry) *Client {
-	if config.BaseURL == "" {
-		config.BaseURL = "https://api.openai.com/v1"
+func New(cfg Config, registry *tools.Registry) *Client {
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = config.DefaultLLMBaseURL
 	}
-	if config.Model == "" {
-		config.Model = "gpt-4o"
+	if cfg.Model == "" {
+		cfg.Model = config.DefaultLLMModel
 	}
 	return &Client{
-		config: config,
+		config: cfg,
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},

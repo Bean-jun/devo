@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	projectconfig "devo/internal/core/config"
+	"devo/internal/config"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/tools"
 
@@ -138,7 +138,7 @@ func (m *Manager) ConnectAll(ctx context.Context) error {
 }
 
 func (m *Manager) loadMCPWhitelist() (map[string]bool, bool) {
-	cfg, err := projectconfig.Load(m.workingDir)
+	cfg, err := config.LoadProjectConfig(m.workingDir)
 	if err != nil || cfg == nil {
 		return nil, false
 	}
@@ -286,13 +286,13 @@ func (m *Manager) EnableServer(ctx context.Context, serverID string) error {
 		return fmt.Errorf("no working directory set")
 	}
 
-	cfg, err := projectconfig.Load(m.workingDir)
+	cfg, err := config.LoadProjectConfig(m.workingDir)
 	if err != nil {
 		m.mu.Unlock()
 		return err
 	}
 	if cfg == nil {
-		cfg = &projectconfig.ProjectConfig{}
+		cfg = &config.ProjectConfig{}
 	}
 
 	found := false
@@ -306,7 +306,7 @@ func (m *Manager) EnableServer(ctx context.Context, serverID string) error {
 		cfg.MCP = append(cfg.MCP, serverID)
 	}
 
-	if err := projectconfig.Save(m.workingDir, cfg); err != nil {
+	if err := config.SaveProjectConfig(m.workingDir, cfg); err != nil {
 		m.mu.Unlock()
 		return err
 	}
@@ -329,12 +329,12 @@ func (m *Manager) DisableServer(serverID string) error {
 		return fmt.Errorf("no working directory set")
 	}
 
-	cfg, err := projectconfig.Load(m.workingDir)
+	cfg, err := config.LoadProjectConfig(m.workingDir)
 	if err != nil {
 		return err
 	}
 	if cfg == nil {
-		cfg = &projectconfig.ProjectConfig{}
+		cfg = &config.ProjectConfig{}
 	}
 
 	filtered := make([]string, 0, len(cfg.MCP))
@@ -345,7 +345,7 @@ func (m *Manager) DisableServer(serverID string) error {
 	}
 	cfg.MCP = filtered
 
-	if err := projectconfig.Save(m.workingDir, cfg); err != nil {
+	if err := config.SaveProjectConfig(m.workingDir, cfg); err != nil {
 		return err
 	}
 

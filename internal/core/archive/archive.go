@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"devo/internal/config"
 	"devo/internal/core/concurrency"
 	"devo/internal/core/session"
 )
@@ -27,7 +28,7 @@ func (am *ArchiveManager) ArchivePath(sess *session.Session) string {
 	if sess.ArchivePath != "" {
 		return sess.ArchivePath
 	}
-	return filepath.Join(sess.WorkingDirectory, ".devo", "sessions", sess.ID+".md")
+	return filepath.Join(config.ProjectSessionsDir(sess.WorkingDirectory), sess.ID+".md")
 }
 
 func (am *ArchiveManager) EnsureArchivePath(sess *session.Session) error {

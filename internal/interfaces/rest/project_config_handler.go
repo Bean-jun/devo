@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"devo/internal/core/config"
+	"devo/internal/config"
 )
 
 type getProjectConfigResponse struct {
@@ -20,7 +20,7 @@ func (h *Handler) GetProjectConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg, err := config.Load(wd)
+	cfg, err := config.LoadProjectConfig(wd)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to load config: "+err.Error())
 		return
@@ -73,7 +73,7 @@ func (h *Handler) SetProjectConfig(w http.ResponseWriter, r *http.Request) {
 		ApprovalPolicy: req.ApprovalPolicy,
 	}
 
-	if err := config.Save(wd, cfg); err != nil {
+	if err := config.SaveProjectConfig(wd, cfg); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save config: "+err.Error())
 		return
 	}

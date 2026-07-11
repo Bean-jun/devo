@@ -107,6 +107,11 @@ async function copyContent() {
   max-width: 75%;
 }
 
+.message-bubble.role-user .bubble-inner ::selection {
+  background: var(--color-user-bubble-text);
+  color: var(--color-user-bubble);
+}
+
 .message-bubble.role-assistant .bubble-inner {
   background: var(--color-assistant-bubble);
   border: 1px solid var(--color-border-light);

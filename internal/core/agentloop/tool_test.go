@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"devo/internal/config"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
@@ -516,8 +517,8 @@ func TestUpdateConfigSessionNotFound(t *testing.T) {
 }
 
 func TestDefaultToolCallLimit(t *testing.T) {
-	if session.DefaultToolCallLimit != 50 {
-		t.Errorf("expected DefaultToolCallLimit 50, got %d", session.DefaultToolCallLimit)
+	if config.DefaultToolCallLimit != 50 {
+		t.Errorf("expected DefaultToolCallLimit 50, got %d", config.DefaultToolCallLimit)
 	}
 }
 

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"devo/internal/config"
 	"devo/internal/core/approval"
-	"devo/internal/core/config"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/tools"
 )
@@ -77,7 +77,7 @@ func (l *Loop) resolveEffectivePolicy(sess *session.Session, opType approval.Ope
 
 	var projectPolicy map[approval.OperationType]approval.PolicyLevel
 	if sess.WorkingDirectory != "" {
-		if cfg, err := config.Load(sess.WorkingDirectory); err == nil && cfg != nil && cfg.ApprovalPolicy != nil {
+		if cfg, err := config.LoadProjectConfig(sess.WorkingDirectory); err == nil && cfg != nil && cfg.ApprovalPolicy != nil {
 			projectPolicy = make(map[approval.OperationType]approval.PolicyLevel)
 			for k, v := range cfg.ApprovalPolicy {
 				projectPolicy[approval.OperationType(k)] = approval.PolicyLevel(v)

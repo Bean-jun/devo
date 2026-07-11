@@ -3,17 +3,18 @@ package prompt
 import (
 	"os"
 	"path/filepath"
+
+	"devo/internal/config"
 )
 
 const (
-	agentsMDFile  = "agents.md"
-	devoRulesFile = ".devo/rules.md"
+	agentsMDFile = "agents.md"
 )
 
 func LoadAgentsMD(workingDir string) (string, bool) {
 	candidates := []string{
 		filepath.Join(workingDir, agentsMDFile),
-		filepath.Join(workingDir, devoRulesFile),
+		config.ProjectRulesFilePath(workingDir),
 	}
 
 	for _, p := range candidates {

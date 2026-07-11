@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"devo/internal/config"
 	"devo/internal/core/session"
 	"devo/internal/pkg/process"
 	"devo/internal/taskexec/tools"
@@ -48,7 +49,7 @@ func (l *Loop) incrementToolCallCount(sessionID string, eventBus *session.EventB
 
 	sess.ToolCallCount++
 	if sess.ToolCallLimit <= 0 {
-		sess.ToolCallLimit = session.DefaultToolCallLimit
+		sess.ToolCallLimit = config.DefaultToolCallLimit
 	}
 	l.store.Update(sess)
 

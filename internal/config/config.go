@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 type LLMConfig struct {
@@ -15,31 +14,45 @@ type LLMConfig struct {
 }
 
 type Config struct {
-	LLM            LLMConfig         `json:"llm"`
+	LLM            LLMConfig         `json:"llm,omitempty"`
 	DBPath         string            `json:"db_path,omitempty"`
 	LogPath        string            `json:"log_path,omitempty"`
 	ApprovalPolicy map[string]string `json:"approval_policy,omitempty"`
+	Skills         []string          `json:"skills,omitempty"`
+	MCP            []string          `json:"mcp,omitempty"`
 }
 
-func Load() (*Config, error) {
+type GlobalConfig = Config
+
+func LoadGlobal() (*Config, error) {
 	cfg := &Config{}
 
-	candidates := []string{
-		filepath.Join(".devo", "config.json"),
-		filepath.Join(userHomeDir(), ".devo", "config.json"),
+	globalConfigPath := GlobalConfigPath()
+
+	if _, err := os.Stat(globalConfigPath); err == nil {
+		data, err := os.ReadFile(globalConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("read config file %s: %w", globalConfigPath, err)
+		}
+		if err := json.Unmarshal(data, cfg); err != nil {
+			return nil, fmt.Errorf("parse config file %s: %w", globalConfigPath, err)
+		}
 	}
 
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			data, err := os.ReadFile(p)
-			if err != nil {
-				return nil, fmt.Errorf("read config file %s: %w", p, err)
-			}
-			if err := json.Unmarshal(data, cfg); err != nil {
-				return nil, fmt.Errorf("parse config file %s: %w", p, err)
-			}
-			break
-		}
+	applyEnvOverrides(cfg)
+	applyDefaults(cfg)
+	return cfg, nil
+}
+
+func LoadFullConfig(projectDir string) (*Config, error) {
+	cfg, err := LoadGlobal()
+	if err != nil {
+		return nil, err
+	}
+
+	pcfg, err := LoadProjectConfig(projectDir)
+	if err == nil {
+		cfg = Merge(cfg, pcfg)
 	}
 
 	applyEnvOverrides(cfg)
@@ -62,7 +75,6 @@ func Load() (*Config, error) {
 				"Or set the environment variable: DEVO_LLM_API_KEY",
 		)
 	}
-
 	return cfg, nil
 }
 
@@ -92,17 +104,54 @@ func applyEnvOverrides(cfg *Config) {
 
 func applyDefaults(cfg *Config) {
 	if cfg.LLM.BaseURL == "" {
-		cfg.LLM.BaseURL = "https://api.openai.com/v1"
+		cfg.LLM.BaseURL = DefaultLLMBaseURL
 	}
 	if cfg.LLM.Model == "" {
-		cfg.LLM.Model = "gpt-4o"
+		cfg.LLM.Model = DefaultLLMModel
 	}
 }
 
-func userHomeDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
+func Merge(global, project *Config) *Config {
+	if global == nil && project == nil {
+		return &Config{}
 	}
-	return home
+	if global == nil {
+		return project
+	}
+	if project == nil {
+		return global
+	}
+
+	result := &Config{}
+	*result = *global
+
+	if project.LLM.APIKey != "" {
+		result.LLM.APIKey = project.LLM.APIKey
+	}
+	if project.LLM.BaseURL != "" {
+		result.LLM.BaseURL = project.LLM.BaseURL
+	}
+	if project.LLM.Model != "" {
+		result.LLM.Model = project.LLM.Model
+	}
+	if project.LLM.ExtraHeaders != nil {
+		result.LLM.ExtraHeaders = project.LLM.ExtraHeaders
+	}
+	if project.DBPath != "" {
+		result.DBPath = project.DBPath
+	}
+	if project.LogPath != "" {
+		result.LogPath = project.LogPath
+	}
+	if project.ApprovalPolicy != nil {
+		result.ApprovalPolicy = project.ApprovalPolicy
+	}
+	if project.Skills != nil {
+		result.Skills = project.Skills
+	}
+	if project.MCP != nil {
+		result.MCP = project.MCP
+	}
+
+	return result
 }

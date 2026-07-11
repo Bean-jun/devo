@@ -1,7 +1,7 @@
 package skills
 
 import (
-	"devo/internal/core/config"
+	"devo/internal/config"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,12 +14,11 @@ import (
 const skillFileName = "SKILL.md"
 
 func DefaultGlobalSkillsDir() string {
-	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".devo", "skills")
+	return config.GlobalSkillsDir()
 }
 
 func DefaultProjectSkillsDir(workingDir string) string {
-	return filepath.Join(workingDir, ".devo", "skills")
+	return config.ProjectSkillsDir(workingDir)
 }
 
 type Manager struct {
@@ -244,7 +243,7 @@ func (m *Manager) applyConfig() error {
 		return nil
 	}
 
-	cfg, err := config.Load(m.projectDir)
+	cfg, err := config.LoadProjectConfig(m.projectDir)
 	if err != nil {
 		return err
 	}
@@ -282,7 +281,7 @@ func (m *Manager) EnableSkill(name string) error {
 		return fmt.Errorf("no project directory set")
 	}
 
-	cfg, err := config.Load(m.projectDir)
+	cfg, err := config.LoadProjectConfig(m.projectDir)
 	if err != nil {
 		return err
 	}
@@ -301,7 +300,7 @@ func (m *Manager) EnableSkill(name string) error {
 		cfg.Skills = append(cfg.Skills, name)
 	}
 
-	if err := config.Save(m.projectDir, cfg); err != nil {
+	if err := config.SaveProjectConfig(m.projectDir, cfg); err != nil {
 		return err
 	}
 
@@ -323,7 +322,7 @@ func (m *Manager) DisableSkill(name string) error {
 		return fmt.Errorf("no project directory set")
 	}
 
-	cfg, err := config.Load(m.projectDir)
+	cfg, err := config.LoadProjectConfig(m.projectDir)
 	if err != nil {
 		return err
 	}
@@ -339,7 +338,7 @@ func (m *Manager) DisableSkill(name string) error {
 	}
 	cfg.Skills = filtered
 
-	if err := config.Save(m.projectDir, cfg); err != nil {
+	if err := config.SaveProjectConfig(m.projectDir, cfg); err != nil {
 		return err
 	}
 
@@ -511,7 +510,7 @@ func (m *Manager) DeleteSkill(name string) error {
 	delete(m.globalSkills, name)
 
 	if m.projectDir != "" {
-		cfg, err := config.Load(m.projectDir)
+		cfg, err := config.LoadProjectConfig(m.projectDir)
 		if err != nil {
 			return err
 		}
@@ -523,7 +522,7 @@ func (m *Manager) DeleteSkill(name string) error {
 				}
 			}
 			cfg.Skills = filtered
-			if err := config.Save(m.projectDir, cfg); err != nil {
+			if err := config.SaveProjectConfig(m.projectDir, cfg); err != nil {
 				return err
 			}
 		}

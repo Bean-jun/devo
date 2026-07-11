@@ -3,9 +3,8 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 
+	"devo/internal/config"
 	"devo/internal/core/approval"
 )
 
@@ -30,37 +29,13 @@ func (h *Handler) SetUserApprovalPolicy(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	configDir := h.userConfigDir
-	if configDir == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "cannot determine user config directory")
-			return
-		}
-		configDir = filepath.Join(homeDir, ".devo")
+	cfg, _ := config.LoadGlobal()
+	if cfg == nil {
+		cfg = &config.Config{}
 	}
+	cfg.ApprovalPolicy = req
 
-	configPath := filepath.Join(configDir, "config.json")
-
-	existing := make(map[string]json.RawMessage)
-	if data, err := os.ReadFile(configPath); err == nil {
-		_ = json.Unmarshal(data, &existing)
-	}
-
-	approvalData, err := json.Marshal(req)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to marshal policy")
-		return
-	}
-	existing["approval_policy"] = approvalData
-
-	data, err := json.MarshalIndent(existing, "", "  ")
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to marshal config")
-		return
-	}
-
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	if err := config.SaveGlobalConfig(cfg); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save config: "+err.Error())
 		return
 	}
@@ -75,35 +50,12 @@ func (h *Handler) SetUserApprovalPolicy(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handler) loadUserApprovalPolicyFromConfig() map[string]string {
-	configDir := h.userConfigDir
-	if configDir == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return map[string]string{}
-		}
-		configDir = filepath.Join(homeDir, ".devo")
-	}
-
-	configPath := filepath.Join(configDir, "config.json")
-	data, err := os.ReadFile(configPath)
-	if err != nil {
+	cfg, err := config.LoadGlobal()
+	if err != nil || cfg == nil {
 		return map[string]string{}
 	}
-
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
+	if cfg.ApprovalPolicy == nil {
 		return map[string]string{}
 	}
-
-	approvalRaw, ok := raw["approval_policy"]
-	if !ok {
-		return map[string]string{}
-	}
-
-	var policy map[string]string
-	if err := json.Unmarshal(approvalRaw, &policy); err != nil {
-		return map[string]string{}
-	}
-
-	return policy
+	return cfg.ApprovalPolicy
 }

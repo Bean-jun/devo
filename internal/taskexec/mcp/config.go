@@ -5,28 +5,28 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"devo/internal/config"
 )
 
 const (
-	SourceProject  = "project"
-	SourceGlobal   = "global"
-	configFileName = "mcp_servers.json"
+	SourceProject = "project"
+	SourceGlobal  = "global"
 )
 
-func DefaultGlobalConfigPath() string {
-	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".devo", configFileName)
+func GlobalMcpConfigPath() string {
+	return config.GlobalMcpServersPath()
 }
 
-func DefaultProjectConfigPath(workingDir string) string {
-	return filepath.Join(workingDir, ".devo", configFileName)
+func ProjectMcpConfigPath(workingDir string) string {
+	return config.ProjectMcpServersPath(workingDir)
 }
 
 func ConfigPathForScope(workingDir, scope string) string {
 	if scope == SourceGlobal {
-		return DefaultGlobalConfigPath()
+		return GlobalMcpConfigPath()
 	}
-	return DefaultProjectConfigPath(workingDir)
+	return ProjectMcpConfigPath(workingDir)
 }
 
 func LoadConfig(workingDir string) ([]McpServerConfig, error) {
@@ -36,14 +36,14 @@ func LoadConfig(workingDir string) ([]McpServerConfig, error) {
 		path   string
 		source string
 	}{
-		{DefaultProjectConfigPath(workingDir), SourceProject},
+		{ProjectMcpConfigPath(workingDir), SourceProject},
 	}
 
 	if _, err := os.UserHomeDir(); err == nil {
 		configPaths = append(configPaths, struct {
 			path   string
 			source string
-		}{DefaultGlobalConfigPath(), SourceGlobal})
+		}{GlobalMcpConfigPath(), SourceGlobal})
 	}
 
 	seenIDs := make(map[string]bool)

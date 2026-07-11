@@ -9,7 +9,7 @@ import (
 	"devo/internal/taskexec/tools"
 )
 
-func NewClient(cfg *config.Config, registry *tools.Registry) llmclient.Client {
+func NewClient(cfg *config.GlobalConfig, registry *tools.Registry) llmclient.Client {
 	if cfg.LLM.APIKey == "" {
 		log.Println("[devo] LLM API key not configured, using MockClient")
 		return llmclient.NewMockClient()

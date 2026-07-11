@@ -5,26 +5,10 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
+
+	"devo/internal/config"
 )
-
-func defaultDBPath() string {
-	devoDir := defaultDevoDir()
-	return filepath.Join(devoDir, "devo.db")
-}
-
-func defaultDevoDir() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("[devo] Failed to get home directory: %v", err)
-	}
-	devoDir := filepath.Join(homeDir, ".devo")
-	if err := os.MkdirAll(devoDir, 0755); err != nil {
-		log.Fatalf("[devo] Failed to create .devo directory: %v", err)
-	}
-	return devoDir
-}
 
 func findFreePort() (int, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -48,5 +32,12 @@ func openBrowser(url string) {
 	}
 	if err := cmd.Start(); err != nil {
 		log.Printf("[devo] Failed to open browser: %v", err)
+	}
+}
+
+func verifyDevoDir() {
+	devoDir := config.DevoDir()
+	if err := os.MkdirAll(devoDir, 0755); err != nil {
+		log.Fatalf("[devo] Failed to create .devo directory: %v", err)
 	}
 }
