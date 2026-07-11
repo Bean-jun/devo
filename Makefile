@@ -44,8 +44,10 @@ build-go:
 	upx -9 $(BUILD_DIR)\$(APP_NAME)-linux-amd64
 	@echo [BUILD]   macOS (amd64)...
 	set GOOS=darwin&& set GOARCH=amd64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
+	upx -9 $(BUILD_DIR)\$(APP_NAME)-darwin-amd64 --force-macos
 	@echo [BUILD]   macOS (arm64)...
 	set GOOS=darwin&& set GOARCH=arm64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
+	upx -9 $(BUILD_DIR)\$(APP_NAME)-darwin-arm64 --force-macos
 	@echo [OK] 3 platforms (4 binaries) built
 
 # ========== VS Code Extension ==========

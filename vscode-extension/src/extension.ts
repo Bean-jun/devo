@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as cp from 'child_process'
 import * as fs from 'fs'
 import * as net from 'net'
+import * as http from 'http'
 
 let outputChannel: vscode.OutputChannel
 
@@ -256,6 +257,40 @@ function getDevoPath(context: vscode.ExtensionContext): string {
   return 'devo'
 }
 
+function waitForHealth(port: number, timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const url = `http://127.0.0.1:${port}/api/v1/health`
+    const startTime = Date.now()
+
+    function poll() {
+      if (Date.now() - startTime > timeoutMs) {
+        return reject(new Error('Devo startup timed out after 30 seconds'))
+      }
+
+      const req = http.get(url, (res) => {
+        if (res.statusCode === 200) {
+          res.resume()
+          resolve()
+        } else {
+          res.resume()
+          setTimeout(poll, 500)
+        }
+      })
+
+      req.on('error', () => {
+        setTimeout(poll, 500)
+      })
+
+      req.setTimeout(3000, () => {
+        req.destroy()
+        setTimeout(poll, 500)
+      })
+    }
+
+    poll()
+  })
+}
+
 async function startDevoProcess(
   instance: DevoInstance,
   context: vscode.ExtensionContext
@@ -283,33 +318,15 @@ async function startDevoProcess(
     })
     outputChannel.appendLine(`[instance-${instanceId}] PID: ${instance.process.pid}`)
 
-    const timeout = setTimeout(() => {
-      outputChannel.appendLine(`[instance-${instanceId}] Startup timed out after 30 seconds`)
-      reject(new Error('Devo startup timed out after 30 seconds'))
-    }, 30000)
-
     instance.process.stdout?.on('data', (data: Buffer) => {
-      const text = data.toString()
-      outputChannel.appendLine(`[instance-${instanceId}][stdout] ${text.trim()}`)
-      if (text.includes('Server ready')) {
-        clearTimeout(timeout)
-        outputChannel.appendLine(`[instance-${instanceId}] Server started successfully`)
-        resolve()
-      }
+      outputChannel.appendLine(`[instance-${instanceId}][stdout] ${data.toString().trim()}`)
     })
 
     instance.process.stderr?.on('data', (data: Buffer) => {
-      const text = data.toString()
-      outputChannel.appendLine(`[instance-${instanceId}][stderr] ${text.trim()}`)
-      if (text.includes('Server ready')) {
-        clearTimeout(timeout)
-        outputChannel.appendLine(`[instance-${instanceId}] Server started successfully (via stderr)`)
-        resolve()
-      }
+      outputChannel.appendLine(`[instance-${instanceId}][stderr] ${data.toString().trim()}`)
     })
 
     instance.process.on('error', (err) => {
-      clearTimeout(timeout)
       instance.process = null
       instance.port = null
       outputChannel.appendLine(`[instance-${instanceId}] Error: ${err.message}`)
@@ -317,7 +334,6 @@ async function startDevoProcess(
     })
 
     instance.process.on('close', (code) => {
-      clearTimeout(timeout)
       outputChannel.appendLine(`[instance-${instanceId}] Process exited with code ${code}`)
       if (instance.port === null) {
         reject(new Error(`Devo exited with code ${code} before port was assigned`))
@@ -325,6 +341,16 @@ async function startDevoProcess(
         handleProcessCrash(instance, code)
       }
     })
+
+    waitForHealth(instance.port!, 30000)
+      .then(() => {
+        outputChannel.appendLine(`[instance-${instanceId}] Server started successfully`)
+        resolve()
+      })
+      .catch((err) => {
+        outputChannel.appendLine(`[instance-${instanceId}] Startup timed out after 30 seconds`)
+        reject(err)
+      })
   })
 }
 

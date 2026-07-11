@@ -57,6 +57,7 @@ func (h *Handler) SetLLMConfigured(configured bool) {
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/health", h.GetHealth)
 	mux.HandleFunc("GET /api/v1/version", h.GetVersion)
 
 	mux.HandleFunc("GET /api/v1/current-workspace", h.GetCurrentWorkspace)
@@ -119,6 +120,13 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/project/config", h.SetProjectConfig)
 
 	mux.HandleFunc("GET /api/v1/config/status", h.GetConfigStatus)
+}
+
+func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status":  "ok",
+		"version": h.version,
+	})
 }
 
 func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {

@@ -3,6 +3,7 @@ const path = require("path");
 const cp = require("child_process");
 const fs = require("fs");
 const net = require("net");
+const http = require("http");
 
 // ====================== 日志 ======================
 function log(...args) {
@@ -164,6 +165,41 @@ function getCrashContent(code) {
 </html>`;
 }
 
+// ====================== 健康检查轮询 ======================
+function waitForHealth(port, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const url = `http://127.0.0.1:${port}/api/v1/health`;
+    const startTime = Date.now();
+
+    function poll() {
+      if (Date.now() - startTime > timeoutMs) {
+        return reject(new Error("Devo 启动超时（30 秒）"));
+      }
+
+      const req = http.get(url, (res) => {
+        if (res.statusCode === 200) {
+          res.resume();
+          resolve();
+        } else {
+          res.resume();
+          setTimeout(poll, 500);
+        }
+      });
+
+      req.on("error", () => {
+        setTimeout(poll, 500);
+      });
+
+      req.setTimeout(3000, () => {
+        req.destroy();
+        setTimeout(poll, 500);
+      });
+    }
+
+    poll();
+  });
+}
+
 // ====================== 启动 Go 后端 ======================
 function startServer(workspace) {
   return new Promise(async (resolve, reject) => {
@@ -183,33 +219,15 @@ function startServer(workspace) {
     });
     log("PID:", serverProcess.pid);
 
-    const timeout = setTimeout(() => {
-      log("Startup timed out after 30 seconds");
-      reject(new Error("Devo 启动超时（30 秒）"));
-    }, 30000);
-
     serverProcess.stdout.on("data", (data) => {
-      const text = data.toString();
-      console.log(`[devo][stdout] ${text.trim()}`);
-      if (text.includes("Server ready")) {
-        clearTimeout(timeout);
-        log("Server started successfully");
-        resolve();
-      }
+      console.log(`[devo][stdout] ${data.toString().trim()}`);
     });
 
     serverProcess.stderr.on("data", (data) => {
-      const text = data.toString();
-      console.log(`[devo][stderr] ${text.trim()}`);
-      if (text.includes("Server ready")) {
-        clearTimeout(timeout);
-        log("Server started successfully (via stderr)");
-        resolve();
-      }
+      console.log(`[devo][stderr] ${data.toString().trim()}`);
     });
 
     serverProcess.on("error", (err) => {
-      clearTimeout(timeout);
       serverProcess = null;
       serverPort = null;
       log("Process error:", err.message);
@@ -221,7 +239,6 @@ function startServer(workspace) {
     });
 
     serverProcess.on("close", (code) => {
-      clearTimeout(timeout);
       log("Process exited with code:", code);
       if (serverPort === null) {
         reject(new Error(`Devo 在端口分配前退出（退出码: ${code}）`));
@@ -229,6 +246,14 @@ function startServer(workspace) {
         handleProcessCrash(code);
       }
     });
+
+    try {
+      await waitForHealth(serverPort, 30000);
+      log("Server started successfully");
+      resolve();
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
