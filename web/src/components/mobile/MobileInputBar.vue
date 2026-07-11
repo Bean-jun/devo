@@ -253,6 +253,7 @@ function openCommand() {
   line-height: 1.4;
   resize: none;
   outline: none;
+  overflow-y: hidden;
   transition: border-color var(--transition-fast);
 }
 
@@ -302,7 +303,7 @@ function openCommand() {
   gap: 2px;
   margin-top: var(--space-xs);
   padding: 0 var(--space-xs);
-  font-size: 11px;
+  font-size: 10px;
   font-family: var(--font-mono);
   color: var(--color-text-secondary);
   user-select: none;
@@ -328,7 +329,7 @@ function openCommand() {
 }
 
 .fps-counter {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
   white-space: nowrap;
