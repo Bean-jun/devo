@@ -125,7 +125,7 @@ const serverPort = computed(() => window.location.port)
 </script>
 
 <template>
-  <header v-if="sessionStore.currentSession" class="statusbar" :class="{ yolo: sessionStore.yoloEnabled }">
+  <header v-if="sessionStore.currentSession" class="statusbar" :class="{ yolo: sessionStore.yoloEnabled }" data-test="status-bar">
     <div class="statusbar-left">
       <input
         v-if="isRenaming"

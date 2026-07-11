@@ -15,6 +15,12 @@ const sessionStore = useSessionStore()
 const uiStore = useUiStore()
 const { openPalette } = useCommand()
 
+const props = withDefaults(defineProps<{
+  hideInput?: boolean
+}>(), {
+  hideInput: false,
+})
+
 const messageListRef = ref<InstanceType<typeof MessageList> | null>(null)
 
 function handleScrollToMessage(messageId: string): void {
@@ -209,6 +215,7 @@ async function handleExecuteCommand(text: string) {
     </div>
 
     <InputArea
+      v-if="!props.hideInput"
       :is-disabled="isDisabled"
       :is-processing="isProcessing"
       @send="handleSend"

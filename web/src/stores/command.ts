@@ -6,6 +6,8 @@ export interface Command {
   name: string
   description: string
   placeholder?: string
+  group?: 'panel' | 'session' | 'workspace' | 'app'
+  mobileLabel?: string
 }
 
 export const useCommandStore = defineStore('command', () => {

@@ -95,7 +95,7 @@ export const useUiStore = defineStore('ui', () => {
   const focusInputCounter = ref(0)
   const pendingCommand = ref<string | null>(null)
   const theme = ref<ThemeType>(loadTheme())
-  const isVscodeMode = ref(false)
+  const layoutMode = ref<'browser' | 'vscode' | 'mobile'>('browser')
 
   const activeWorkspace = ref<string | null>(loadActiveWorkspace())
   const activeRightTab = ref<RightTabType>('files')
@@ -170,8 +170,8 @@ export const useUiStore = defineStore('ui', () => {
     saveTheme(theme.value)
   }
 
-  function setVscodeMode(mode: boolean): void {
-    isVscodeMode.value = mode
+  function setLayoutMode(mode: 'browser' | 'vscode' | 'mobile'): void {
+    layoutMode.value = mode
   }
 
   let _themeTransitionHandler: ((x: number, y: number, cb: () => void) => void) | null = null
@@ -273,7 +273,7 @@ export const useUiStore = defineStore('ui', () => {
     focusInputCounter,
     pendingCommand,
     theme,
-    isVscodeMode,
+    layoutMode,
     activeWorkspace,
     activeRightTab,
     rightPanelVisible,
@@ -296,7 +296,7 @@ export const useUiStore = defineStore('ui', () => {
     requestFocusInput,
     toggleTheme,
     setTheme,
-    setVscodeMode,
+    setLayoutMode,
     registerThemeTransition,
     toggleThemeWithTransition,
     activityStream,

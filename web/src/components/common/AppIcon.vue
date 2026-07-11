@@ -41,6 +41,8 @@ import {
   PhSpinner,
   PhQuestion,
   PhCheck,
+  PhMagnifyingGlass,
+  PhSliders,
 } from '@phosphor-icons/vue'
 
 const props = withDefaults(defineProps<{
@@ -93,6 +95,8 @@ const iconMap: Record<IconName, Component> = {
   spinner: PhSpinner,
   question: PhQuestion,
   check: PhCheck,
+  'magnifying-glass': PhMagnifyingGlass,
+  sliders: PhSliders,
 }
 
 export type IconName =
@@ -135,6 +139,8 @@ export type IconName =
   | 'spinner'
   | 'question'
   | 'check'
+  | 'magnifying-glass'
+  | 'sliders'
 
 const resolvedIcon = computed(() => iconMap[props.name])
 

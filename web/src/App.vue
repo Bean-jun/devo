@@ -17,6 +17,7 @@ import { useAudio } from '@/composables/useAudio'
 import { API_BASE } from '@/utils/constants'
 import VscodeLayout from '@/layouts/VscodeLayout.vue'
 import BrowserLayout from '@/layouts/BrowserLayout.vue'
+import MobileLayout from '@/layouts/MobileLayout.vue'
 
 const sessionStore = useSessionStore()
 const chatStore = useChatStore()
@@ -26,7 +27,7 @@ const approvalStore = useApprovalStore()
 const skillsStore = useSkillsStore()
 const memoryStore = useMemoryStore()
 const mcpStore = useMcpStore()
-const { detectMode, isVscodeMode } = usePlatform()
+const { detectMode, isVscodeMode, isMobileMode } = usePlatform()
 const { startTransition } = useThemeTransition()
 const { playCompletedSound } = useAudio()
 
@@ -427,5 +428,6 @@ useKeyboard([
 
 <template>
   <VscodeLayout v-if="isVscodeMode" />
+  <MobileLayout v-else-if="isMobileMode" />
   <BrowserLayout v-else />
 </template>
