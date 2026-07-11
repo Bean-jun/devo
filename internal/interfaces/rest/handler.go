@@ -2,7 +2,6 @@ package rest
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
 	"devo/internal/core/skills"
+	"devo/internal/pkg/logging"
 	"devo/internal/taskexec/mcp"
 	"devo/internal/taskexec/tools"
 )
@@ -168,13 +168,17 @@ func (h *Handler) SetCurrentWorkspace(w http.ResponseWriter, r *http.Request) {
 
 	if h.skillsManager != nil {
 		if err := h.skillsManager.SetProjectDir(req.WorkingDirectory); err != nil {
-			log.Printf("[devo] Skills scan warning after workspace switch: %v", err)
+			logging.Warn(r.Context(), "skills scan warning after workspace switch",
+				"error", err,
+			)
 		}
 	}
 
 	if h.mcpManager != nil {
 		if err := h.mcpManager.SetProjectDir(req.WorkingDirectory); err != nil {
-			log.Printf("[devo] MCP reconnect warning after workspace switch: %v", err)
+			logging.Warn(r.Context(), "mcp reconnect warning after workspace switch",
+				"error", err,
+			)
 		}
 	}
 

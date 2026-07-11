@@ -3,7 +3,6 @@ package rest
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 
 	"devo/internal/core/approval"
 	"devo/internal/core/session"
+	"devo/internal/pkg/logging"
 	"devo/internal/taskexec/pathsec"
 )
 
@@ -132,7 +132,10 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[DEBUG] GetSession: id=%s, state=%s, snake=%s", id, sess.State, sess.State.ToSnakeCase())
+	logging.Debug(r.Context(), "get session",
+		"session_id", id,
+		"state", string(sess.State),
+	)
 
 	if err := validateWorkingDirectory(sess); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -293,7 +296,10 @@ func (h *Handler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 	if h.bgProcManager != nil {
 		errs := h.bgProcManager.ShutdownAll(id)
 		if len(errs) > 0 {
-			log.Printf("[devo] Warning: failed to stop some background processes for session %s: %v", id, errs)
+			logging.Warn(r.Context(), "failed to stop background processes",
+				"session_id", id,
+				"errors", errs,
+			)
 		}
 	}
 

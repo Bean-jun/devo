@@ -1,13 +1,14 @@
 package main
 
 import (
-	"log"
+	"context"
 	"net"
 	"os"
 	"os/exec"
 	"runtime"
 
 	"devo/internal/config"
+	"devo/internal/pkg/logging"
 )
 
 func findFreePort() (int, error) {
@@ -20,7 +21,9 @@ func findFreePort() (int, error) {
 }
 
 func openBrowser(url string) {
-	log.Printf("[devo] Opening browser: %s", url)
+	logging.Info(context.Background(), "opening browser",
+		"url", url,
+	)
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
@@ -31,13 +34,18 @@ func openBrowser(url string) {
 		cmd = exec.Command("xdg-open", url)
 	}
 	if err := cmd.Start(); err != nil {
-		log.Printf("[devo] Failed to open browser: %v", err)
+		logging.Warn(context.Background(), "failed to open browser",
+			"error", err,
+		)
 	}
 }
 
 func verifyDevoDir() {
 	devoDir := config.DevoDir()
 	if err := os.MkdirAll(devoDir, 0755); err != nil {
-		log.Fatalf("[devo] Failed to create .devo directory: %v", err)
+		logging.Error(context.Background(), "failed to create .devo directory",
+			"error", err,
+		)
+		os.Exit(1)
 	}
 }

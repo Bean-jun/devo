@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"devo/internal/core/skills"
 	"devo/internal/interfaces/rest"
 	"devo/internal/interfaces/tui"
+	"devo/internal/pkg/logging"
 	"devo/internal/storage/sqlite"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/llmclient/providers"
@@ -57,7 +57,9 @@ func NewApp(tuiMode, webMode bool, portFlag int) (*App, error) {
 	}
 	cfg, err := config.LoadFullConfig(wd)
 	if err != nil {
-		log.Printf("[devo] Config warning: %v", err)
+		logging.Warn(context.Background(), "config warning",
+			"error", err,
+		)
 	}
 	if cfg == nil {
 		cfg = &config.Config{}
@@ -82,7 +84,9 @@ func NewApp(tuiMode, webMode bool, portFlag int) (*App, error) {
 
 	app.initRegistry()
 	app.initLLM()
-	app.initMemory()
+	if err := app.initMemory(); err != nil {
+		return nil, err
+	}
 	app.initSkills()
 	app.initMCP()
 	app.initTools()
@@ -136,14 +140,18 @@ func (a *App) initLLM() {
 	a.loop = agentloop.NewWithTools(a.store, a.llm, a.toolRegistry)
 }
 
-func (a *App) initMemory() {
+func (a *App) initMemory() error {
 	pathLockManager := concurrency.NewPathLockManager()
 	memoryFileStore, err := memory.DefaultFileStore()
 	if err != nil {
-		log.Fatalf("[devo] Failed to create memory file store: %v", err)
+		logging.Error(context.Background(), "failed to create memory file store",
+			"error", err,
+		)
+		return fmt.Errorf("failed to create memory file store: %w", err)
 	}
 	a.memoryMgr = memory.NewManager(memoryFileStore, pathLockManager, a.loop.GetApprovalManager())
 	a.loop.SetMemoryManager(a.memoryMgr)
+	return nil
 }
 
 func (a *App) initSkills() {
@@ -151,7 +159,9 @@ func (a *App) initSkills() {
 
 	wd, _ := os.Getwd()
 	if err := a.skillsMgr.SetProjectDir(wd); err != nil {
-		log.Printf("[devo] Skills scan warning: %v", err)
+		logging.Warn(context.Background(), "skills scan warning",
+			"error", err,
+		)
 	}
 
 	a.loop.SetSkillsManager(a.skillsMgr)
@@ -164,7 +174,9 @@ func (a *App) initMCP() {
 	wd, _ := os.Getwd()
 	a.mcpMgr = mcp.NewManager(wd)
 	if err := a.mcpMgr.ConnectAll(context.Background()); err != nil {
-		log.Printf("[devo] MCP manager: some servers failed to connect: %v", err)
+		logging.Warn(context.Background(), "mcp connect partial failure",
+			"error", err,
+		)
 	}
 }
 
@@ -178,7 +190,9 @@ func (a *App) initHandler() {
 	a.handler.SetMcpManager(a.mcpMgr)
 
 	if err := ensureProjectConfig(wd, a.skillsMgr, a.mcpMgr); err != nil {
-		log.Printf("[devo] Project config init warning: %v", err)
+		logging.Warn(context.Background(), "project config init warning",
+			"error", err,
+		)
 	}
 
 	a.devoDir = config.DevoDir()
@@ -189,44 +203,55 @@ func (a *App) initHandler() {
 }
 
 func (a *App) Run() {
+	ctx := context.Background()
+
 	mux := http.NewServeMux()
 	a.handler.RegisterRoutes(mux)
 	serveWebUI(mux)
 
-	log.Printf("[devo] Running crash recovery check...")
+	tracedMux := logging.TracingMiddleware(mux)
+
+	logging.Info(ctx, "running crash recovery check")
 	if err := a.loop.RecoverCrashedSessions(); err != nil {
-		log.Printf("[devo] Crash recovery scan failed (non-fatal): %v", err)
+		logging.Warn(ctx, "crash recovery scan failed (non-fatal)",
+			"error", err,
+		)
 	}
 
 	server := &http.Server{
 		Addr:    a.addr,
-		Handler: mux,
+		Handler: tracedMux,
 	}
 
 	go func() {
-		log.Printf("[devo] Web server starting on %s", a.addr)
+		logging.Info(ctx, "web server starting",
+			"addr", a.addr,
+		)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("[devo] Server error: %v", err)
+			logging.Error(ctx, "server error",
+				"error", err,
+			)
 		}
 	}()
 
 	waitForReady(a.baseURL, 10*time.Second)
-	log.Printf("[devo] Server ready: %s", a.baseURL)
 
 	if a.webMode {
 		openBrowser(a.baseURL)
 	}
 
 	if a.tuiMode {
-		log.Printf("[devo] Launching TUI...")
+		logging.Info(ctx, "launching TUI")
 		tui.RedirectStdLog()
 		tui.Launch(a.baseURL, Version)
-		log.Printf("[devo] TUI exited, shutting down server...")
+		logging.Info(ctx, "TUI exited, shutting down server")
 		server.Close()
 		return
 	}
 
-	log.Printf("[devo] Server running on %s (press Ctrl+C to stop)", a.baseURL)
+	logging.Info(ctx, "server running",
+		"base_url", a.baseURL,
+	)
 	select {}
 }
 
@@ -266,6 +291,8 @@ func ensureProjectConfig(workingDir string, sm *skills.Manager, mcpMgr *mcp.Mana
 		return err
 	}
 
-	log.Printf("[devo] Created default project config at %s/.devo/config.json", workingDir)
+	logging.Info(context.Background(), "created default project config",
+		"path", workingDir+"/.devo/config.json",
+	)
 	return nil
 }

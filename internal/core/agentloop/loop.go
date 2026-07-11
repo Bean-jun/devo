@@ -15,6 +15,7 @@ import (
 	"devo/internal/core/session"
 	"devo/internal/core/skills"
 	"devo/internal/core/tokenmeter"
+	"devo/internal/pkg/logging"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
 )
@@ -179,8 +180,15 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		"message": "开始处理用户请求...",
 	})
 
+	traceID := logging.TraceIDFromContext(ctx)
+	if traceID == "" {
+		traceID = logging.GenerateTraceID()
+	}
+	ctx = logging.WithSessionID(ctx, sessionID)
+
 	lc := &LoopContext{
 		SessionID: sessionID,
+		TraceID:   traceID,
 		EventBus:  eventBus,
 		CancelCh:  make(chan struct{}, 1),
 		PauseCh:   make(chan struct{}, 1),
@@ -190,7 +198,10 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 	l.activeLoops.Store(sessionID, lc)
 	go func() {
 		defer l.activeLoops.Delete(sessionID)
-		l.stateMachine.Run(context.Background(), lc)
+		bgCtx := context.Background()
+		bgCtx = logging.WithTraceID(bgCtx, traceID)
+		bgCtx = logging.WithSessionID(bgCtx, sessionID)
+		l.stateMachine.Run(bgCtx, lc)
 
 		sess, err := l.store.Get(sessionID)
 		if err == nil && sess.State != session.StatePaused {

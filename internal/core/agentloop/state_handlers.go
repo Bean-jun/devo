@@ -5,12 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"time"
 
 	"devo/internal/core/compressor"
 	"devo/internal/core/session"
 	"devo/internal/core/tokenmeter"
+	"devo/internal/pkg/logging"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
 )
@@ -103,7 +103,10 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 				ToolCalls:  evt.ToolCalls,
 				TokenUsage: evt.TokenUsage,
 			}
-			log.Printf("[DEBUG] thinkingHandler got done for session=%s, ToolCalls=%d", lc.SessionID, len(evt.ToolCalls))
+			logging.Debug(ctx, "thinking handler completed",
+				"session_id", lc.SessionID,
+				"tool_calls", len(evt.ToolCalls),
+			)
 			lc.StepSeq++
 
 			if evt.TokenUsage != nil {
@@ -112,7 +115,9 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 
 				sess, err := l.store.Get(lc.SessionID)
 				if err != nil {
-					log.Printf("[DEBUG] thinkingHandler: get session for token_usage failed: %v", err)
+					logging.Debug(ctx, "thinking handler: get session for token_usage failed",
+						"error", err,
+					)
 				} else {
 					lc.EventBus.Publish("token_usage", map[string]any{
 						"step":                   lc.StepSeq,
@@ -133,8 +138,15 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 				if inputTokens > 0 {
 					hitRate = float64(cachedTokens) / float64(inputTokens) * 100
 				}
-				log.Printf("[CACHE] session=%s step=%d system_hash=%s input_tokens=%d cached_tokens=%d hit_rate=%.1f%% len(system)=%d",
-					lc.SessionID, lc.StepSeq, hashStr, inputTokens, cachedTokens, hitRate, len(lc.DynamicPrompt))
+				logging.Info(ctx, "llm cache stats",
+					"session_id", lc.SessionID,
+					"step", lc.StepSeq,
+					"system_hash", hashStr,
+					"input_tokens", inputTokens,
+					"cached_tokens", cachedTokens,
+					"hit_rate", fmt.Sprintf("%.1f%%", hitRate),
+					"system_len", len(lc.DynamicPrompt),
+				)
 			}
 
 			lc.EventBus.Publish("streaming_complete", map[string]any{
@@ -157,23 +169,36 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 }
 
 func (l *Loop) evaluatingResultHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
-	log.Printf("[DEBUG] evaluatingResultHandler called for session=%s, ToolCalls=%d", lc.SessionID, len(lc.LLMResult.ToolCalls))
+	logging.Debug(ctx, "evaluating result handler called",
+		"session_id", lc.SessionID,
+		"tool_calls", len(lc.LLMResult.ToolCalls),
+	)
 	if len(lc.LLMResult.ToolCalls) > 0 {
 		lc.ExecutedToolCallIDs = make(map[string]bool)
 		lc.EventBus.Publish("loop.result_evaluated", map[string]string{"type": "tool_calls"})
 
 		sess, err := l.store.Get(lc.SessionID)
 		if err != nil {
-			log.Printf("[DEBUG] evaluatingResultHandler: failed to get session: %v", err)
+			logging.Debug(ctx, "evaluating result handler: failed to get session",
+				"error", err,
+			)
 		} else {
 			oldState := string(sess.State)
-			log.Printf("[DEBUG] evaluatingResultHandler: current state=%s, setting to ToolExecuting", oldState)
+			logging.Debug(ctx, "evaluating result handler: setting state to ToolExecuting",
+				"session_id", lc.SessionID,
+				"old_state", oldState,
+			)
 			sess.State = session.StateToolExecuting
 			sess.LastActiveAt = time.Now()
 			if err := l.store.Update(sess); err != nil {
-				log.Printf("[DEBUG] evaluatingResultHandler: failed to update state to ToolExecuting: %v", err)
+				logging.Error(ctx, "evaluating result handler: failed to update state to ToolExecuting",
+					"error", err,
+				)
 			} else {
-				log.Printf("[DEBUG] evaluatingResultHandler: updated state from %s to ToolExecuting", oldState)
+				logging.Debug(ctx, "evaluating result handler: updated state",
+					"old_state", oldState,
+					"new_state", "ToolExecuting",
+				)
 			}
 			lc.EventBus.Publish("session_state_change", map[string]any{
 				"old_state": session.State(oldState).ToSnakeCase(),
@@ -190,7 +215,10 @@ func (l *Loop) evaluatingResultHandler(ctx context.Context, lc *LoopContext) (Lo
 }
 
 func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
-	log.Printf("[DEBUG] toolExecutingHandler called for session=%s, ToolCalls=%d", lc.SessionID, len(lc.LLMResult.ToolCalls))
+	logging.Debug(ctx, "tool executing handler called",
+		"session_id", lc.SessionID,
+		"tool_calls", len(lc.LLMResult.ToolCalls),
+	)
 	if lc.ExecutedToolCallIDs == nil {
 		lc.ExecutedToolCallIDs = make(map[string]bool)
 	}
@@ -210,16 +238,26 @@ func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopS
 
 	sess, err := l.store.Get(lc.SessionID)
 	if err != nil {
-		log.Printf("[DEBUG] toolExecutingHandler: failed to get session: %v", err)
+		logging.Error(ctx, "tool executing handler: failed to get session",
+			"error", err,
+		)
 	} else {
 		oldState := string(sess.State)
-		log.Printf("[DEBUG] toolExecutingHandler: current state=%s, setting to ToolExecuting", oldState)
+		logging.Debug(ctx, "tool executing handler: setting state to ToolExecuting",
+			"session_id", lc.SessionID,
+			"old_state", oldState,
+		)
 		sess.State = session.StateToolExecuting
 		sess.LastActiveAt = time.Now()
 		if err := l.store.Update(sess); err != nil {
-			log.Printf("[DEBUG] toolExecutingHandler: failed to update state to ToolExecuting: %v", err)
+			logging.Error(ctx, "tool executing handler: failed to update state to ToolExecuting",
+				"error", err,
+			)
 		} else {
-			log.Printf("[DEBUG] toolExecutingHandler: updated state from %s to ToolExecuting", oldState)
+			logging.Debug(ctx, "tool executing handler: updated state",
+				"old_state", oldState,
+				"new_state", "ToolExecuting",
+			)
 		}
 		lc.EventBus.Publish("session_state_change", map[string]any{
 			"old_state": session.State(oldState).ToSnakeCase(),

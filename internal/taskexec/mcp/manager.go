@@ -3,13 +3,13 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"log"
 	"os/exec"
 	"sync"
 	"time"
 
 	"devo/internal/config"
 	"devo/internal/core/session"
+	"devo/internal/pkg/logging"
 	"devo/internal/taskexec/tools"
 
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -690,15 +690,22 @@ func (m *Manager) startReconnect(serverID string) {
 				return
 			}
 
-			log.Printf("[mcp] attempting reconnect to server %s...", serverID)
+			logging.Info(m.reconnectCtx, "mcp attempting reconnect",
+				"server_id", serverID,
+			)
 			ctx, cancel := context.WithTimeout(m.reconnectCtx, 10*time.Second)
 			if err := m.Connect(ctx, serverID); err != nil {
-				log.Printf("[mcp] reconnect failed for %s: %v", serverID, err)
+				logging.Warn(m.reconnectCtx, "mcp reconnect failed",
+					"server_id", serverID,
+					"error", err,
+				)
 				cancel()
 				continue
 			}
 			cancel()
-			log.Printf("[mcp] reconnect succeeded for %s", serverID)
+			logging.Info(m.reconnectCtx, "mcp reconnect succeeded",
+				"server_id", serverID,
+			)
 			m.registerServerTools(serverID)
 			return
 		}

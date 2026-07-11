@@ -1,9 +1,9 @@
 package providers
 
 import (
-	"log"
-
+	"context"
 	"devo/internal/config"
+	"devo/internal/pkg/logging"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/llmclient/providers/openai"
 	"devo/internal/taskexec/tools"
@@ -11,7 +11,7 @@ import (
 
 func NewClient(cfg *config.GlobalConfig, registry *tools.Registry) llmclient.Client {
 	if cfg.LLM.APIKey == "" {
-		log.Println("[devo] LLM API key not configured, using MockClient")
+		logging.Info(context.Background(), "llm api key not configured, using mock client")
 		return llmclient.NewMockClient()
 	}
 
@@ -22,6 +22,9 @@ func NewClient(cfg *config.GlobalConfig, registry *tools.Registry) llmclient.Cli
 		Headers: cfg.LLM.ExtraHeaders,
 	}, registry)
 
-	log.Printf("[devo] Using LLM: base_url=%s, model=%s", cfg.LLM.BaseURL, cfg.LLM.Model)
+	logging.Info(context.Background(), "using llm",
+		"base_url", cfg.LLM.BaseURL,
+		"model", cfg.LLM.Model,
+	)
 	return client
 }

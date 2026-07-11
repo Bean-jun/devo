@@ -1,16 +1,18 @@
 package agentloop
 
 import (
+	"context"
 	"fmt"
-	"log"
 
 	"devo/internal/core/session"
+	"devo/internal/pkg/logging"
 	"devo/internal/pkg/process"
 )
 
 const crashRecoverySystemMessage = "系统检测到上次服务异常中断，当前会话已重置。未完成的工具调用已丢弃，请检查文件状态。"
 
 func (l *Loop) RecoverCrashedSessions() error {
+	ctx := context.Background()
 	sessions, total, err := l.store.ListSessions("all", "", 0, 0)
 	if err != nil {
 		return fmt.Errorf("list sessions for crash recovery: %w", err)
@@ -28,7 +30,7 @@ func (l *Loop) RecoverCrashedSessions() error {
 
 		switch sess.State {
 		case session.StateThinking, session.StateToolExecuting, session.StateAwaitingApproval:
-			l.recoverSession(sess)
+			l.recoverSession(ctx, sess)
 
 		case session.StatePaused, session.StateIdle:
 		}
@@ -37,7 +39,7 @@ func (l *Loop) RecoverCrashedSessions() error {
 	return nil
 }
 
-func (l *Loop) recoverSession(sess *session.Session) {
+func (l *Loop) recoverSession(ctx context.Context, sess *session.Session) {
 	oldState := string(sess.State)
 
 	if sess.ChildPID != nil {
@@ -54,7 +56,10 @@ func (l *Loop) recoverSession(sess *session.Session) {
 	sess.PauseRequested = false
 
 	if err := l.store.Update(sess); err != nil {
-		log.Printf("[crash-recovery] failed to update session %s: %v", sess.ID, err)
+		logging.Warn(ctx, "crash recovery: failed to update session",
+			"session_id", sess.ID,
+			"error", err,
+		)
 		return
 	}
 
@@ -65,7 +70,10 @@ func (l *Loop) recoverSession(sess *session.Session) {
 		CreatedAt: sess.LastActiveAt,
 	}
 	if err := l.store.AddMessage(sess.ID, sysMsg); err != nil {
-		log.Printf("[crash-recovery] failed to add system message to session %s: %v", sess.ID, err)
+		logging.Warn(ctx, "crash recovery: failed to add system message",
+			"session_id", sess.ID,
+			"error", err,
+		)
 	}
 
 	l.archiveManager.AppendSystemMessage(sess.ID, crashRecoverySystemMessage)
@@ -79,5 +87,9 @@ func (l *Loop) recoverSession(sess *session.Session) {
 		})
 	}
 
-	log.Printf("[crash-recovery] recovered session %s: %s -> Idle", sess.ID, oldState)
+	logging.Info(ctx, "crash recovery: recovered session",
+		"session_id", sess.ID,
+		"old_state", oldState,
+		"new_state", "Idle",
+	)
 }

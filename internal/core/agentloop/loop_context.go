@@ -8,6 +8,7 @@ import (
 
 type LoopContext struct {
 	SessionID string
+	TraceID   string
 	EventBus  *session.EventBus
 
 	StepSeq         int

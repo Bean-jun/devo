@@ -2,11 +2,11 @@ package rest
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"sort"
 	"strings"
 
+	"devo/internal/pkg/logging"
 	"devo/internal/taskexec/mcp"
 )
 
@@ -183,7 +183,9 @@ func (h *Handler) AddMcpServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.mcpManager.ConnectAll(r.Context()); err != nil {
-		log.Printf("[devo] MCP reconnect after add warning: %v", err)
+		logging.Warn(r.Context(), "mcp reconnect after add warning",
+			"error", err,
+		)
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]string{
@@ -210,7 +212,9 @@ func (h *Handler) RemoveMcpServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.mcpManager.DisableServer(serverID); err != nil {
-		log.Printf("[devo] MCP disable during remove warning: %v", err)
+		logging.Warn(r.Context(), "mcp disable during remove warning",
+			"error", err,
+		)
 	}
 
 	if err := mcp.RemoveServerConfig(h.projectDir, scope, serverID); err != nil {

@@ -17,6 +17,7 @@ type Config struct {
 	LLM            LLMConfig         `json:"llm,omitempty"`
 	DBPath         string            `json:"db_path,omitempty"`
 	LogPath        string            `json:"log_path,omitempty"`
+	LogLevel       string            `json:"log_level,omitempty"`
 	ApprovalPolicy map[string]string `json:"approval_policy,omitempty"`
 	Skills         []string          `json:"skills,omitempty"`
 	MCP            []string          `json:"mcp,omitempty"`
@@ -100,6 +101,9 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("DEVO_LOG_PATH"); v != "" {
 		cfg.LogPath = v
 	}
+	if v := os.Getenv("DEVO_LOG_LEVEL"); v != "" {
+		cfg.LogLevel = v
+	}
 }
 
 func applyDefaults(cfg *Config) {
@@ -142,6 +146,9 @@ func Merge(global, project *Config) *Config {
 	}
 	if project.LogPath != "" {
 		result.LogPath = project.LogPath
+	}
+	if project.LogLevel != "" {
+		result.LogLevel = project.LogLevel
 	}
 	if project.ApprovalPolicy != nil {
 		result.ApprovalPolicy = project.ApprovalPolicy

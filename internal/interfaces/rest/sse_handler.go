@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"devo/internal/core/session"
+	"devo/internal/pkg/logging"
 )
 
 func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +46,7 @@ func (h *Handler) SSEEvents(w http.ResponseWriter, r *http.Request) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		log.Printf("SSE handler: flusher not supported")
+		logging.Warn(r.Context(), "sse handler: flusher not supported")
 		writeError(w, http.StatusInternalServerError, "streaming not supported")
 		return
 	}

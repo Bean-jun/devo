@@ -3,10 +3,10 @@ package agentloop
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 
 	"devo/internal/core/session"
+	"devo/internal/pkg/logging"
 )
 
 type LoopState string
@@ -46,7 +46,10 @@ func (sm *StateMachine) Register(state LoopState, handler StateHandler) {
 func (sm *StateMachine) Run(ctx context.Context, lc *LoopContext) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("state machine panic for session %s: %v", lc.SessionID, r)
+			logging.Error(ctx, "state machine panic",
+				"session_id", lc.SessionID,
+				"panic", r,
+			)
 			lc.TerminationReason = "panic"
 			lc.EventBus.Publish("error", map[string]any{
 				"message": fmt.Sprintf("panic: %v", r),
@@ -113,7 +116,9 @@ func (sm *StateMachine) Run(ctx context.Context, lc *LoopContext) {
 		sm.mu.RUnlock()
 
 		if !ok {
-			log.Printf("state machine: no handler registered for state %s", currentState)
+			logging.Error(ctx, "state machine: no handler registered",
+				"state", currentState,
+			)
 			lc.TerminationReason = "error"
 			lc.EventBus.Publish("error", map[string]any{
 				"message": fmt.Sprintf("no handler for state: %s", currentState),
@@ -124,7 +129,10 @@ func (sm *StateMachine) Run(ctx context.Context, lc *LoopContext) {
 		nextState, err := handler(ctx, lc)
 
 		if err != nil {
-			log.Printf("state machine error in state %s: %v", currentState, err)
+			logging.Error(ctx, "state machine error",
+				"state", currentState,
+				"error", err,
+			)
 			lc.TerminationReason = "error"
 			lc.EventBus.Publish("error", map[string]any{
 				"message": err.Error(),

@@ -1,11 +1,12 @@
 package main
 
 import (
-	"log"
+	"context"
 	"net/http"
 	"os"
 	"time"
 
+	"devo/internal/pkg/logging"
 	webembed "devo/web"
 )
 
@@ -34,21 +35,24 @@ func serveWebUI(mux *http.ServeMux) {
 }
 
 func waitForReady(baseURL string, timeout time.Duration) {
+	ctx := context.Background()
 	deadline := time.Now().Add(timeout)
 	url := baseURL + "/api/v1/sessions"
 	client := &http.Client{Timeout: 2 * time.Second}
-	log.Printf("[devo] Waiting for server readiness (timeout: %v)...", timeout)
+	logging.Info(ctx, "waiting for server readiness",
+		"timeout", timeout.String(),
+	)
 	for time.Now().Before(deadline) {
 		resp, err := client.Get(url)
 		if err == nil {
 			resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
-				log.Printf("[devo] Server is ready.")
 				return
 			}
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	log.Printf("[devo] Server did not become ready within %v", timeout)
-	log.Fatalf("server did not become ready within %v", timeout)
+	logging.Error(ctx, "server not ready within timeout",
+		"timeout", timeout.String(),
+	)
 }
