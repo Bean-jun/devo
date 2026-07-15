@@ -27,7 +27,7 @@ type ExecPythonTool struct {
 	bgManager *BackgroundProcessManager
 }
 
-var pythonSearchOrder = []string{"python3", "python", "python3.12", "python3.11", "python3.10"}
+var pythonSearchOrder = []string{"python3", "python", "python.exe", "python3.12", "python3.11", "python3.10"}
 
 // pythonBlacklistPatterns 是基于源码文本的最后一道防线，不是主要安全边界。
 // 真正的隔离应在进程/系统层面完成（容器化、namespace、资源限制、网络限制等）。

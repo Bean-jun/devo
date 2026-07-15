@@ -21,6 +21,23 @@ func NormalizePath(p string) string {
 	return p
 }
 
+// isRealAbsPath checks if a path is a "real" absolute path.
+// On Windows, paths starting with "/" (e.g., "/foo/bar") are considered absolute
+// by filepath.IsAbs, but they are not truly absolute since they lack a drive letter.
+// Such paths should be treated as relative and joined with the working directory.
+func isRealAbsPath(p string) bool {
+	if !filepath.IsAbs(p) {
+		return false
+	}
+	if len(p) >= 2 && p[1] == ':' {
+		return true
+	}
+	if len(p) >= 2 && p[0] == '\\' && p[1] == '\\' {
+		return true
+	}
+	return false
+}
+
 func CheckPath(workingDir, requestedPath string) (string, error) {
 	absWorkDir, err := filepath.Abs(workingDir)
 	if err != nil {
@@ -28,8 +45,12 @@ func CheckPath(workingDir, requestedPath string) (string, error) {
 	}
 	absWorkDir = NormalizePath(absWorkDir)
 
+	if !strings.HasSuffix(absWorkDir, string(filepath.Separator)) {
+		absWorkDir += string(filepath.Separator)
+	}
+
 	var absRequested string
-	if filepath.IsAbs(requestedPath) {
+	if isRealAbsPath(requestedPath) {
 		absRequested = requestedPath
 	} else {
 		absRequested = filepath.Join(absWorkDir, requestedPath)

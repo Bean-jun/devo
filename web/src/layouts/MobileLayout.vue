@@ -153,6 +153,7 @@ function handleCommandSelect(cmd: Command) {
 
 function handleSend(text: string) {
   if (!sessionStore.currentSession) return
+  uiStore.clearErrorToasts()
   chatStore.appendUserMessage(text)
 
   fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/messages`, {

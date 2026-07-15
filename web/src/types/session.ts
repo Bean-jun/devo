@@ -30,6 +30,8 @@ export interface Session {
   tokenUsage: TokenUsage
   trustLevel: TrustLevel
   approvalPolicy: ApprovalPolicy
+  toolCallLimit?: number
+  keepRecent?: number
   maxContextTokens?: number
   currentContextTokens?: number
 }

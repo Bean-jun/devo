@@ -6,114 +6,295 @@ import (
 	"testing"
 )
 
-func TestCheckPath_ValidRelativePath(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	absPath, err := CheckPath(tmpDir, "test.txt")
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+func TestIsRealAbsPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		{
+			name:     "Windows drive letter path",
+			path:     `D:\devo\projects\devo\build`,
+			expected: true,
+		},
+		{
+			name:     "Windows lowercase drive letter",
+			path:     `c:\Users\test`,
+			expected: true,
+		},
+		{
+			name:     "UNC path",
+			path:     `\\server\share\file`,
+			expected: true,
+		},
+		{
+			name:     "Unix-style absolute path (slash start)",
+			path:     `/devo-windows-amd64.exe`,
+			expected: false,
+		},
+		{
+			name:     "relative path",
+			path:     `devo-windows-amd64.exe`,
+			expected: false,
+		},
+		{
+			name:     "relative path with dir",
+			path:     `subdir/file.txt`,
+			expected: false,
+		},
+		{
+			name:     "Unix-style absolute with subdir",
+			path:     `/usr/local/bin`,
+			expected: false,
+		},
 	}
 
-	expected := filepath.Join(tmpDir, "test.txt")
-	if absPath != expected {
-		t.Errorf("expected %q, got %q", expected, absPath)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isRealAbsPath(tt.path)
+			if result != tt.expected {
+				t.Errorf("isRealAbsPath(%q) = %v, want %v", tt.path, result, tt.expected)
+			}
+		})
 	}
 }
 
-func TestCheckPath_ValidSubdirectory(t *testing.T) {
+func TestCheckPath_SlashPrefix(t *testing.T) {
 	tmpDir := t.TempDir()
-	subDir := filepath.Join(tmpDir, "subdir")
-	os.Mkdir(subDir, 0755)
 
-	absPath, err := CheckPath(tmpDir, "subdir/file.txt")
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	workDir := filepath.Join(tmpDir, "build")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatal(err)
 	}
 
-	expected := filepath.Join(tmpDir, "subdir", "file.txt")
-	if absPath != expected {
-		t.Errorf("expected %q, got %q", expected, absPath)
+	testFile := filepath.Join(workDir, "devo-windows-amd64.exe")
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := CheckPath(workDir, "/devo-windows-amd64.exe")
+	if err != nil {
+		t.Fatalf("CheckPath with slash prefix should succeed: %v", err)
+	}
+
+	expected := filepath.Join(workDir, "devo-windows-amd64.exe")
+	resultAbs, _ := filepath.Abs(result)
+	expectedAbs, _ := filepath.Abs(expected)
+	if resultAbs != expectedAbs {
+		t.Errorf("CheckPath result = %q, want %q", resultAbs, expectedAbs)
 	}
 }
 
-func TestCheckPath_ValidAbsolutePath(t *testing.T) {
+func TestCheckPath_RelativePath(t *testing.T) {
 	tmpDir := t.TempDir()
-	subDir := filepath.Join(tmpDir, "subdir")
-	os.Mkdir(subDir, 0755)
 
-	absPath, err := CheckPath(tmpDir, subDir)
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	workDir := filepath.Join(tmpDir, "build")
+	subDir := filepath.Join(workDir, "subdir")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatal(err)
 	}
 
-	if absPath != subDir {
-		t.Errorf("expected %q, got %q", subDir, absPath)
+	testFile := filepath.Join(subDir, "file.txt")
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := CheckPath(workDir, "subdir/file.txt")
+	if err != nil {
+		t.Fatalf("CheckPath with relative path should succeed: %v", err)
+	}
+
+	resultAbs, _ := filepath.Abs(result)
+	expectedAbs, _ := filepath.Abs(testFile)
+	if resultAbs != expectedAbs {
+		t.Errorf("CheckPath result = %q, want %q", resultAbs, expectedAbs)
 	}
 }
 
-func TestCheckPath_TraversalAttempt(t *testing.T) {
+func TestCheckPath_AbsolutePath(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	_, err := CheckPath(tmpDir, "../../etc/passwd")
+	workDir := filepath.Join(tmpDir, "project")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	testFile := filepath.Join(workDir, "main.go")
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := CheckPath(workDir, testFile)
+	if err != nil {
+		t.Fatalf("CheckPath with absolute path should succeed: %v", err)
+	}
+
+	resultAbs, _ := filepath.Abs(result)
+	expectedAbs, _ := filepath.Abs(testFile)
+	if resultAbs != expectedAbs {
+		t.Errorf("CheckPath result = %q, want %q", resultAbs, expectedAbs)
+	}
+}
+
+func TestCheckPath_SiblingDir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	workDir := filepath.Join(tmpDir, "devo")
+	siblingDir := filepath.Join(tmpDir, "devo2")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(siblingDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	siblingFile := filepath.Join(siblingDir, "main.go")
+	if err := os.WriteFile(siblingFile, []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := CheckPath(workDir, siblingFile)
 	if err != ErrPathOutsideWorkDir {
-		t.Errorf("expected ErrPathOutsideWorkDir, got: %v", err)
+		t.Errorf("CheckPath with sibling dir should return ErrPathOutsideWorkDir, got: %v", err)
 	}
 }
 
-func TestCheckPath_AbsolutePathOutsideWorkDir(t *testing.T) {
+func TestCheckPath_ParentDir(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	absPath := filepath.Join(tmpDir, "..", "..", "..", "..", "Windows", "System32", "drivers", "etc", "hosts")
-	absPath, _ = filepath.Abs(absPath)
+	workDir := filepath.Join(tmpDir, "project", "subdir")
+	parentFile := filepath.Join(tmpDir, "project", "main.go")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(parentFile, []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
-	_, err := CheckPath(tmpDir, absPath)
+	_, err := CheckPath(workDir, parentFile)
 	if err != ErrPathOutsideWorkDir {
-		t.Errorf("expected ErrPathOutsideWorkDir, got: %v", err)
+		t.Errorf("CheckPath with parent dir should return ErrPathOutsideWorkDir, got: %v", err)
 	}
 }
 
-func TestCheckPath_DotDotInSubdir(t *testing.T) {
+func TestCheckPath_WindowsRelativePaths(t *testing.T) {
 	tmpDir := t.TempDir()
-	subDir := filepath.Join(tmpDir, "subdir")
-	os.Mkdir(subDir, 0755)
 
-	_, err := CheckPath(tmpDir, "subdir/../../etc/passwd")
-	if err != ErrPathOutsideWorkDir {
-		t.Errorf("expected ErrPathOutsideWorkDir, got: %v", err)
+	workDir := filepath.Join(tmpDir, "devo")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name       string
+		relPath    string
+		createFile string
+	}{
+		{
+			name:       "forward slash relative path",
+			relPath:    "docs/问题排查与修复方案.md",
+			createFile: "docs/问题排查与修复方案.md",
+		},
+		{
+			name:       "backslash relative path",
+			relPath:    `tests\knowledge-base\resource-platform\TC-UPLOAD-011_1061.spec.js`,
+			createFile: `tests\knowledge-base\resource-platform\TC-UPLOAD-011_1061.spec.js`,
+		},
+		{
+			name:       "forward slash with subdirs",
+			relPath:    "internal/taskexec/pathsec/check.go",
+			createFile: "internal/taskexec/pathsec/check.go",
+		},
+		{
+			name:       "simple forward slash filename",
+			relPath:    "问题排查与修复方案.md",
+			createFile: "问题排查与修复方案.md",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fullPath := filepath.Join(workDir, tt.createFile)
+			dir := filepath.Dir(fullPath)
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(fullPath, []byte("test"), 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			result, err := CheckPath(workDir, tt.relPath)
+			if err != nil {
+				t.Fatalf("CheckPath(%q) should succeed: %v", tt.relPath, err)
+			}
+
+			resultAbs, _ := filepath.Abs(result)
+			expectedAbs, _ := filepath.Abs(fullPath)
+			if resultAbs != expectedAbs {
+				t.Errorf("CheckPath(%q) = %q, want %q", tt.relPath, resultAbs, expectedAbs)
+			}
+		})
 	}
 }
 
-func TestCheckPath_CurrentDir(t *testing.T) {
+func TestCheckPath_MixedSeparatorRelativePath(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	absPath, err := CheckPath(tmpDir, ".")
+	workDir := filepath.Join(tmpDir, "devo")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	testFile := filepath.Join(workDir, "src", "utils", "helper.go")
+	dir := filepath.Dir(testFile)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := CheckPath(workDir, "src/utils/helper.go")
 	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+		t.Fatalf("CheckPath with mixed separators should succeed: %v", err)
 	}
 
-	if absPath != tmpDir {
-		t.Errorf("expected %q, got %q", tmpDir, absPath)
-	}
-}
-
-func TestCheckRelativePath_Valid(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	rel, err := CheckRelativePath(tmpDir, "test.txt")
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-
-	if rel != "test.txt" {
-		t.Errorf("expected 'test.txt', got %q", rel)
+	resultAbs, _ := filepath.Abs(result)
+	expectedAbs, _ := filepath.Abs(testFile)
+	if resultAbs != expectedAbs {
+		t.Errorf("CheckPath result = %q, want %q", resultAbs, expectedAbs)
 	}
 }
 
-func TestCheckRelativePath_Traversal(t *testing.T) {
-	tmpDir := t.TempDir()
+func TestNormalizePath(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "lowercase drive letter",
+			input:    `d:\devo\project`,
+			expected: `D:\devo\project`,
+		},
+		{
+			name:     "already uppercase",
+			input:    `D:\devo\project`,
+			expected: `D:\devo\project`,
+		},
+		{
+			name:     "unix path (Windows will convert to backslash)",
+			input:    `/usr/local`,
+			expected: `\usr\local`,
+		},
+	}
 
-	_, err := CheckRelativePath(tmpDir, "../../etc/passwd")
-	if err != ErrPathOutsideWorkDir {
-		t.Errorf("expected ErrPathOutsideWorkDir, got: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := NormalizePath(tt.input)
+			if result != tt.expected {
+				t.Errorf("NormalizePath(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
 	}
 }

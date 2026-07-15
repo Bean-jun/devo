@@ -84,6 +84,34 @@ func SaveProjectConfig(projectDir string, cfg *Config) error {
 		}
 		existing["log_path"] = logData
 	}
+	if cfg.ToolCallLimit > 0 {
+		toolCallLimitData, err := json.Marshal(cfg.ToolCallLimit)
+		if err != nil {
+			return fmt.Errorf("marshal tool_call_limit: %w", err)
+		}
+		existing["tool_call_limit"] = toolCallLimitData
+	}
+	if cfg.MaxContextTokens > 0 {
+		maxCtxData, err := json.Marshal(cfg.MaxContextTokens)
+		if err != nil {
+			return fmt.Errorf("marshal max_context_tokens: %w", err)
+		}
+		existing["max_context_tokens"] = maxCtxData
+	}
+	if cfg.KeepRecent > 0 {
+		keepRecentData, err := json.Marshal(cfg.KeepRecent)
+		if err != nil {
+			return fmt.Errorf("marshal keep_recent: %w", err)
+		}
+		existing["keep_recent"] = keepRecentData
+	}
+	if cfg.ContextCompressRatio > 0 {
+		compressRatioData, err := json.Marshal(cfg.ContextCompressRatio)
+		if err != nil {
+			return fmt.Errorf("marshal context_compress_ratio: %w", err)
+		}
+		existing["context_compress_ratio"] = compressRatioData
+	}
 
 	data, err := json.MarshalIndent(existing, "", "  ")
 	if err != nil {
@@ -165,6 +193,34 @@ func SaveGlobalConfig(cfg *Config) error {
 			return fmt.Errorf("marshal mcp: %w", err)
 		}
 		existing["mcp"] = mcpData
+	}
+	if cfg.ToolCallLimit > 0 {
+		toolCallLimitData, err := json.Marshal(cfg.ToolCallLimit)
+		if err != nil {
+			return fmt.Errorf("marshal tool_call_limit: %w", err)
+		}
+		existing["tool_call_limit"] = toolCallLimitData
+	}
+	if cfg.MaxContextTokens > 0 {
+		maxCtxData, err := json.Marshal(cfg.MaxContextTokens)
+		if err != nil {
+			return fmt.Errorf("marshal max_context_tokens: %w", err)
+		}
+		existing["max_context_tokens"] = maxCtxData
+	}
+	if cfg.KeepRecent > 0 {
+		keepRecentData, err := json.Marshal(cfg.KeepRecent)
+		if err != nil {
+			return fmt.Errorf("marshal keep_recent: %w", err)
+		}
+		existing["keep_recent"] = keepRecentData
+	}
+	if cfg.ContextCompressRatio > 0 {
+		compressRatioData, err := json.Marshal(cfg.ContextCompressRatio)
+		if err != nil {
+			return fmt.Errorf("marshal context_compress_ratio: %w", err)
+		}
+		existing["context_compress_ratio"] = compressRatioData
 	}
 
 	data, err := json.MarshalIndent(existing, "", "  ")

@@ -82,10 +82,6 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/trust", h.SetTrustLevel)
 	mux.HandleFunc("PUT /api/v1/sessions/{id}/approval-policy", h.SetApprovalPolicy)
 
-	// 全局有效
-	mux.HandleFunc("GET /api/v1/user/approval-policy", h.GetUserApprovalPolicy)
-	mux.HandleFunc("PUT /api/v1/user/approval-policy", h.SetUserApprovalPolicy)
-
 	mux.HandleFunc("POST /api/v1/sessions/{id}/cancel", h.Cancel)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/pause", h.Pause)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/resume", h.Resume)
@@ -120,6 +116,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/project/config", h.SetProjectConfig)
 
 	mux.HandleFunc("GET /api/v1/config/status", h.GetConfigStatus)
+
+	mux.HandleFunc("GET /api/v1/global/config", h.GetGlobalConfig)
+	mux.HandleFunc("PUT /api/v1/global/config", h.SetGlobalConfig)
 }
 
 func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {

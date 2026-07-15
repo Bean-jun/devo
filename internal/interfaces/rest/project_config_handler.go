@@ -8,9 +8,13 @@ import (
 )
 
 type getProjectConfigResponse struct {
-	Skills         []string          `json:"skills"`
-	MCP            []string          `json:"mcp"`
-	ApprovalPolicy map[string]string `json:"approval_policy"`
+	Skills               []string          `json:"skills"`
+	MCP                  []string          `json:"mcp"`
+	ApprovalPolicy       map[string]string `json:"approval_policy"`
+	ToolCallLimit        int               `json:"tool_call_limit,omitempty"`
+	MaxContextTokens     int               `json:"max_context_tokens,omitempty"`
+	KeepRecent           int               `json:"keep_recent,omitempty"`
+	ContextCompressRatio float64           `json:"context_compress_ratio,omitempty"`
 }
 
 func (h *Handler) GetProjectConfig(w http.ResponseWriter, r *http.Request) {
@@ -20,12 +24,7 @@ func (h *Handler) GetProjectConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg, err := config.LoadProjectConfig(wd)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to load config: "+err.Error())
-		return
-	}
-
+	cfg, _ := config.LoadFullConfig(wd)
 	if cfg == nil {
 		writeJSON(w, http.StatusOK, getProjectConfigResponse{Skills: []string{}, MCP: []string{}, ApprovalPolicy: map[string]string{}})
 		return
@@ -37,16 +36,24 @@ func (h *Handler) GetProjectConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, getProjectConfigResponse{
-		Skills:         cfg.Skills,
-		MCP:            cfg.MCP,
-		ApprovalPolicy: approvalPolicy,
+		Skills:               cfg.Skills,
+		MCP:                  cfg.MCP,
+		ApprovalPolicy:       approvalPolicy,
+		ToolCallLimit:        cfg.ToolCallLimit,
+		MaxContextTokens:     cfg.MaxContextTokens,
+		KeepRecent:           cfg.KeepRecent,
+		ContextCompressRatio: cfg.ContextCompressRatio,
 	})
 }
 
 type setProjectConfigRequest struct {
-	Skills         []string          `json:"skills"`
-	MCP            []string          `json:"mcp"`
-	ApprovalPolicy map[string]string `json:"approval_policy"`
+	Skills               []string          `json:"skills"`
+	MCP                  []string          `json:"mcp"`
+	ApprovalPolicy       map[string]string `json:"approval_policy"`
+	ToolCallLimit        int               `json:"tool_call_limit,omitempty"`
+	MaxContextTokens     int               `json:"max_context_tokens,omitempty"`
+	KeepRecent           int               `json:"keep_recent,omitempty"`
+	ContextCompressRatio float64           `json:"context_compress_ratio,omitempty"`
 }
 
 func (h *Handler) SetProjectConfig(w http.ResponseWriter, r *http.Request) {
@@ -68,9 +75,13 @@ func (h *Handler) SetProjectConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := &config.ProjectConfig{
-		Skills:         req.Skills,
-		MCP:            req.MCP,
-		ApprovalPolicy: req.ApprovalPolicy,
+		Skills:               req.Skills,
+		MCP:                  req.MCP,
+		ApprovalPolicy:       req.ApprovalPolicy,
+		ToolCallLimit:        req.ToolCallLimit,
+		MaxContextTokens:     req.MaxContextTokens,
+		KeepRecent:           req.KeepRecent,
+		ContextCompressRatio: req.ContextCompressRatio,
 	}
 
 	if err := config.SaveProjectConfig(wd, cfg); err != nil {

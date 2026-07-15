@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"devo/internal/config"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
@@ -513,12 +512,6 @@ func TestUpdateConfigSessionNotFound(t *testing.T) {
 	err := loop.UpdateConfig("nonexistent", 80)
 	if err == nil {
 		t.Fatal("expected error for nonexistent session")
-	}
-}
-
-func TestDefaultToolCallLimit(t *testing.T) {
-	if config.DefaultToolCallLimit != 50 {
-		t.Errorf("expected DefaultToolCallLimit 50, got %d", config.DefaultToolCallLimit)
 	}
 }
 

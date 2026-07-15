@@ -1,0 +1,125 @@
+package rest
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"devo/internal/config"
+	"devo/internal/core/approval"
+)
+
+type getGlobalConfigResponse struct {
+	LLM                  config.LLMConfig  `json:"llm,omitempty"`
+	ApprovalPolicy       map[string]string `json:"approval_policy,omitempty"`
+	Skills               []string          `json:"skills,omitempty"`
+	MCP                  []string          `json:"mcp,omitempty"`
+	ToolCallLimit        int               `json:"tool_call_limit,omitempty"`
+	MaxContextTokens     int               `json:"max_context_tokens,omitempty"`
+	KeepRecent           int               `json:"keep_recent,omitempty"`
+	ContextCompressRatio float64           `json:"context_compress_ratio,omitempty"`
+}
+
+type setGlobalConfigRequest struct {
+	LLM                  *config.LLMConfig `json:"llm,omitempty"`
+	ApprovalPolicy       map[string]string `json:"approval_policy,omitempty"`
+	Skills               []string          `json:"skills,omitempty"`
+	MCP                  []string          `json:"mcp,omitempty"`
+	ToolCallLimit        *int              `json:"tool_call_limit,omitempty"`
+	MaxContextTokens     *int              `json:"max_context_tokens,omitempty"`
+	KeepRecent           *int              `json:"keep_recent,omitempty"`
+	ContextCompressRatio *float64          `json:"context_compress_ratio,omitempty"`
+}
+
+func (h *Handler) GetGlobalConfig(w http.ResponseWriter, r *http.Request) {
+	cfg, err := config.LoadGlobal()
+	if err != nil || cfg == nil {
+		cfg = &config.Config{}
+	}
+
+	writeJSON(w, http.StatusOK, getGlobalConfigResponse{
+		LLM:                  cfg.LLM,
+		ApprovalPolicy:       cfg.ApprovalPolicy,
+		Skills:               cfg.Skills,
+		MCP:                  cfg.MCP,
+		ToolCallLimit:        cfg.ToolCallLimit,
+		MaxContextTokens:     cfg.MaxContextTokens,
+		KeepRecent:           cfg.KeepRecent,
+		ContextCompressRatio: cfg.ContextCompressRatio,
+	})
+}
+
+func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
+	var req setGlobalConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	cfg, _ := config.LoadGlobal()
+	if cfg == nil {
+		cfg = &config.Config{}
+	}
+
+	if req.LLM != nil {
+		cfg.LLM = *req.LLM
+	}
+	if req.ApprovalPolicy != nil {
+		cfg.ApprovalPolicy = req.ApprovalPolicy
+	}
+	if req.Skills != nil {
+		cfg.Skills = req.Skills
+	}
+	if req.MCP != nil {
+		cfg.MCP = req.MCP
+	}
+	if req.ToolCallLimit != nil {
+		cfg.ToolCallLimit = *req.ToolCallLimit
+	}
+	if req.MaxContextTokens != nil {
+		cfg.MaxContextTokens = *req.MaxContextTokens
+	}
+	if req.KeepRecent != nil {
+		cfg.KeepRecent = *req.KeepRecent
+	}
+	if req.ContextCompressRatio != nil {
+		cfg.ContextCompressRatio = *req.ContextCompressRatio
+	}
+
+	if err := config.SaveGlobalConfig(cfg); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save global config: "+err.Error())
+		return
+	}
+
+	h.LoadUserApprovalPolicy()
+
+	writeJSON(w, http.StatusOK, getGlobalConfigResponse{
+		LLM:                  cfg.LLM,
+		ApprovalPolicy:       cfg.ApprovalPolicy,
+		Skills:               cfg.Skills,
+		MCP:                  cfg.MCP,
+		ToolCallLimit:        cfg.ToolCallLimit,
+		MaxContextTokens:     cfg.MaxContextTokens,
+		KeepRecent:           cfg.KeepRecent,
+		ContextCompressRatio: cfg.ContextCompressRatio,
+	})
+}
+
+func (h *Handler) LoadUserApprovalPolicy() {
+	raw := h.loadUserApprovalPolicyFromConfig()
+	policy := make(map[approval.OperationType]approval.PolicyLevel)
+	for k, v := range raw {
+		policy[approval.OperationType(k)] = approval.PolicyLevel(v)
+	}
+	h.loop.GetApprovalManager().SetUserGlobalPolicy(policy)
+}
+
+func (h *Handler) loadUserApprovalPolicyFromConfig() map[string]string {
+	cfg, err := config.LoadGlobal()
+	if err != nil || cfg == nil {
+		return map[string]string{}
+	}
+	if cfg.ApprovalPolicy == nil {
+		return map[string]string{}
+	}
+	return cfg.ApprovalPolicy
+}

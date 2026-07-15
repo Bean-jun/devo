@@ -18,10 +18,24 @@ const activeTab = ref<SubTab>('project')
 interface ProjectConfig {
   skills: string[]
   mcp: string[]
+  tool_call_limit?: number
+  max_context_tokens?: number
+  keep_recent?: number
+  context_compress_ratio?: number
 }
 
 const config = ref<ProjectConfig>({ skills: [], mcp: [] })
 const configLoading = ref(false)
+
+const toolCallLimit = ref<number | null>(null)
+const maxContextTokens = ref<number | null>(null)
+const keepRecent = ref<number | null>(null)
+const contextCompressRatio = ref<number | null>(null)
+
+const globalToolCallLimit = ref<number | null>(null)
+const globalMaxContextTokens = ref<number | null>(null)
+const globalKeepRecent = ref<number | null>(null)
+const globalContextCompressRatio = ref<number | null>(null)
 
 interface ApprovelOp {
   key: string
@@ -102,6 +116,10 @@ async function fetchConfig() {
       const data = await res.json()
       config.value = { skills: data.skills || [], mcp: data.mcp || [] }
       projectApprovalPolicy.value = data.approval_policy || {}
+      toolCallLimit.value = data.tool_call_limit ?? null
+      maxContextTokens.value = data.max_context_tokens ?? null
+      keepRecent.value = data.keep_recent ?? null
+      contextCompressRatio.value = data.context_compress_ratio ?? null
     }
   } catch {
     // ignore
@@ -110,17 +128,67 @@ async function fetchConfig() {
   }
 }
 
-async function fetchGlobalPolicy() {
+async function saveProjectParams() {
   try {
-    globalApprovalPolicy.value = await sessionStore.fetchGlobalApprovalPolicy()
+    const body: Record<string, unknown> = {
+      skills: config.value.skills,
+      mcp: config.value.mcp,
+      approval_policy: projectApprovalPolicy.value,
+    }
+    if (toolCallLimit.value != null) body.tool_call_limit = toolCallLimit.value
+    if (maxContextTokens.value != null) body.max_context_tokens = maxContextTokens.value
+    if (keepRecent.value != null) body.keep_recent = keepRecent.value
+    if (contextCompressRatio.value != null) body.context_compress_ratio = contextCompressRatio.value
+
+    await fetch(`${API_BASE}/project/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    uiStore.showToast('success', '项目设置已保存')
+  } catch {
+    uiStore.showToast('error', '保存失败')
+  }
+}
+
+async function fetchGlobalConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/global/config`)
+    if (res.ok) {
+      const data = await res.json()
+      globalToolCallLimit.value = data.tool_call_limit ?? null
+      globalMaxContextTokens.value = data.max_context_tokens ?? null
+      globalKeepRecent.value = data.keep_recent ?? null
+      globalContextCompressRatio.value = data.context_compress_ratio ?? null
+      globalApprovalPolicy.value = data.approval_policy || {}
+    }
   } catch {
     // ignore
   }
 }
 
+async function saveGlobalParams() {
+  try {
+    const body: Record<string, unknown> = {}
+    if (globalToolCallLimit.value != null) body.tool_call_limit = globalToolCallLimit.value
+    if (globalMaxContextTokens.value != null) body.max_context_tokens = globalMaxContextTokens.value
+    if (globalKeepRecent.value != null) body.keep_recent = globalKeepRecent.value
+    if (globalContextCompressRatio.value != null) body.context_compress_ratio = globalContextCompressRatio.value
+
+    await fetch(`${API_BASE}/global/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    uiStore.showToast('success', '全局设置已保存')
+  } catch {
+    uiStore.showToast('error', '保存失败')
+  }
+}
+
 onMounted(async () => {
   await fetchConfig()
-  await fetchGlobalPolicy()
+  await fetchGlobalConfig()
   await skillsStore.fetchSkills()
   await mcpStore.fetchServers()
 })
@@ -147,6 +215,53 @@ onMounted(async () => {
         <div class="setting-item">
           <span class="setting-value">{{ uiStore.activeWorkspace || '无' }}</span>
         </div>
+      </div>
+
+      <div class="setting-section">
+        <div class="section-title">LLM 参数</div>
+        <div class="setting-item">
+          <label>工具调用上限</label>
+          <input
+            v-model.number="toolCallLimit"
+            type="number"
+            min="1"
+            placeholder="50"
+            class="setting-input"
+          />
+        </div>
+        <div class="setting-item">
+          <label>最大上下文 Tokens</label>
+          <input
+            v-model.number="maxContextTokens"
+            type="number"
+            min="1"
+            placeholder="128000"
+            class="setting-input"
+          />
+        </div>
+        <div class="setting-item">
+          <label>保留最近轮数</label>
+          <input
+            v-model.number="keepRecent"
+            type="number"
+            min="1"
+            placeholder="30"
+            class="setting-input"
+          />
+        </div>
+        <div class="setting-item">
+          <label>上下文压缩比例</label>
+          <input
+            v-model.number="contextCompressRatio"
+            type="number"
+            min="0.1"
+            max="1.0"
+            step="0.1"
+            placeholder="0.8"
+            class="setting-input"
+          />
+        </div>
+        <button class="save-btn" @click="saveProjectParams">保存参数</button>
       </div>
 
       <div class="setting-section">
@@ -207,6 +322,53 @@ onMounted(async () => {
     </div>
 
     <div v-else class="settings-content">
+      <div class="setting-section">
+        <div class="section-title">LLM 参数（全局默认）</div>
+        <div class="setting-item">
+          <label>工具调用上限</label>
+          <input
+            v-model.number="globalToolCallLimit"
+            type="number"
+            min="1"
+            placeholder="50"
+            class="setting-input"
+          />
+        </div>
+        <div class="setting-item">
+          <label>最大上下文 Tokens</label>
+          <input
+            v-model.number="globalMaxContextTokens"
+            type="number"
+            min="1"
+            placeholder="128000"
+            class="setting-input"
+          />
+        </div>
+        <div class="setting-item">
+          <label>保留最近轮数</label>
+          <input
+            v-model.number="globalKeepRecent"
+            type="number"
+            min="1"
+            placeholder="30"
+            class="setting-input"
+          />
+        </div>
+        <div class="setting-item">
+          <label>上下文压缩比例</label>
+          <input
+            v-model.number="globalContextCompressRatio"
+            type="number"
+            min="0.1"
+            max="1.0"
+            step="0.1"
+            placeholder="0.8"
+            class="setting-input"
+          />
+        </div>
+        <button class="save-btn" @click="saveGlobalParams">保存全局参数</button>
+      </div>
+
       <div class="setting-item">
         <label>主题</label>
         <span class="setting-value">{{ uiStore.theme }}</span>
@@ -376,5 +538,39 @@ onMounted(async () => {
   border-color: var(--color-accent);
   color: #fff;
   box-shadow: 0 1px 4px rgba(59, 130, 246, 0.3);
+}
+
+.setting-input {
+  width: 120px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.setting-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.save-btn {
+  margin-top: 8px;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 4px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.save-btn:hover {
+  opacity: 0.9;
 }
 </style>

@@ -206,9 +206,11 @@ export const useUiStore = defineStore('ui', () => {
       toasts.value.shift()
     }
 
-    setTimeout(() => {
-      removeToast(toast.id)
-    }, duration)
+    if (type !== 'error') {
+      setTimeout(() => {
+        removeToast(toast.id)
+      }, duration)
+    }
   }
 
   function removeToast(id: string): void {
@@ -266,6 +268,10 @@ export const useUiStore = defineStore('ui', () => {
     activityActive.value = false
   }
 
+  function clearErrorToasts(): void {
+    toasts.value = toasts.value.filter(t => t.type !== 'error')
+  }
+
   return {
     toasts,
     activeModal,
@@ -303,5 +309,6 @@ export const useUiStore = defineStore('ui', () => {
     activityActive,
     setActivity,
     clearActivity,
+    clearErrorToasts,
   }
 })

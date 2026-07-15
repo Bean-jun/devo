@@ -64,6 +64,8 @@ export const useSessionStore = defineStore('session', () => {
         tokenUsage: data.token_usage || { input: 0, output: 0 },
         trustLevel: data.trust_level || 'normal',
         approvalPolicy: data.approval_policy || {},
+        toolCallLimit: data.tool_call_limit,
+        keepRecent: data.keep_recent,
         maxContextTokens: data.max_context_tokens,
         currentContextTokens: data.current_context_tokens,
       }
@@ -236,6 +238,8 @@ export const useSessionStore = defineStore('session', () => {
       tokenUsage: data.token_usage || { input: 0, output: 0 },
       trustLevel: data.trust_level || 'normal',
       approvalPolicy: data.approval_policy || {},
+      toolCallLimit: data.tool_call_limit,
+      keepRecent: data.keep_recent,
       maxContextTokens: data.max_context_tokens,
       currentContextTokens: data.current_context_tokens,
     }
@@ -281,10 +285,10 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function setGlobalApprovalPolicy(updates: Record<string, string>): Promise<void> {
-    const res = await fetch(`${API_BASE}/user/approval-policy`, {
+    const res = await fetch(`${API_BASE}/global/config`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
+      body: JSON.stringify({ approval_policy: updates }),
     })
     if (!res.ok) throw new Error('保存全局审批策略失败')
   }
@@ -301,9 +305,10 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function fetchGlobalApprovalPolicy(): Promise<Record<string, string>> {
-    const res = await fetch(`${API_BASE}/user/approval-policy`)
+    const res = await fetch(`${API_BASE}/global/config`)
     if (!res.ok) return {}
-    return await res.json()
+    const data = await res.json()
+    return data.approval_policy || {}
   }
 
   return {

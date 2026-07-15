@@ -37,6 +37,7 @@ const isProcessing = computed(() => sessionStore.isProcessing)
 
 async function handleSend(text: string) {
   if (!sessionStore.currentSession) return
+  uiStore.clearErrorToasts()
   chatStore.appendUserMessage(text)
 
   try {

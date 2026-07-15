@@ -280,6 +280,34 @@ func (l *Loop) UpdateConfig(sessionID string, toolCallLimit int) error {
 	return nil
 }
 
+func (l *Loop) UpdateContextConfig(sessionID string, maxContextTokens, keepRecent *int) error {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+
+	if maxContextTokens != nil {
+		if *maxContextTokens <= 0 {
+			return fmt.Errorf("max_context_tokens must be greater than 0")
+		}
+		sess.MaxContextTokens = *maxContextTokens
+	}
+
+	if keepRecent != nil {
+		if *keepRecent <= 0 {
+			return fmt.Errorf("keep_recent must be greater than 0")
+		}
+		sess.KeepRecent = *keepRecent
+	}
+
+	sess.LastActiveAt = time.Now()
+	if err := l.store.Update(sess); err != nil {
+		return fmt.Errorf("update session context config: %w", err)
+	}
+
+	return nil
+}
+
 func (l *Loop) UpdateConcurrencyConfig(sessionID string, maxConcurrentToolCalls, maxConcurrentSubprocesses *int) error {
 	sess, err := l.store.Get(sessionID)
 	if err != nil {

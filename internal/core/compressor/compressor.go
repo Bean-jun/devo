@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"devo/internal/config"
 	"devo/internal/core/session"
 	"devo/internal/core/tokenmeter"
 	"devo/internal/taskexec/llmclient"
@@ -14,6 +13,7 @@ import (
 
 const (
 	DefaultCompressThreshold = 60 // 默认压缩对话轮数，已废弃
+	ProgressiveBatchSize     = 10 // 渐进式压缩：每次最多压缩 10 条消息
 )
 
 type Compressor struct {
@@ -47,11 +47,11 @@ func (c *Compressor) Compress(ctx context.Context, sessionID string, eventBus *s
 
 	maxContext := sess.MaxContextTokens
 	if maxContext <= 0 {
-		maxContext = config.DefaultMaxContextTokens
+		maxContext = 128000
 	}
 
 	estimatedTokens := EstimateContextTokens(msgs, sess.CompressionState) + systemPromptTokens
-	compressThreshold := int(float64(maxContext) * config.DefaultContextCompressRatio)
+	compressThreshold := int(float64(maxContext) * 0.8)
 
 	if estimatedTokens <= compressThreshold {
 		return nil, nil
@@ -59,12 +59,16 @@ func (c *Compressor) Compress(ctx context.Context, sessionID string, eventBus *s
 
 	keepRecent := sess.KeepRecent
 	if keepRecent <= 0 {
-		keepRecent = config.DefaultKeepRecent
+		keepRecent = 30
 	}
 
 	compressible, toCompress := selectMessagesToCompress(msgs, keepRecent)
 	if len(toCompress) == 0 {
 		return nil, nil
+	}
+
+	if len(toCompress) > ProgressiveBatchSize {
+		toCompress = toCompress[:ProgressiveBatchSize]
 	}
 
 	summaryText, err := c.generateSummary(ctx, toCompress)
