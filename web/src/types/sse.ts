@@ -18,6 +18,7 @@
   | 'memory_updated'
   | 'mcp_tool_discovered'
   | 'loop.completed_with_reason'
+  | 'background_output'
   | 'error'
 
 export interface SSEEvent {
@@ -38,5 +39,11 @@ export interface SSEEventData {
   rollbackTo?: string
   error?: string
   message?: string
+  /** background_output: OS PID of the background process emitting the output */
+  pid?: number
+  /** background_output: which stream the chunk came from - "stdout" or "stderr" */
+  stream?: string
+  /** background_output: the raw text chunk */
+  data?: string
   [key: string]: unknown
 }

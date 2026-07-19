@@ -20,6 +20,7 @@ export type RightTabType =
   | 'skills'
   | 'mcp'
   | 'memory'
+  | 'background'
   | 'dashboard'
   | 'settings'
 

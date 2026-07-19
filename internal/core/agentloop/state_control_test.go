@@ -789,9 +789,3 @@ func TestCancelNoPIDs(t *testing.T) {
 		t.Errorf("expected BackgroundPIDs to be empty, got %v", sess.BackgroundPIDs)
 	}
 }
-
-func TestKillAllBackgroundPIDs(t *testing.T) {
-	killAllBackgroundPIDs(nil)
-	killAllBackgroundPIDs([]int{})
-	killAllBackgroundPIDs([]int{-1, 0, 99999999})
-}

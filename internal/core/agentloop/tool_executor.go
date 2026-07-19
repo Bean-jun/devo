@@ -271,8 +271,6 @@ func (l *Loop) executeSingleTool(ctx context.Context, lc *LoopContext, tc sessio
 		l.pathLockManager.Unlock(lockPath)
 	}
 
-	l.recordChildPID(lc.SessionID, tc.ToolName, toolResult)
-
 	if toolResult.Success && (tc.ToolName == "write_file" || tc.ToolName == "edit_file") {
 		if path, ok := tc.Params["path"].(string); ok && path != "" {
 			l.store.RecordFileModification(session.FileModificationRecord{
@@ -457,8 +455,6 @@ func (l *Loop) executeToolsParallel(ctx context.Context, lc *LoopContext, maxCon
 			if lockPath != "" {
 				l.pathLockManager.Unlock(lockPath)
 			}
-
-			l.recordChildPID(lc.SessionID, tc.ToolName, toolResult)
 
 			if toolResult.Success && (tc.ToolName == "write_file" || tc.ToolName == "edit_file") {
 				if path, ok := tc.Params["path"].(string); ok && path != "" {

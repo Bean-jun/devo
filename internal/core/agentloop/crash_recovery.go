@@ -6,7 +6,6 @@ import (
 
 	"devo/internal/core/session"
 	"devo/internal/pkg/logging"
-	"devo/internal/pkg/process"
 )
 
 const crashRecoverySystemMessage = "系统检测到上次服务异常中断，当前会话已重置。未完成的工具调用已丢弃，请检查文件状态。"
@@ -42,12 +41,14 @@ func (l *Loop) RecoverCrashedSessions() error {
 func (l *Loop) recoverSession(ctx context.Context, sess *session.Session) {
 	oldState := string(sess.State)
 
-	if sess.ChildPID != nil {
-		process.KillProcessGroup(*sess.ChildPID)
-	}
-	if len(sess.BackgroundPIDs) > 0 {
-		killAllBackgroundPIDs(sess.BackgroundPIDs)
-	}
+	// Note: we intentionally do NOT kill processes via sess.ChildPID /
+	// sess.BackgroundPIDs here. Those fields are leftover from the pre-refactor
+	// design (where exec_python emitted __DEVO_CHILD_PID__ / __DEVO_BG_PID__
+	// markers). After devo crashed, those PIDs may have been recycled by the OS
+	// and killing them risks hitting an unrelated process. New background
+	// processes started under the new design are tracked in-memory by the
+	// BackgroundProcessManager and are killed on App.Shutdown; anything that
+	// survives a crash is left for the user or OS to handle.
 
 	sess.State = session.StateIdle
 	sess.ChildPID = nil

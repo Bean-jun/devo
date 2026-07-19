@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -27,7 +26,7 @@ type ExecPythonTool struct {
 	bgManager *BackgroundProcessManager
 }
 
-var pythonSearchOrder = []string{"python3", "python", "python.exe", "python3.12", "python3.11", "python3.10"}
+var pythonSearchOrder = []string{"python3", "python", "python3.12", "python3.11", "python3.10"}
 
 // pythonBlacklistPatterns 是基于源码文本的最后一道防线，不是主要安全边界。
 // 真正的隔离应在进程/系统层面完成（容器化、namespace、资源限制、网络限制等）。
@@ -49,9 +48,17 @@ var pythonBlacklistPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`os\.system\s*\(\s*["'].*mkfs`),
 }
 
-// 管道读取完成后，若在强制关闭 fd 之后仍未能在此时间内退出（极端情况），
-// 放弃等待，直接进入结果处理，避免 Execute 无限期阻塞。
+// pipeDrainGracePeriod 是 sync 模式超时后强制关闭管道前的等待时间。
 const pipeDrainGracePeriod = 3 * time.Second
+
+// backgroundPopenPattern matches any use of subprocess.Popen (or `from subprocess
+// import Popen` then bare `Popen(`). In background mode this is almost always a
+// spawn-and-exit variant - the agent starts a child, reads a few lines of output
+// to confirm readiness, then lets Python exit, leaving the actual server running
+// as an orphaned grandchild that BackgroundProcessManager cannot stop. The correct
+// primitive for background mode is `subprocess.run([...])` which blocks until the
+// child exits and lets the runtime capture the PID automatically.
+var backgroundPopenPattern = regexp.MustCompile(`\b(?:subprocess\.)?Popen\s*\(`)
 
 func NewExecPythonTool(bgManager *BackgroundProcessManager) *ExecPythonTool {
 	return &ExecPythonTool{
@@ -66,11 +73,21 @@ func detectPython() string {
 		if err != nil {
 			continue
 		}
-		// 验证能否真正执行
-		cmd := exec.Command(path, "-c", "print('ok')")
-		if err := cmd.Run(); err == nil {
-			return path // 返回绝对路径，而不是 name
+		// Verify the binary actually works. On Windows, Microsoft installs a
+		// python3.exe stub under WindowsApps that exits with code 49 and
+		// prints nothing - it just redirects users to the Store. Treat any
+		// non-zero exit (or timeout) as "not really python" and keep scanning.
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		cmd := exec.CommandContext(ctx, path, "--version")
+		err = cmd.Run()
+		cancel()
+		if ctx.Err() == context.DeadlineExceeded {
+			continue
 		}
+		if err != nil {
+			continue
+		}
+		return path
 	}
 	return ""
 }
@@ -80,38 +97,49 @@ func (t *ExecPythonTool) Name() string {
 }
 
 func (t *ExecPythonTool) Description() string {
-	return `Execute Python code and return the output. This is the ONLY runtime tool — use it for ALL tasks.
+	return `Execute Python code. This is the ONLY runtime tool - use it for shell commands,
+builds, tests, data processing, and starting services.
 
-In sync mode (default): Python runs to completion, Go waits for exit code and output.
-  Use subprocess.run() to call shell commands, ALWAYS with explicit text/encoding/errors:
-    subprocess.run(
-        ["go", "build", "./..."],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",   # never let a bad byte crash the whole call
-        cwd=None,           # set explicitly if you need a directory other than the CWD you're already in
-    )
-  Do not rely on ambient environment variables for decoding: this Python process already runs
-  in UTF-8 mode, but that does NOT guarantee the external program you're calling emits UTF-8
-  bytes (e.g. a Windows exe printing in the system's local codepage). Passing encoding="utf-8",
-  errors="replace" explicitly makes decoding failures visible/safe instead of raising
-  UnicodeDecodeError or silently producing mojibake.
-  If you need to pass env=..., base it on os.environ.copy() (not a fresh dict) so you don't
-  accidentally strip inherited settings from nested subprocess calls.
+Two modes:
 
-In background mode: Python starts a long-running process, prints __DEVO_BG_PID__=<pid>, then exits.
-  Use subprocess.Popen with start_new_session=True: p = subprocess.Popen(["npm", "run", "dev"], start_new_session=True)
-  Python MUST print the PID marker and exit. Do NOT use subprocess.run for background processes.
+sync (default): Python runs to completion. Use for finite tasks.
+  Call shell commands via subprocess.run with explicit decoding:
+    subprocess.run(["go", "build", "./..."],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+  This Python runs in UTF-8 mode, but the external program you call may emit bytes in the
+  local codepage (e.g. a Windows exe) - encoding="utf-8" + errors="replace" makes decoding
+  failures visible instead of raising UnicodeDecodeError or producing mojibake.
+  If you pass env=, base it on os.environ.copy() so you don't strip inherited settings.
+  Any subprocess you spawn must either finish before this script exits, or be started with
+  start_new_session=True and its stdout/stderr redirected to DEVNULL or a file - NOT left
+  inheriting this process's pipes, or the tool call hangs until timeout.
 
-IMPORTANT: any subprocess you spawn from within Python (sync mode) should either finish before
-your script exits, or be started with start_new_session=True and its stdout/stderr redirected
-(e.g. to subprocess.DEVNULL or a file) — NOT left inheriting this process's stdout/stderr.
-Otherwise the tool call may hang until the timeout is reached, because the parent process's
-output pipes will not reach EOF while a child still holds them open.
+background: Python itself IS the long-running process. The tool returns immediately with the
+  PID; stdout/stderr stream to the frontend in real time (visible in the BG panel). The
+  process is a direct child of devo - killed automatically on devo exit.
+  Write code that blocks directly:
+    subprocess.run(["npm", "run", "dev"])        # Python blocks on the dev server
+    uvicorn.run(app, host="0.0.0.0", port=8000) # Python runs the server itself
+  CRITICAL - do NOT use subprocess.Popen in background mode. It is rejected by PreCheck.
+  Every Popen-based pattern is wrong, including these common variants:
+    # WRONG - classic spawn-and-exit
+    p = subprocess.Popen([...], start_new_session=True); print(p.pid); exit()
+    # WRONG - read startup output then exit (spawn-and-exit in disguise)
+    p = subprocess.Popen([...], stdout=subprocess.PIPE)
+    while ...: line = p.stdout.readline(); if "ready" in line: break
+    # WRONG - sleep + poll + exit
+    p = subprocess.Popen([...]); time.sleep(5); print(p.poll())
+  The ONLY correct primitive is 'subprocess.run([...])' blocking. Do not redirect stdout
+  to a file or PIPE - let the child inherit Python's stdout so the runtime can stream it
+  to the frontend. Python MUST block; if it exits, the background process is unregistered
+  and any grandchild is orphaned and unstoppable via stop_background_process.
+  To stop later: use stop_background_process with the returned PID, or list_background_processes
+  to discover active PIDs. To verify readiness: poll an HTTP endpoint in a SEPARATE sync
+  exec_python call - do not try to capture startup output from within the background call.
 
-Output is always treated as UTF-8. Security: Python code is pre-checked for dangerous patterns
-(best-effort only, not a substitute for sandboxing).`
+Never use os.system(). Always use subprocess with list arguments.
+
+Security: Python code is pre-checked for dangerous patterns (best-effort, not a sandbox).`
 }
 
 func (t *ExecPythonTool) RiskLevel() RiskLevel {
@@ -128,12 +156,12 @@ func (t *ExecPythonTool) ParamsSchema() map[string]interface{} {
 			},
 			"mode": map[string]interface{}{
 				"type":        "string",
-				"description": "执行模式：sync（默认，等待任务完成）| background（启动后台进程后立即返回）",
+				"description": "执行模式：sync（默认，等待任务完成）| background（启动长进程，立即返回 PID，输出实时流给前端）",
 				"enum":        []string{"sync", "background"},
 			},
 			"timeout_seconds": map[string]interface{}{
 				"type":        "integer",
-				"description": "执行超时时间（秒），sync 默认 30，background 默认 10",
+				"description": "执行超时时间（秒），仅 sync 模式生效，默认 30",
 			},
 		},
 		"required": []string{"code"},
@@ -151,9 +179,6 @@ func (t *ExecPythonTool) GetCommandContext(workingDir string, params map[string]
 	}
 
 	timeoutSeconds := 30
-	if mode == "background" {
-		timeoutSeconds = 10
-	}
 	if ts, ok := params["timeout_seconds"].(float64); ok && ts > 0 {
 		timeoutSeconds = int(ts)
 	}
@@ -174,6 +199,21 @@ func (t *ExecPythonTool) PreCheck(params map[string]interface{}) error {
 
 	if isPythonCodeBlacklisted(code) {
 		return fmt.Errorf("code rejected by security blacklist")
+	}
+
+	// In background mode, Python itself must block on the long-running process.
+	// Any use of subprocess.Popen tends to be a spawn-and-exit variant
+	// (Popen + readline + exit, Popen + sleep + exit, Popen + print PID + exit)
+	// that leaves the actual server as an orphaned grandchild the
+	// BackgroundProcessManager cannot stop. The correct primitive is
+	// subprocess.run, which blocks until the child exits.
+	mode, _ := params["mode"].(string)
+	if mode == "background" && backgroundPopenPattern.MatchString(code) {
+		return fmt.Errorf("background mode rejected: code uses subprocess.Popen. " +
+			"In background mode Python itself must block - use `subprocess.run([...])` " +
+			"instead. The runtime captures the PID automatically and streams output to " +
+			"the frontend; using Popen + reading output + exiting leaves the server " +
+			"orphaned and unstoppable via stop_background_process")
 	}
 
 	return nil
@@ -199,27 +239,35 @@ func (t *ExecPythonTool) Execute(ctx context.Context, workingDir string, params 
 	}
 
 	timeoutSeconds := 30
-	if mode == "background" {
-		timeoutSeconds = 10
-	}
 	if ts, ok := params["timeout_seconds"].(float64); ok && ts > 0 {
 		timeoutSeconds = int(ts)
 	}
-
-	execCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
-	defer cancel()
 
 	if t.pythonBin == "" {
 		return fmt.Errorf("python not found: none of %v are available in PATH", pythonSearchOrder)
 	}
 
-	cmd := exec.CommandContext(execCtx, t.pythonBin, "-u", "-c", code)
+	// sync 模式需要一个可超时的 context 来终止长跑的 python；background 模式
+	// 不能用 execCtx 绑定 cmd，否则 Execute 返回时的 defer cancel() 会立刻把
+	// python 进程杀掉。background 模式的进程生命周期由 bgManager.Stop / devo
+	// 退出负责，不跟随 execCtx。
+	var execCtx context.Context
+	var cancel context.CancelFunc
+	if mode == "sync" {
+		execCtx, cancel = context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
+		defer cancel()
+	}
+
+	var cmd *exec.Cmd
+	if mode == "sync" {
+		cmd = exec.CommandContext(execCtx, t.pythonBin, "-u", "-c", code)
+	} else {
+		cmd = exec.Command(t.pythonBin, "-u", "-c", code)
+	}
 	cmd.Dir = workingDir
 	cmd.SysProcAttr = getPythonSysProcAttr()
 
-	// 强制 Python 以 UTF-8 编解码 stdout/stderr，而不是事后猜测编码。
-	// 这样即便在 LANG=C / 非 UTF-8 locale 的环境下也不会产生乱码或
-	// UnicodeEncodeError。decodePythonOutput 中的猜测逻辑仅作为极端情况兜底。
+	// 强制 Python 以 UTF-8 编解码 stdout/stderr。
 	cmd.Env = append(os.Environ(),
 		"PYTHONIOENCODING=utf-8",
 		"PYTHONUTF8=1",
@@ -241,15 +289,25 @@ func (t *ExecPythonTool) Execute(ctx context.Context, workingDir string, params 
 
 	pythonPID := cmd.Process.Pid
 
+	if mode == "background" {
+		return t.executeBackground(ctx, code, w, cmd, pythonPID, stdoutPipe, stderrPipe)
+	}
+
+	return t.executeSync(execCtx, w, cmd, pythonPID, stdoutPipe, stderrPipe, timeoutSeconds)
+}
+
+// executeSync runs python to completion and streams output via w. Behavior
+// preserved from the original implementation; only the dead __DEVO_CHILD_PID__
+// marker is removed.
+func (t *ExecPythonTool) executeSync(execCtx context.Context, w StreamWriter, cmd *exec.Cmd, pythonPID int, stdoutPipe, stderrPipe io.ReadCloser, timeoutSeconds int) error {
 	var stdoutBuf, stderrBuf bytes.Buffer
-	var writeMu sync.Mutex // 保护对 StreamWriter 的并发写入（stdout/stderr 两个 goroutine 共用）
+	var writeMu sync.Mutex
 
 	var scanErrMu sync.Mutex
 	var scanErrs []error
 
 	readPipe := func(pipe io.ReadCloser, buf *bytes.Buffer, prefix string) {
 		scanner := bufio.NewScanner(pipe)
-		// 默认 64KB 单行上限太容易截断长输出（如单行大 JSON），扩大到 1MB 起步，最高 16MB。
 		scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 		for scanner.Scan() {
 			line := scanner.Text()
@@ -285,8 +343,6 @@ func (t *ExecPythonTool) Execute(ctx context.Context, workingDir string, params 
 	// 如果用户的 Python 代码启动了未 detach 的子进程（继承了 stdout/stderr fd），
 	// 即使主进程被 kill，管道写端仍可能保持打开，导致 Scan() 永远读不到 EOF，
 	// 从而让整个 Execute 调用无限期挂起，timeoutSeconds 形同虚设。
-	// 这里用 execCtx.Done() 做兜底：超时/取消发生时主动杀掉整个进程组，
-	// 并且只再等待一小段宽限期，宽限期结束后强制关闭管道来解除 Scan() 阻塞。
 	select {
 	case <-readDone:
 		// 正常情况：所有输出已读完（隐含子进程已退出或已关闭 fd）。
@@ -295,15 +351,13 @@ func (t *ExecPythonTool) Execute(ctx context.Context, workingDir string, params 
 		select {
 		case <-readDone:
 		case <-time.After(pipeDrainGracePeriod):
-			// 极端情况：仍有孙子进程持有 fd。强制关闭管道解除 Scan() 阻塞，
-			// 代价是可能丢失少量尚未读取的输出。
 			stdoutPipe.Close()
 			stderrPipe.Close()
 			<-readDone
 		}
 	}
 
-	err = cmd.Wait()
+	err := cmd.Wait()
 
 	timedOut := false
 	cancelled := false
@@ -313,11 +367,9 @@ func (t *ExecPythonTool) Execute(ctx context.Context, workingDir string, params 
 		if execCtx.Err() == context.DeadlineExceeded {
 			timedOut = true
 			exitCode = -1
-			process.KillProcessGroup(pythonPID)
-		} else if ctx.Err() != nil {
+		} else if execCtx.Err() == context.Canceled {
 			cancelled = true
 			exitCode = -1
-			process.KillProcessGroup(pythonPID)
 		} else if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
@@ -337,22 +389,11 @@ func (t *ExecPythonTool) Execute(ctx context.Context, workingDir string, params 
 		stderr += fmt.Sprintf("\n[warning] output may be truncated: %s", sb.String())
 	}
 
-	if mode == "background" {
-		return t.handleBackgroundResult(ctx, code, w, pythonPID, stdout, stderr, timedOut, cancelled)
-	}
-
-	return t.handleSyncResult(w, pythonPID, exitCode, stdout, stderr, timedOut, cancelled, timeoutSeconds)
-}
-
-func (t *ExecPythonTool) handleSyncResult(w StreamWriter, pythonPID, exitCode int, stdout, stderr string, timedOut, cancelled bool, timeoutSeconds int) error {
-	pidTag := fmt.Sprintf("\n__DEVO_CHILD_PID__=%d", pythonPID)
-
 	if timedOut {
 		output := fmt.Sprintf("Python execution timed out after %d seconds.\nExit code: %d\nStdout:\n%s", timeoutSeconds, exitCode, stdout)
 		if stderr != "" {
 			output += fmt.Sprintf("\nStderr:\n%s", stderr)
 		}
-		output += pidTag
 		w.WriteDone(false, output)
 		return nil
 	}
@@ -362,7 +403,6 @@ func (t *ExecPythonTool) handleSyncResult(w StreamWriter, pythonPID, exitCode in
 		if stderr != "" {
 			output += fmt.Sprintf("\nStderr:\n%s", stderr)
 		}
-		output += pidTag
 		w.WriteDone(false, output)
 		return nil
 	}
@@ -371,133 +411,49 @@ func (t *ExecPythonTool) handleSyncResult(w StreamWriter, pythonPID, exitCode in
 	if stderr != "" {
 		output += fmt.Sprintf("\nStderr:\n%s", stderr)
 	}
-	output += pidTag
 
 	w.WriteDone(exitCode == 0, output)
 	return nil
 }
 
-func (t *ExecPythonTool) handleBackgroundResult(ctx context.Context, code string, w StreamWriter, pythonPID int, stdout, stderr string, timedOut, cancelled bool) error {
-	pidTag := fmt.Sprintf("\n__DEVO_CHILD_PID__=%d", pythonPID)
-
-	if timedOut {
-		output := "Python background startup timed out.\n"
-		bgPID := parseBGPID(stdout)
-		if bgPID > 0 {
-			output += fmt.Sprintf("但已检测到后台进程 PID: %d\n", bgPID)
-			output += fmt.Sprintf("__DEVO_BG_PID__=%d", bgPID)
-			// 注册到管理器，会话结束时自动清理
-			if t.bgManager != nil {
-				sessionID := SessionIDFromContext(ctx)
-				cmd := code
-				if len(cmd) > 200 {
-					cmd = cmd[:200] + "..."
-				}
-				if err := t.bgManager.Register(bgPID, cmd, sessionID, ""); err != nil {
-					stderr += fmt.Sprintf("\n[warning] failed to register background process: %v", err)
-				}
-			}
-		} else {
-			output += "未检测到 __DEVO_BG_PID__ 标记，后台进程可能未成功启动。\n"
-			output += "请确保 Python 代码中打印了 __DEVO_BG_PID__=<pid> 后再退出。"
-		}
-		output += pidTag
-		if stderr != "" {
-			output += fmt.Sprintf("\nStderr:\n%s", stderr)
-		}
-		// 超时但检测到 PID 标记时算成功，因为进程实际上已经启动了
-		w.WriteDone(bgPID > 0, output)
-		return nil
+// executeBackground registers the python process with the BackgroundProcessManager
+// and returns immediately. The manager owns the pipes from here on - it starts a
+// goroutine that streams stdout/stderr to the frontend via the manager's
+// OutputForwarder (set by the agent loop), and unregisters the process when
+// both pipes reach EOF (python exited) or Stop is called.
+//
+// cmd.Wait is invoked in a separate goroutine because we cannot return from
+// Execute without releasing the StreamWriter, but we still need Wait to reap
+// the process and free OS resources. The goroutine is owned by the manager's
+// process record and exits after Wait returns.
+func (t *ExecPythonTool) executeBackground(ctx context.Context, code string, w StreamWriter, cmd *exec.Cmd, pythonPID int, stdoutPipe, stderrPipe io.ReadCloser) error {
+	if t.bgManager == nil {
+		// No manager - close pipes and kill python to avoid leaking a process.
+		stdoutPipe.Close()
+		stderrPipe.Close()
+		process.KillProcessGroup(pythonPID)
+		return fmt.Errorf("background process manager not configured")
 	}
 
-	if cancelled {
-		output := "Python background startup cancelled.\n"
-		bgPID := parseBGPID(stdout)
-		if bgPID > 0 {
-			output += fmt.Sprintf("但后台进程已启动 (PID: %d)\n", bgPID)
-			output += fmt.Sprintf("__DEVO_BG_PID__=%d", bgPID)
-			if t.bgManager != nil {
-				sessionID := SessionIDFromContext(ctx)
-				cmd := code
-				if len(cmd) > 200 {
-					cmd = cmd[:200] + "..."
-				}
-				if err := t.bgManager.Register(bgPID, cmd, sessionID, ""); err != nil {
-					stderr += fmt.Sprintf("\n[warning] failed to register background process: %v", err)
-				}
-			}
-		}
-		output += pidTag
-		if stderr != "" {
-			output += fmt.Sprintf("\nStderr:\n%s", stderr)
-		}
-		w.WriteDone(bgPID > 0, output)
-		return nil
+	sessionID := SessionIDFromContext(ctx)
+	cmdPreview := code
+	if len(cmdPreview) > 200 {
+		cmdPreview = cmdPreview[:200] + "..."
 	}
 
-	bgPID := parseBGPID(stdout)
-	if bgPID == 0 {
-		output := "后台进程启动失败：Python 进程已退出，但未检测到 __DEVO_BG_PID__ 标记。\n"
-		output += "请确保 Python 代码中打印了 __DEVO_BG_PID__=<pid> 后再退出。\n"
-		if stdout != "" {
-			output += fmt.Sprintf("\nStdout:\n%s", stdout)
-		}
-		if stderr != "" {
-			output += fmt.Sprintf("\nStderr:\n%s", stderr)
-		}
-		output += pidTag
-		w.WriteDone(false, output)
-		return nil
-	}
+	// Reap the python process when it exits. We can't call cmd.Wait in Execute
+	// (would block until python exits, defeating the point of background mode),
+	// so the manager kicks off a goroutine that calls Wait after registering.
+	t.bgManager.Register(pythonPID, cmdPreview, sessionID, stdoutPipe, stderrPipe)
+	go func() {
+		_ = cmd.Wait()
+		// Python exited. The pipe reader goroutine inside the manager will see
+		// EOF and unregister. Nothing else to do here.
+	}()
 
-	// 成功启动，注册到后台进程管理器
-	if t.bgManager != nil {
-		sessionID := SessionIDFromContext(ctx)
-		cmd := code
-		if len(cmd) > 200 {
-			cmd = cmd[:200] + "..."
-		}
-		if err := t.bgManager.Register(bgPID, cmd, sessionID, ""); err != nil {
-			stderr += fmt.Sprintf("\n[warning] failed to register background process: %v", err)
-		}
-	}
-
-	output := fmt.Sprintf("后台进程已启动 (PID: %d)\n", bgPID)
-	if stdout != "" {
-		output += fmt.Sprintf("启动输出:\n%s", stdout)
-	}
-	if stderr != "" {
-		output += fmt.Sprintf("\nStderr:\n%s", stderr)
-	}
-	output += fmt.Sprintf("\n__DEVO_BG_PID__=%d", bgPID)
-	output += pidTag
-
-	w.WriteDone(true, output)
+	w.WriteChunk(fmt.Sprintf("background process started, PID=%d\n", pythonPID))
+	w.WriteDone(true, fmt.Sprintf("background process started, PID=%d", pythonPID))
 	return nil
-}
-
-func parseBGPID(content string) int {
-	marker := "__DEVO_BG_PID__="
-	idx := findLastIndex(content, marker)
-	if idx < 0 {
-		return 0
-	}
-
-	start := idx + len(marker)
-	end := start
-	for end < len(content) && content[end] >= '0' && content[end] <= '9' {
-		end++
-	}
-
-	if end == start {
-		return 0
-	}
-
-	pid, err := strconv.Atoi(content[start:end])
-	if err != nil {
-		return 0
-	}
-	return pid
 }
 
 func isPythonCodeBlacklisted(code string) bool {
@@ -534,14 +490,5 @@ func decodePythonOutput(data []byte) string {
 		}
 	}
 
-	return strings.ToValidUTF8(string(data), "\uFFFD")
-}
-
-func findLastIndex(s, substr string) int {
-	for i := len(s) - len(substr); i >= 0; i-- {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
+	return strings.ToValidUTF8(string(data), "�")
 }

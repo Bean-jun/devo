@@ -329,7 +329,7 @@ func (h *Handler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 
 	// 停止会话中所有后台进程
 	if h.bgProcManager != nil {
-		errs := h.bgProcManager.ShutdownAll(id)
+		errs := h.bgProcManager.StopSession(id)
 		if len(errs) > 0 {
 			logging.Warn(r.Context(), "failed to stop background processes",
 				"session_id", id,

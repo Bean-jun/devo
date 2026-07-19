@@ -158,21 +158,17 @@ func matchDoubleStar(pattern, path string) bool {
 }
 
 func matchExact(parts, pathParts []string) bool {
-	if len(parts) > len(pathParts) {
-		subPath := strings.Join(pathParts[len(pathParts)-len(parts):], "/")
-		expected := strings.Join(parts, "/")
-		ok, _ := filepath.Match(expected, subPath)
-		return ok
+	// Patterns containing "/" are anchored: they only match a path of the same
+	// depth. A pattern longer than the path can never match (the slice
+	// arithmetic below used to panic with [-N:] here); a pattern shorter than
+	// the path doesn't match either, since the pattern is not a prefix.
+	if len(parts) != len(pathParts) {
+		return false
 	}
-
-	if len(parts) == len(pathParts) {
-		for i := range parts {
-			if !matchPattern(parts[i], pathParts[i]) {
-				return false
-			}
+	for i := range parts {
+		if !matchPattern(parts[i], pathParts[i]) {
+			return false
 		}
-		return true
 	}
-
-	return false
+	return true
 }

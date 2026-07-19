@@ -177,6 +177,41 @@ func TestCheckPath_ParentDir(t *testing.T) {
 	}
 }
 
+// TestCheckPath_WorkDirRoot covers the regression where requesting the
+// workspace directory itself (via "." or the absolute path) was rejected.
+// The trailing-separator HasPrefix check used to fail because the requested
+// path has no trailing separator - this guards against that bug coming back.
+func TestCheckPath_WorkDirRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	workDir := filepath.Join(tmpDir, "project")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name string
+		path string
+	}{
+		{"dot", "."},
+		{"dotSlash", "./"},
+		{"absoluteWorkDir", workDir},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := CheckPath(workDir, tc.path)
+			if err != nil {
+				t.Fatalf("CheckPath(%q) should succeed: %v", tc.path, err)
+			}
+			resultAbs, _ := filepath.Abs(result)
+			workDirAbs, _ := filepath.Abs(workDir)
+			if resultAbs != workDirAbs {
+				t.Errorf("CheckPath(%q) = %q, want %q", tc.path, resultAbs, workDirAbs)
+			}
+		})
+	}
+}
+
 func TestCheckPath_WindowsRelativePaths(t *testing.T) {
 	tmpDir := t.TempDir()
 

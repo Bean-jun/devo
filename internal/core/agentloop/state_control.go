@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"devo/internal/core/session"
-	"devo/internal/pkg/process"
 )
 
 func (l *Loop) Pause(sessionID string) error {
@@ -113,15 +112,10 @@ func (l *Loop) Cancel(sessionID string) error {
 		return fmt.Errorf("%w: current state is %s", session.ErrSessionNotCancellable, sess.State)
 	}
 
-	childPID := sess.ChildPID
-	bgPIDs := sess.BackgroundPIDs
-
-	if childPID != nil {
-		process.KillProcessGroup(*childPID)
-	}
-	if len(bgPIDs) > 0 {
-		killAllBackgroundPIDs(bgPIDs)
-	}
+	// Stop every background process owned by this session via the manager
+	// (kills the process group, closes pipes, unregisters). Sync-mode python
+	// has already exited by the time we get here; nothing to clean up for it.
+	l.stopSessionBackgrounds(sessionID)
 
 	sess, err = l.store.Get(sessionID)
 	if err == nil {
@@ -173,15 +167,7 @@ func (l *Loop) Complete(sessionID string) error {
 	}
 
 	if sess.State == session.StateThinking || sess.State == session.StateToolExecuting || sess.State == session.StateAwaitingApproval {
-		childPID := sess.ChildPID
-		bgPIDs := sess.BackgroundPIDs
-
-		if childPID != nil {
-			process.KillProcessGroup(*childPID)
-		}
-		if len(bgPIDs) > 0 {
-			killAllBackgroundPIDs(bgPIDs)
-		}
+		l.stopSessionBackgrounds(sessionID)
 
 		sess, err := l.store.Get(sessionID)
 		if err == nil {

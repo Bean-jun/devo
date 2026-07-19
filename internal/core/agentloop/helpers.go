@@ -6,15 +6,8 @@ import (
 	"time"
 
 	"devo/internal/core/session"
-	"devo/internal/pkg/process"
 	"devo/internal/taskexec/tools"
 )
-
-func killAllBackgroundPIDs(pids []int) {
-	for _, pid := range pids {
-		process.KillProcessGroup(pid)
-	}
-}
 
 func (l *Loop) rejectionMessage(tc session.ToolCall) session.Message {
 	return session.Message{
@@ -85,87 +78,14 @@ func (l *Loop) incrementToolCallCount(sessionID string, eventBus *session.EventB
 	return false
 }
 
-func (l *Loop) recordChildPID(sessionID, toolName string, tr *tools.ToolResult) {
-	if toolName != "exec_python" {
+// stopSessionBackgrounds kills every background process owned by sessionID via
+// the BackgroundProcessManager. Returns when all kill goroutines have completed.
+// No-op if the manager isn't configured (e.g. in unit tests).
+func (l *Loop) stopSessionBackgrounds(sessionID string) {
+	if l.bgManager == nil {
 		return
 	}
-
-	pid := extractPIDFromContent(tr.Content)
-	if pid <= 0 {
-		return
-	}
-
-	sess, err := l.store.Get(sessionID)
-	if err != nil {
-		return
-	}
-
-	bgPID := extractBGPIDFromContent(tr.Content)
-
-	if bgPID > 0 {
-		sess.BackgroundPIDs = append(sess.BackgroundPIDs, bgPID)
-	} else {
-		sess.ChildPID = &pid
-	}
-
-	l.store.Update(sess)
-}
-
-func extractBGPIDFromContent(content string) int {
-	marker := "__DEVO_BG_PID__="
-	idx := findLastIndex(content, marker)
-	if idx < 0 {
-		return 0
-	}
-
-	start := idx + len(marker)
-	end := start
-	for end < len(content) && content[end] >= '0' && content[end] <= '9' {
-		end++
-	}
-
-	if end == start {
-		return 0
-	}
-
-	pid := 0
-	for i := start; i < end; i++ {
-		pid = pid*10 + int(content[i]-'0')
-	}
-	return pid
-}
-
-func extractPIDFromContent(content string) int {
-	marker := "__DEVO_CHILD_PID__="
-	idx := findLastIndex(content, marker)
-	if idx < 0 {
-		return 0
-	}
-
-	start := idx + len(marker)
-	end := start
-	for end < len(content) && content[end] >= '0' && content[end] <= '9' {
-		end++
-	}
-
-	if end == start {
-		return 0
-	}
-
-	pid := 0
-	for i := start; i < end; i++ {
-		pid = pid*10 + int(content[i]-'0')
-	}
-	return pid
-}
-
-func findLastIndex(s, substr string) int {
-	for i := len(s) - len(substr); i >= 0; i-- {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
+	_ = l.bgManager.StopSession(sessionID)
 }
 
 func (l *Loop) getLockPath(workingDir, toolName string, params map[string]interface{}) string {

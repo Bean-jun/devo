@@ -8,6 +8,7 @@ import { useApprovalStore } from '@/stores/approval'
 import { useSkillsStore } from '@/stores/skills'
 import { useMemoryStore } from '@/stores/memory'
 import { useMcpStore } from '@/stores/mcp'
+import { useBackgroundStore } from '@/stores/background'
 import { useSSE } from '@/composables/useSSE'
 import { useKeyboard } from '@/composables/useKeyboard'
 import { useCommand } from '@/composables/useCommand'
@@ -27,6 +28,7 @@ const approvalStore = useApprovalStore()
 const skillsStore = useSkillsStore()
 const memoryStore = useMemoryStore()
 const mcpStore = useMcpStore()
+const backgroundStore = useBackgroundStore()
 const { detectMode, isVscodeMode, isMobileMode } = usePlatform()
 const { startTransition } = useThemeTransition()
 const { playCompletedSound } = useAudio()
@@ -188,6 +190,20 @@ function connectSSE(sessionId: string) {
     const success = data.success === true
     const summary = data.summary || ''
     const diff = data.diff || ''
+
+    // exec_python background mode returns "background process started, PID=N".
+    // Register the process so the BackgroundPanel shows it even before any
+    // output event arrives.
+    if (toolName === 'exec_python' && summary) {
+      const m = /PID=(\d+)/.exec(summary)
+      if (m) {
+        const pid = parseInt(m[1], 10)
+        if (Number.isFinite(pid) && pid > 0) {
+          backgroundStore.register(pid, '(background)', sessionStore.currentSession?.id || '')
+        }
+      }
+    }
+
     const msgs = chatStore.messages
     for (let i = msgs.length - 1; i >= 0; i--) {
       const msg = msgs[i]
@@ -331,6 +347,20 @@ function connectSSE(sessionId: string) {
   onEvent('loop.completed_with_reason', (data: any) => {
     if (data.reason === 'completed') {
       playCompletedSound()
+    }
+  })
+
+  onEvent('background_output', (data: any) => {
+    const pid = Number(data.pid)
+    if (!Number.isFinite(pid) || pid <= 0) return
+    // Lazily register if we missed the tool_result (e.g. SSE reconnect gap).
+    if (!backgroundStore.processes.has(pid)) {
+      backgroundStore.register(pid, '(background)', sessionStore.currentSession?.id || '')
+    }
+    const stream = data.stream === 'stderr' ? 'stderr' : 'stdout'
+    const chunk = typeof data.data === 'string' ? data.data : ''
+    if (chunk) {
+      backgroundStore.appendOutput(pid, stream, chunk)
     }
   })
 

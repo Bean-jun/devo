@@ -122,6 +122,11 @@ func (a *App) initRegistry() {
 func (a *App) initTools() {
 	bgProcManager := tools.NewBackgroundProcessManager()
 	a.bgProcManager = bgProcManager
+	// Wire bidirectional: loop needs the manager to stop processes on
+	// cancel/complete; manager needs the loop to forward background output
+	// to the session EventBus via ForwardBackgroundOutput.
+	a.loop.SetBackgroundProcessManager(bgProcManager)
+	bgProcManager.SetOutputForwarder(a.loop)
 	a.toolRegistry.Register(&tools.GlobTool{})
 	a.toolRegistry.Register(&tools.ReadFileTool{})
 	a.toolRegistry.Register(&tools.ListFilesTool{})
@@ -256,6 +261,12 @@ func (a *App) Run() {
 }
 
 func (a *App) Shutdown() {
+	if a.bgProcManager != nil {
+		// Kill every background process spawned by exec_python so devo exit
+		// doesn't leave orphan children. Each Stop() kills the process group
+		// and waits for the pipe-reader goroutine to exit.
+		a.bgProcManager.Shutdown()
+	}
 	if a.store != nil {
 		a.store.Close()
 	}

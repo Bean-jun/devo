@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"devo/internal/taskexec/pathsec"
 )
@@ -53,11 +52,11 @@ func (t *ReadFileTool) Execute(ctx context.Context, workingDir string, params ma
 		return fmt.Errorf("path security check failed")
 	}
 
-	gi := pathsec.LoadGitignore(workingDir)
-	relPath, _ := filepath.Rel(workingDir, safePath)
-	if gi.IsIgnored(relPath, false) {
-		return fmt.Errorf("file is excluded by .gitignore: %s", path)
-	}
+	// .gitignore is a VCS concept, not an access-control boundary. The pathsec
+	// check above already confines reads to the workspace; refusing to read
+	// files that happen to match an ignore rule just blocks the agent from
+	// reading its own scratch files (logs, build artifacts) that it created
+	// via exec_python.
 
 	info, err := os.Stat(safePath)
 	if err != nil {

@@ -10,7 +10,11 @@ import (
 
 func executeTool(t *testing.T, tool Tool, workingDir string, params map[string]interface{}) (*ToolResult, error) {
 	t.Helper()
-	ctx := context.Background()
+	return executeToolWithCtx(t, context.Background(), tool, workingDir, params)
+}
+
+func executeToolWithCtx(t *testing.T, ctx context.Context, tool Tool, workingDir string, params map[string]interface{}) (*ToolResult, error) {
+	t.Helper()
 	ch := make(chan StreamEvent, 256)
 	sw := NewChannelStreamWriter(ch)
 

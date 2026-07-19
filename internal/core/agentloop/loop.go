@@ -46,6 +46,7 @@ type Loop struct {
 	memoryManager    *memory.Manager
 	skillsManager    *skills.Manager
 	solidifier       *skills.Solidifier
+	bgManager        *tools.BackgroundProcessManager
 	stateMachine     *StateMachine
 	activeLoops      sync.Map
 	mu               sync.Mutex
@@ -255,6 +256,30 @@ func (l *Loop) GetSkillsManager() *skills.Manager {
 
 func (l *Loop) SetSolidifier(sol *skills.Solidifier) {
 	l.solidifier = sol
+}
+
+// SetBackgroundProcessManager injects the background process manager. Required
+// for exec_python background mode to register/stream processes and for
+// Cancel/Complete to stop them. May be nil in tests.
+func (l *Loop) SetBackgroundProcessManager(mgr *tools.BackgroundProcessManager) {
+	l.bgManager = mgr
+}
+
+// ForwardBackgroundOutput implements tools.OutputForwarder. It is called by
+// the BackgroundProcessManager's pipe-reader goroutines whenever a background
+// process emits output. We publish a "background_output" event on the session's
+// EventBus so any SSE subscribers receive it. If the session has no bus (e.g.
+// was deleted), the output is silently dropped.
+func (l *Loop) ForwardBackgroundOutput(sessionID string, pid int, stream string, data []byte) {
+	bus, err := l.store.GetEventBus(sessionID)
+	if err != nil {
+		return
+	}
+	bus.Publish("background_output", map[string]any{
+		"pid":    pid,
+		"stream": stream,
+		"data":   string(data),
+	})
 }
 
 func (l *Loop) SolidifySession(ctx context.Context, sessionID string) (*skills.SolidifyResult, error) {

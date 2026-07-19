@@ -45,10 +45,6 @@ func CheckPath(workingDir, requestedPath string) (string, error) {
 	}
 	absWorkDir = NormalizePath(absWorkDir)
 
-	if !strings.HasSuffix(absWorkDir, string(filepath.Separator)) {
-		absWorkDir += string(filepath.Separator)
-	}
-
 	var absRequested string
 	if isRealAbsPath(requestedPath) {
 		absRequested = requestedPath
@@ -62,7 +58,13 @@ func CheckPath(workingDir, requestedPath string) (string, error) {
 	}
 	absRequested = NormalizePath(absRequested)
 
-	if !strings.HasPrefix(absRequested, absWorkDir) {
+	// A path is inside the workspace if it equals the workspace root or is a
+	// descendant of it. Comparing against absWorkDir+separator (rather than
+	// appending a separator to absWorkDir and using HasPrefix) ensures the
+	// exact-root case (requestedPath == "." or the absolute workdir itself)
+	// passes instead of being rejected for lacking a trailing separator.
+	sep := string(filepath.Separator)
+	if absRequested != absWorkDir && !strings.HasPrefix(absRequested, absWorkDir+sep) {
 		return "", ErrPathOutsideWorkDir
 	}
 
