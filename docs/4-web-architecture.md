@@ -1,6 +1,6 @@
 # Devo Web 前端工程架构文档
 
-**版本**：1.2.0（2026-06-26 更新：基于实际实现状态全面更新——API 端点变更为 `/api/v1/workspace` 和 `/api/v1/current-workspace`，会话支持删除/重命名，StatusBar 移至顶部，AppHeader 已移除，文件预览带大小限制和类型过滤，状态管理更完整）
+**版本**：1.3.0（2026-07-20 更新：会话状态拆分 thinking/tool_executing，信任级别改为 low/normal/elevated，审批策略补充 auto_approve，新增 MobileLayout 和 backgroundStore，SSE 事件补充 tool_chunk/background_output/loop.completed_with_reason，项目结构补全遗漏组件）
 
 ---
 
@@ -31,19 +31,26 @@ web/
 │   │
 │   ├── layouts/                     ← 布局层
 │   │   ├── BrowserLayout.vue        ← 浏览器三栏布局
-│   │   └── VscodeLayout.vue         ← VSCode 极简布局
+│   │   ├── VscodeLayout.vue         ← VSCode 极简布局
+│   │   └── MobileLayout.vue         ← 移动端布局
 │   │
 │   ├── components/                  ← 共享组件
 │   │   ├── chat/                    ← 聊天相关组件
 │   │   │   ├── ChatPanel.vue        ← 聊天面板（消息列表 + 输入区）
+│   │   │   ├── FloatingNavPanel.vue ← 浮动导航面板
 │   │   │   ├── InputArea.vue        ← 输入区（/ 命令 + 发送 + 停止）
 │   │   │   ├── MessageBubble.vue    ← 消息气泡（Markdown 渲染）
 │   │   │   ├── MessageList.vue      ← 消息列表（自动滚动）
 │   │   │   ├── ThinkingIndicator.vue← 思考指示器
 │   │   │   ├── ToolCallCard.vue     ← 工具调用卡片
-│   │   │   └── ToolCallGroup.vue    ← 工具调用分组
+│   │   │   ├── ToolCallGroup.vue    ← 工具调用分组
+│   │   │   └── VirtualMessageItem.vue← 虚拟滚动消息项
 │   │   ├── command/
 │   │   │   └── CommandPalette.vue   ← 命令面板
+│   │   ├── common/
+│   │   │   └── AppIcon.vue          ← 应用图标
+│   │   ├── editor/
+│   │   │   └── MonacoEditor.vue     ← Monaco 代码编辑器
 │   │   ├── layout/
 │   │   │   ├── AppSidebar.vue       ← 左侧栏（工作区 + 会话列表）
 │   │   │   ├── AppHeader.vue        ← 顶部栏（已从 BrowserLayout 移除，保留待用）
@@ -52,15 +59,27 @@ web/
 │   │   │   ├── StatusBar.vue        ← 顶部状态栏
 │   │   │   ├── ToastContainer.vue   ← 浮动提示容器
 │   │   │   └── ToastItem.vue        ← 单个提示
+│   │   ├── mobile/                  ← 移动端组件
+│   │   │   ├── MobileCommandSheet.vue   ← 移动端命令面板
+│   │   │   ├── MobileInputBar.vue       ← 移动端输入栏
+│   │   │   ├── MobilePanelDrawer.vue    ← 移动端面板抽屉
+│   │   │   ├── MobileSessionPicker.vue  ← 移动端会话选择器
+│   │   │   └── MobileWorkspacePicker.vue← 移动端工作区选择器
 │   │   └── modal/
 │   │       ├── ApprovalModal.vue    ← 审批弹窗
+│   │       ├── ConfigWarningDialog.vue  ← 配置警告弹窗
+│   │       ├── ConfirmDeleteDialog.vue  ← 删除确认弹窗
 │   │       ├── HelpPanel.vue        ← 帮助面板
 │   │       ├── RollbackPicker.vue   ← 回滚选择器
 │   │       └── SessionPicker.vue    ← 会话选择器
 │   │
 │   ├── panels/                      ← 右侧面板组件
+│   │   ├── background/
+│   │   │   └── BackgroundPanel.vue  ← 后台进程面板
 │   │   ├── files/
 │   │   │   └── FilesPanel.vue       ← 文件树 + 预览
+│   │   ├── mcp/
+│   │   │   └── McpPanel.vue         ← MCP 管理
 │   │   ├── skills/
 │   │   │   └── SkillsPanel.vue      ← 技能管理
 │   │   ├── memory/
@@ -74,23 +93,35 @@ web/
 │   │
 │   ├── views/                       ← 路由视图
 │   │   ├── ChatView.vue             ← 聊天视图（当前唯一注册路由）
-│   │   └── *.vue                    ← 其他预留页面（未注册路由）
+│   │   ├── ApprovalPolicyView.vue   ← 审批策略视图
+│   │   ├── DashboardView.vue        ← 仪表盘视图
+│   │   ├── McpSettingsView.vue      ← MCP 设置视图
+│   │   ├── MemoryView.vue           ← 记忆视图
+│   │   ├── ProjectSettingsView.vue  ← 项目设置视图
+│   │   ├── SessionArchiveView.vue   ← 会话存档视图
+│   │   ├── SessionListView.vue      ← 会话列表视图
+│   │   ├── SkillDetailView.vue      ← 技能详情视图
+│   │   └── SkillsListView.vue       ← 技能列表视图
 │   │
 │   ├── composables/                 ← 可复用逻辑
 │   │   ├── useApi.ts                ← HTTP 请求封装
+│   │   ├── useAudio.ts              ← 音频提示
 │   │   ├── useSSE.ts                ← SSE 连接管理
 │   │   ├── useCommand.ts            ← 命令处理
+│   │   ├── useFps.ts                ← FPS 监控
 │   │   ├── useKeyboard.ts           ← 键盘快捷键
 │   │   ├── useAutoScroll.ts         ← 自动滚动
 │   │   ├── useSession.ts            ← 会话逻辑
 │   │   ├── useThemeTransition.ts    ← 主题切换动画
-│   │   └── usePlatform.ts           ← 平台模式检测
+│   │   ├── usePlatform.ts           ← 平台模式检测
+│   │   └── useVirtualScroll.ts      ← 虚拟滚动
 │   │
 │   ├── stores/                      ← Pinia 状态管理
 │   │   ├── ui.ts                    ← UI 全局状态
 │   │   ├── session.ts               ← 会话状态
 │   │   ├── chat.ts                  ← 聊天状态
 │   │   ├── approval.ts              ← 审批状态
+│   │   ├── background.ts            ← 后台进程状态
 │   │   ├── command.ts               ← 命令状态
 │   │   ├── skills.ts                ← 技能状态
 │   │   ├── memory.ts                ← 记忆状态
@@ -113,6 +144,7 @@ web/
 │   ├── utils/                       ← 工具函数
 │   │   ├── constants.ts             ← 常量（API_BASE 等）
 │   │   ├── formatters.ts            ← 格式化工具
+│   │   ├── languageMap.ts           ← 语言映射
 │   │   └── markdown.ts              ← Markdown 渲染
 │   │
 │   └── styles/                      ← 样式
@@ -138,7 +170,7 @@ web/
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          App.vue                                    │
 │  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  detectMode() → BrowserLayout  or  VscodeLayout               │  │
+│  │  detectMode() → BrowserLayout / VscodeLayout / MobileLayout   │  │
 │  │  onMounted: fetchWorkspace() → fetchWorkspaceList() →         │  │
 │  │             setActiveWorkspace() → fetchSessions() →          │  │
 │  │             connectSSE()                                       │  │
@@ -151,10 +183,10 @@ web/
                                   │
                     ┌─────────────┴─────────────┐
                     │                           │
-            ┌───────┴───────┐           ┌───────┴───────┐
-            │ BrowserLayout │           │ VscodeLayout  │
-            │ (三栏+拖拽)    │           │ (极简聊天)    │
-            └───────┬───────┘           └───────┬───────┘
+            ┌───────┴───────┐           ┌───────┴───────┐           ┌───────┴───────┐
+            │ BrowserLayout │           │ VscodeLayout  │           │ MobileLayout  │
+            │ (三栏+拖拽)    │           │ (极简聊天)    │           │ (移动端适配)  │
+            └───────┬───────┘           └───────┬───────┘           └───────┬───────┘
                     │                           │
     ┌───────┬───────┼───────┬───────┐   ┌───────┼───────┐
     │       │       │       │       │   │       │       │
@@ -200,13 +232,17 @@ BrowserLayout.vue
 ├── RightPanel.vue（Tab 切换框架）
 │   ├── FilesPanel.vue       ← 📁 文件树 + 预览（5MB 限制/类型过滤）
 │   ├── SkillsPanel.vue      ← ⚡ 技能管理（scope 筛选）
+│   ├── McpPanel.vue         ← 🔌 MCP 管理
 │   ├── MemoryPanel.vue      ← 🧠 记忆管理（scope 筛选）
+│   ├── BackgroundPanel.vue  ← 🔄 后台进程
 │   ├── DashboardPanel.vue   ← 📊 仪表盘
 │   ├── SettingsPanel.vue    ← ⚙ 设置
 │   └── TerminalPanel.vue    ← 🖥 终端
 │
 └── GlobalModals.vue（Teleport to body）
     ├── ApprovalModal.vue
+    ├── ConfigWarningDialog.vue
+    ├── ConfirmDeleteDialog.vue
     ├── SessionPicker.vue
     ├── RollbackPicker.vue
     └── HelpPanel.vue
@@ -218,6 +254,20 @@ BrowserLayout.vue
 VscodeLayout.vue
 ├── StatusBar.vue（同上）
 ├── ChatView.vue → ChatPanel.vue（同上）
+└── GlobalModals.vue（同上）
+```
+
+### 4.3 移动端模式
+
+```
+MobileLayout.vue
+├── StatusBar.vue（同上）
+├── ChatView.vue → ChatPanel.vue（同上）
+│   └── InputArea.vue → MobileInputBar.vue
+├── MobileCommandSheet.vue
+├── MobilePanelDrawer.vue
+├── MobileSessionPicker.vue
+├── MobileWorkspacePicker.vue
 └── GlobalModals.vue（同上）
 ```
 
@@ -255,7 +305,10 @@ VscodeLayout.vue
            scope 分层体系
            ├── global（全局）
            └── workspace:<id>（项目级）
-```
+
+  ┌──────────────┐
+  │backgroundStore│ ← 后台进程输出管理（SSE 驱动）
+  └──────────────┘
 
 ### 5.2 uiStore（核心）
 
@@ -264,20 +317,25 @@ VscodeLayout.vue
 export const useUiStore = defineStore('ui', () => {
   // ─── 主题 ───
   const theme = ref<ThemeType>(loadTheme())           // 持久化 localStorage
-  // ─── 模式 ───
-  const isVscodeMode = ref(false)
+  // ─── 布局 ───
+  const layoutMode = ref<'browser' | 'vscode' | 'mobile'>('browser')  // 平台模式
+  const sidebarCollapsed = ref(false)                  // 侧栏折叠（持久化）
   // ─── 工作区 ───
   const activeWorkspace = ref<string | null>(loadActiveWorkspace())  // 持久化
   const workspaceList = ref<WorkspaceEntry[]>([])
   // ─── 右侧面板 ───
   const activeRightTab = ref<RightTabType>('files')   // 默认展示文件
-  const rightPanelVisible = ref(false)
+  //     RightTabType = 'files' | 'skills' | 'mcp' | 'memory' | 'background' | 'dashboard' | 'settings'
+  const rightPanelVisible = ref(false)                 // 持久化
   // ─── UI 状态 ───
   const toasts = ref<Toast[]>([])
   const activeModal = ref<ModalType>(null)
+  //     ModalType = 'approval' | 'session-picker' | 'rollback-picker' | 'help' | 'config-warning'
   const connectionStatus = ref<'connected' | 'disconnected' | 'connecting'>('disconnected')
   const focusInputCounter = ref(0)                     // 控制输入框聚焦
   const pendingCommand = ref<string | null>(null)      // 待执行命令
+  const activity = ref<string>('')                     // 当前活动状态文本
+  let activityTimeout: ReturnType<typeof setTimeout> | null = null
 
   // 关键 Actions
   async function fetchWorkspaceList()           // GET /api/v1/workspace
@@ -287,6 +345,8 @@ export const useUiStore = defineStore('ui', () => {
   function setActiveRightTab(tab)               // 切换右侧面板
   function toggleThemeWithTransition(x, y)      // 主题切换（涟漪动画）
   function showToast(type, message)             // 显示 Toast
+  function setActivity(text)                    // 设置活动状态文本
+  function clearActivity()                      // 清除活动状态
   // ...
 })
 ```
@@ -314,12 +374,18 @@ export const useSessionStore = defineStore('session', () => {
   function updateTokenUsage(id, usage)      // 更新 Token 用量（SSE 驱动）
 
   // 关键 Getters
-  const isProcessing         // state === 'processing'
-  const isAwaitingApproval  // state === 'awaiting_approval'
+  const isProcessing         // state === 'processing' || state === 'thinking' || state === 'tool_executing'
+  const isThinking           // state === 'thinking'
+  const isToolExecuting      // state === 'tool_executing'
+  const isAwaitingApproval   // state === 'awaiting_approval'
   const isPaused             // state === 'paused'
   const isArchived           // state === 'archived'
+  const isSessionActive      // 活跃状态判定（thinking / tool_executing / awaiting_approval）
   const sessionStatus        // 当前状态字符串
-  const canPause / canResume / canCancel  // 状态判定
+  const yoloEnabled          // trustLevel === 'elevated'（YOLO 模式）
+  const canPause             // state === 'tool_executing'（仅在工具执行期间可暂停）
+  const canResume            // state === 'paused'
+  const canCancel            // 可取消状态判定
 })
 ```
 
@@ -355,7 +421,8 @@ export const useChatStore = defineStore('chat', () => {
 | `commandStore` | `stores/command.ts` | 命令面板：openPalette/closePalette/executeCommand |
 | `skillsStore` | `stores/skills.ts` | 技能管理：fetch/list/toggle/install/delete + scope 分层 |
 | `memoryStore` | `stores/memory.ts` | 记忆管理：fetch/add/update/delete + scope 分层 |
-| `mcpStore` | `stores/mcp.ts` | MCP 工具：fetchTools |
+| `mcpStore` | `stores/mcp.ts` | MCP 工具：fetchTools/updateToolsFromEvent |
+| `backgroundStore` | `stores/background.ts` | 后台进程：register/appendOutput/terminate（SSE 驱动） |
 
 ---
 
@@ -380,20 +447,32 @@ export function useSSE() {
 ```
 SSE 事件流
 │
-├── thinking               → chatStore.startStreaming()
-├── streaming_token        → chatStore.appendStreamChunk(content)
-├── streaming_complete     → (等待 message_complete)
+├── thinking               → chatStore.startStreaming() + uiStore.setActivity(message)
+├── streaming_token        → chatStore.appendStreamChunk(content) + uiStore.setActivity(content)
+├── streaming_complete     → (内部标记流式完成，实际消息落盘在 message_complete)
 ├── message_complete       → chatStore.finishStreaming(usage) + sessionStore.updateSessionState('idle')
+│                             + uiStore.clearActivity()
+│                             （若没有流式内容，则通过 appendAssistantMessage 落盘完整消息）
 ├── token_usage            → sessionStore.updateTokenUsage(id, usage)
-├── tool_call_request      → chatStore.appendToolCallMessage(toolCall)
+├── tool_call_request      → chatStore.appendToolCallMessage(toolCall) + uiStore.setActivity(toolName)
 ├── tool_result            → chatStore.updateToolCallStatus(id, success/failed, result)
-├── tool_progress          → chatStore.updateToolCallStatus(id, 'executing')
-├── approval_required      → approvalStore.setApproval(data)
-├── approval_auto          → Toast 通知
-├── approval_resolved      → approvalStore.clearApproval()
+│                             + 后台进程注册（exec_python background mode 时提取 PID）
+│                             + uiStore.setActivity(toolName + ' 完成')
+├── tool_progress          → chatStore.updateToolProgress(id, stage) + uiStore.setActivity(stage)
+├── tool_chunk             → chatStore.appendToolStreamChunk(id, chunk)（工具流式输出）
+├── approval_required      → approvalStore.setApproval(data) + uiStore.setActiveModal('approval')
+├── approval_auto          → 系统消息（若 policy 为 yolo 则跳过，避免冗余通知）
+├── approval_resolved      → approvalStore.clearApproval() + uiStore.clearModal()
 ├── session_state_change   → sessionStore.updateSessionState(id, state)
-├── context_compressed     → Toast 通知
-├── file_state_warning     → Toast 通知
+│                             （cancelled 原因特殊处理：state 设为 'cancelled'；
+│                             tool_limit_reached 追加提示消息；error 追加错误消息）
+├── context_compressed     → 系统消息 + Toast 通知
+├── file_state_warning     → 系统消息
+├── skill_solidified       → skillsStore.updateSkillFromEvent(data)
+├── memory_updated         → memoryStore.updateMemoryFromEvent(data)
+├── mcp_tool_discovered    → mcpStore.updateToolsFromEvent(tools)
+├── loop.completed_with_reason → reason === 'completed' 时播放提示音
+├── background_output      → backgroundStore.appendOutput(pid, stream, chunk)
 └── error                  → Toast 通知
 ```
 
@@ -420,6 +499,7 @@ SSE 事件流
 | 分类 | 方法 | 端点 | 调用方 |
 | :--- | :--- | :--- | :--- |
 | 版本 | GET | `/api/v1/version` | - |
+| 配置 | GET | `/api/v1/config/status` | App.vue 初始化时检查 LLM 配置 |
 | 工作区 | GET | `/api/v1/current-workspace` | sessionStore.fetchWorkspace |
 | 工作区 | POST | `/api/v1/current-workspace` | AppSidebar（切换工作区） |
 | 工作区 | GET | `/api/v1/workspace` | uiStore.fetchWorkspaceList |
@@ -461,8 +541,9 @@ SSE 事件流
   ▼
 App.vue onMounted
   ├── detectMode()
-  │   ├── URL 参数 ?mode=vscode → isVscodeMode = true
-  │   └── 否则 → isVscodeMode = false
+  │   ├── URL 参数 ?mode=vscode → layoutMode = 'vscode'
+  │   ├── 移动端检测 → layoutMode = 'mobile'
+  │   └── 否则 → layoutMode = 'browser'
   │
   ├── registerThemeTransition() → 注册主题切换涟漪动画
   │
@@ -473,7 +554,7 @@ App.vue onMounted
   │
   ├── uiStore.fetchWorkspaceList()
   │   └── GET /api/v1/workspace
-  │       └── 返回 { workspaces: [{ id, name, path }, ...] }
+  │       └── 返回 { workspaces: [{ id, name, path, exists }, ...] }
   │           └── uiStore.workspaceList = value
   │
   ├── uiStore.setActiveWorkspace(currentDir)
@@ -485,8 +566,13 @@ App.vue onMounted
   │       └── sessionStore.sessions = [...]
   │
   ├── 自动选中或创建会话
+  │   └── URL 参数 ?session=xxx → 切换该会话
   │   └── 有会话 → 选第一个
   │   └── 无会话 → createSession() → 选新建的
+  │
+  ├── 配置检查
+  │   └── GET /api/v1/config/status
+  │       └── llm_configured === false → uiStore.setActiveModal('config-warning')
   │
   └── watch(activeWorkspace) → 切换时自动刷新
 ```
@@ -646,10 +732,10 @@ useThemeTransition 注册的 handler:
 
 | 决策 | 方案 | 技术细节 |
 | :--- | :--- | :--- |
-| 状态管理 | Pinia + Composition API | 8 个独立 Store，无循环依赖 |
+| 状态管理 | Pinia + Composition API | 9 个独立 Store，无循环依赖 |
 | SSE 事件分发 | App.vue 统一处理 | 事件 → Store action，不分散到组件 |
-| 模式分流 | usePlatform composable | 检测 URL 参数 + VSCode API |
-| 布局切换 | 两套 Layout 组件 | 组件/Store/API 完全复用 |
+| 模式分流 | usePlatform composable | 检测 VSCode API + 移动端 + 浏览器默认 |
+| 布局切换 | 三套 Layout 组件 | 组件/Store/API 完全复用 |
 | 路由 | 仅 `/chat` 路由 | 功能切换走右侧面板 Tab |
 | 工作区持久化 | localStorage + API | 前端存储 activeWorkspace，API 验证 |
 | 工作区同步 | POST /api/v1/current-workspace | 确保前后端目录一致 |
@@ -711,11 +797,12 @@ export default defineConfig({
 
 ```typescript
 // types/session.ts
-export type SessionState = 'idle' | 'processing' | 'awaiting_approval'
-  | 'paused' | 'completed' | 'archived'
+export type SessionState = 'idle' | 'thinking' | 'tool_executing'
+  | 'processing'  // deprecated，保留兼容
+  | 'awaiting_approval' | 'paused' | 'completed' | 'archived'
 
-export type TrustLevel = 'always_ask' | 'session_trust' | 'full_trust'
-export type ApprovalPolicy = 'always_ask' | 'session_trust' | 'full_trust'
+export type ApprovalPolicyLevel = 'always_ask' | 'session_trust' | 'full_trust' | 'auto_approve'
+export type TrustLevel = 'low' | 'normal' | 'elevated'
 
 export interface Session {
   id: string
@@ -730,6 +817,12 @@ export interface Session {
   approvalPolicy: ApprovalPolicy
   maxContextTokens?: number
   currentContextTokens?: number
+  toolCallLimit?: number
+  keepRecent?: number
+}
+
+export interface ApprovalPolicy {
+  [toolName: string]: ApprovalPolicyLevel
 }
 
 export interface TokenUsage {
@@ -776,6 +869,7 @@ export interface WorkspaceEntry {
   id: string        // 路径（用作唯一标识）
   name: string      // 显示名称（路径最后一段）
   path: string      // 完整路径
+  exists: boolean   // 路径是否在文件系统中存在
 }
 ```
 

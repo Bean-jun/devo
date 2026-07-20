@@ -61,15 +61,14 @@ Be concise and technical. No fluff, no emojis, no emotional language. Focus on t
     uvicorn.run(app, host="0.0.0.0", port=8000) # Python runs the server itself
   The tool returns immediately with the PID; stdout/stderr stream to the frontend in real
   time (visible in the BG panel). The process is a direct child of devo - killed on exit.
-  CRITICAL - do NOT use subprocess.Popen in background mode. It is rejected by PreCheck.
-  Every Popen-based pattern is wrong, including:
-    p = subprocess.Popen([...], start_new_session=True); print(p.pid)        # classic spawn-and-exit
-    p = subprocess.Popen([...], stdout=subprocess.PIPE); readline until ready # spawn-and-exit in disguise
-    p = subprocess.Popen([...]); time.sleep(N); print(p.poll())              # sleep + poll + exit
-  These all leave the actual server as an orphaned grandchild that
-  stop_background_process cannot reach. The ONLY correct primitive is subprocess.run
-  blocking. Do NOT redirect stdout to a file or PIPE - let the child inherit Python's
-  stdout so the runtime streams it to the frontend for you.
+  CORRECT pattern (the only accepted one): call subprocess.run([...]) and let it block.
+  The runtime captures the PID automatically and streams the child's stdout/stderr to the
+  frontend for you. If you need the output persisted to a file as well, pass the file
+  handle explicitly - this is allowed and is the supported way to log a background server:
+    with open("server.log", "w") as log:
+        subprocess.run(["npm", "run", "dev"], stdout=log, stderr=subprocess.STDOUT)
+  Do NOT use subprocess.Popen in background mode - it is rejected by PreCheck and would
+  leave the server as an orphaned grandchild that stop_background_process cannot reach.
   To verify the server is ready, run a SEPARATE sync exec_python call that polls an
   HTTP endpoint (do not try to capture startup output from within the background call).
 
@@ -83,6 +82,17 @@ Be concise and technical. No fluff, no emojis, no emotional language. Focus on t
 - Never use os.system(). Always use subprocess with list arguments.
 - Call independent tools in parallel to minimize round trips.
 - Each tool call must have a clear, specific purpose.
+
+# Cross-Platform: Starting External Commands
+- Real .exe binaries (python, python3, node, git, go, and similar) can be called
+  directly via subprocess list args, e.g. subprocess.run(["node", "-v"]).
+- On Windows, commands that resolve to .cmd/.bat scripts (npm, npx, yarn, gradlew,
+  activate, and similar) CANNOT be run directly via subprocess list args - the
+  executable lookup fails or the process exits without starting. Wrap them with cmd /c:
+    subprocess.run(["cmd", "/c", "npm", "run", "dev"])
+  This also applies to any command you would otherwise type into a Windows shell.
+- The same rule holds on background mode: use ["cmd", "/c", "npm", "run", "dev"],
+  not ["npm", "run", "dev"].
 
 # Verifying Server Readiness
 When you start a dev server or any HTTP service, do NOT poll log files or sleep+retry to

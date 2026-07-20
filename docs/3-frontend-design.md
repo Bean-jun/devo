@@ -1,8 +1,8 @@
 ﻿# Devo 前端 Web 应用设计方案
 
-**版本**：1.3.0（2026-06-26 更新：基于实际实现状态全面更新——三栏面板布局已完工，6 个面板全部实现，工作区管理（列表/切换/删除/确认）、会话管理（创建/重命名/删除/归档）、文件预览（大小限制+类型过滤+图片预览）、主题切换动画全部落地）
+**版本**：1.4.0（2026-07-20 更新：模式分流新增移动端布局，isVscodeMode 改为 layoutMode 三态，会话状态拆分 thinking/tool_executing，信任级别改为 low/normal/elevated，审批策略补充 auto_approve，新增 backgroundStore 和三个面板（Mcp/Background），SSE 事件补充 6 个，后端接入状态更新）
 
-**定位**：同一份 Vue 3 应用，通过 `usePlatform` 模式分流同时支持浏览器（完整控制中心，三栏面板布局）和 VSCode Webview（极简聊天窗口）。后端 API 完全复用，不做任何区分。
+**定位**：同一份 Vue 3 应用，通过 `usePlatform` 模式分流同时支持浏览器（完整控制中心，三栏面板布局）、VSCode Webview（极简聊天窗口）和移动端（触摸优化）。后端 API 完全复用，不做任何区分。
 
 ---
 
@@ -22,12 +22,12 @@
 | 系统提示词 | agents.md + 目录摘要 + 占位点 | ✅ 已接入 |
 | 工作区管理 | 当前目录查询/切换、工作区列表去重、按工作区删除会话 | ✅ 已接入 |
 | 文件浏览 | 目录树、文件内容读取、图片 base64 返回 | ✅ 已接入 |
-| 长期记忆 | 用户记忆/项目记忆 CRUD + 自动更新 | 🔶 待接入 |
-| Skills 管理器 | 三种来源加载 + 渐进式披露 + 动态启停 | 🔶 待接入 |
+| 长期记忆 | 用户记忆/项目记忆 CRUD + 自动更新 | ✅ 已接入 |
+| Skills 管理器 | 三种来源加载 + 渐进式披露 + 动态启停 | ✅ 已接入 |
 | 经验固化器 | 完成会话 → 分析 → 生成 SKILL.md | 🔶 待接入 |
 | Token 计量 | 统计/查询/聚合 | 🔶 待接入 |
-| MCP 客户端 | 外部工具发现和调用、自动重连 | 🔶 待接入 |
-| 审批策略 | 按操作类型配置 | 🔶 待接入 |
+| MCP 客户端 | 外部工具发现和调用、自动重连 | ✅ 已接入 |
+| 审批策略 | 按操作类型配置 | ✅ 已接入 |
 
 ### 后端未来
 
@@ -65,24 +65,25 @@
 ```
 浏览器访问  →  http://localhost:8080/             → 完整功能（三栏面板）
 VSCode 访问  →  http://localhost:8080/?mode=vscode  → 仅聊天
+移动端访问  →  自动检测 touch 设备                 → 移动端适配（触摸优化）
 ```
 
 同一个 Vue 应用，入口根据 `usePlatform` 检测结果选择不同的布局壳。**组件、Store、API 层完全复用**。
 
 ### 2.3 职责分离
 
-| | Web（浏览器） | VSCode 扩展 |
-| :--- | :--- | :--- |
-| 定位 | 控制中心 / 配置台（三栏面板） | 终端 / 对话窗口 |
-| 工作区 | 多工作区切换、管理、删除 | 只看当前工作区 |
-| 会话 | 创建/删除/重命名/归档 | 创建/切换 |
-| 技能 | 浏览、安装、启停、删除（面板） | 无（仅被动消费 Web 配置） |
-| 记忆 | 浏览、增删改查（面板） | 无（仅被动消费 Web 配置） |
-| 文件 | 文件树浏览、内容预览（面板） | 无 |
-| 仪表盘 | Token 用量、趋势图表（面板） | 仅状态栏显示 |
-| 终端 | 内嵌终端执行命令（面板） | 无 |
-| 审批 | 弹窗处理 | 弹窗处理 |
-| 聊天 | 有（中间主场） | 有（唯一功能） |
+| | Web（浏览器） | VSCode 扩展 | 移动端 |
+| :--- | :--- | :--- | :--- |
+| 定位 | 控制中心 / 配置台（三栏面板） | 终端 / 对话窗口 | 移动适配（触摸优化） |
+| 工作区 | 多工作区切换、管理、删除 | 只看当前工作区 | 简化选择 |
+| 会话 | 创建/删除/重命名/归档 | 创建/切换 | 创建/切换 |
+| 技能 | 浏览、安装、启停、删除（面板） | 无（仅被动消费 Web 配置） | 无 |
+| 记忆 | 浏览、增删改查（面板） | 无（仅被动消费 Web 配置） | 无 |
+| 文件 | 文件树浏览、内容预览（面板） | 无 | 无 |
+| 仪表盘 | Token 用量、趋势图表（面板） | 仅状态栏显示 | 无 |
+| 终端 | 内嵌终端执行命令（面板） | 无 | 无 |
+| 审批 | 弹窗处理 | 弹窗处理 | 弹窗处理 |
+| 聊天 | 有（中间主场） | 有（唯一功能） | 有（全屏聊天） |
 
 ### 2.4 scope 分层体系
 
@@ -110,8 +111,9 @@ interface Memory {
 
 ```
 Phase 1: 模式分流 + 三栏面板布局重构 ✅ 已完成
-Phase 2: 右侧面板实现（全部 6 个面板）✅ 已完成
+Phase 2: 右侧面板实现（全部 7 个面板）✅ 已完成
 Phase 3: 交互优化（拖拽、动画、快捷键）✅ 已完成
+Phase 4: 移动端适配 ✅ 已完成
 ```
 
 ---
@@ -125,19 +127,26 @@ web/src/
 │
 ├── layouts/                         ← 布局层
 │   ├── BrowserLayout.vue            ← 浏览器三栏布局（可拖拽调整宽度）
-│   └── VscodeLayout.vue             ← VSCode 极简布局（仅聊天）
+│   ├── VscodeLayout.vue             ← VSCode 极简布局（仅聊天）
+│   └── MobileLayout.vue             ← 移动端布局（触摸优化）
 │
 ├── components/                      ← 共享组件
 │   ├── chat/
 │   │   ├── ChatPanel.vue            ← 聊天面板（消息列表 + 输入区）
+│   │   ├── FloatingNavPanel.vue     ← 浮动导航面板
 │   │   ├── InputArea.vue            ← 输入区（/ 命令 + 发送 + 停止）
 │   │   ├── MessageBubble.vue        ← 消息气泡（Markdown 渲染）
 │   │   ├── MessageList.vue          ← 消息列表（自动滚动）
 │   │   ├── ThinkingIndicator.vue    ← 思考指示器（动画）
 │   │   ├── ToolCallCard.vue         ← 工具调用卡片
-│   │   └── ToolCallGroup.vue        ← 工具调用分组
+│   │   ├── ToolCallGroup.vue        ← 工具调用分组
+│   │   └── VirtualMessageItem.vue   ← 虚拟滚动消息项
 │   ├── command/
 │   │   └── CommandPalette.vue       ← 命令面板（/ 触发）
+│   ├── common/
+│   │   └── AppIcon.vue              ← 应用图标
+│   ├── editor/
+│   │   └── MonacoEditor.vue         ← Monaco 代码编辑器
 │   ├── layout/
 │   │   ├── AppSidebar.vue           ← 左侧栏（工作区列表 + 会话列表）
 │   │   ├── AppHeader.vue            ← 顶部栏（已从 BrowserLayout 移除，保留待用）
@@ -146,15 +155,27 @@ web/src/
 │   │   ├── StatusBar.vue            ← 顶部状态栏（会话名/状态/主题切换）
 │   │   ├── ToastContainer.vue       ← 浮动提示容器
 │   │   └── ToastItem.vue            ← 单个提示
+│   ├── mobile/                      ← 移动端组件
+│   │   ├── MobileCommandSheet.vue   ← 移动端命令面板
+│   │   ├── MobileInputBar.vue       ← 移动端输入栏
+│   │   ├── MobilePanelDrawer.vue    ← 移动端面板抽屉
+│   │   ├── MobileSessionPicker.vue  ← 移动端会话选择器
+│   │   └── MobileWorkspacePicker.vue← 移动端工作区选择器
 │   └── modal/
 │       ├── ApprovalModal.vue        ← 审批弹窗
+│       ├── ConfigWarningDialog.vue  ← 配置警告弹窗
+│       ├── ConfirmDeleteDialog.vue  ← 删除确认弹窗
 │       ├── HelpPanel.vue            ← 帮助面板
 │       ├── RollbackPicker.vue       ← 回滚选择器
 │       └── SessionPicker.vue        ← 会话选择器
 │
 ├── panels/                          ← 右侧面板组件
+│   ├── background/
+│   │   └── BackgroundPanel.vue      ← 后台进程面板
 │   ├── files/
 │   │   └── FilesPanel.vue           ← 文件树 + 预览（大小限制/类型过滤/图片预览）
+│   ├── mcp/
+│   │   └── McpPanel.vue             ← MCP 管理面板
 │   ├── skills/
 │   │   └── SkillsPanel.vue          ← 技能管理面板（scope 筛选）
 │   ├── memory/
@@ -180,19 +201,23 @@ web/src/
 │
 ├── composables/                     ← 可复用逻辑
 │   ├── useApi.ts                    ← API 请求封装
+│   ├── useAudio.ts                  ← 音频提示
 │   ├── useSSE.ts                    ← SSE 事件流消费
 │   ├── useCommand.ts                ← 命令处理
+│   ├── useFps.ts                    ← FPS 监控
 │   ├── useKeyboard.ts               ← 键盘快捷键
 │   ├── useAutoScroll.ts             ← 自动滚动
 │   ├── useSession.ts                ← 会话逻辑
 │   ├── useThemeTransition.ts        ← 主题切换动画
-│   └── usePlatform.ts               ← 平台模式检测
+│   ├── usePlatform.ts               ← 平台模式检测
+│   └── useVirtualScroll.ts          ← 虚拟滚动
 │
 ├── stores/                          ← Pinia 状态管理
 │   ├── ui.ts                        ← UI 状态（主题/工作区/面板/Toast/连接状态）
 │   ├── session.ts                   ← 会话状态（CRUD/切换/Token 用量）
 │   ├── chat.ts                      ← 聊天状态（消息/流式/工具调用）
 │   ├── approval.ts                  ← 审批状态
+│   ├── background.ts                ← 后台进程状态
 │   ├── command.ts                   ← 命令状态
 │   ├── skills.ts                    ← 技能状态（scope 分层）
 │   ├── memory.ts                    ← 记忆状态（scope 分层）
@@ -215,6 +240,7 @@ web/src/
 ├── utils/                           ← 工具函数
 │   ├── constants.ts                 ← 常量（API_BASE 等）
 │   ├── formatters.ts                ← 格式化工具
+│   ├── languageMap.ts               ← 语言映射
 │   └── markdown.ts                  ← Markdown 渲染
 │
 └── styles/                          ← 样式
@@ -234,7 +260,9 @@ web/src/
 ```typescript
 // 检测逻辑
 const params = new URLSearchParams(window.location.search)
-const mode = params.get('mode') === 'vscode' ? 'vscode' : 'browser'
+const mode = params.get('mode') === 'vscode' ? 'vscode'
+  : isTouchDevice() ? 'mobile'
+  : 'browser'
 // 也检测 window.acquireVsCodeApi 是否存在（VSCode Webview 环境）
 ```
 
@@ -242,13 +270,21 @@ const mode = params.get('mode') === 'vscode' ? 'vscode' : 'browser'
 
 ```
 App.vue
-  ├── isVscodeMode === true
+  ├── layoutMode === 'vscode'
   │   └── <VscodeLayout>
   │       ├── StatusBar          ← 顶部状态
   │       ├── ChatView           ← 全屏聊天
   │       └── GlobalModals       ← 弹窗层
   │
-  └── isVscodeMode === false
+  ├── layoutMode === 'mobile'
+  │   └── <MobileLayout>
+  │       ├── StatusBar          ← 顶部状态
+  │       ├── ChatView           ← 全屏聊天
+  │       ├── MobileInputBar     ← 移动端输入
+  │       ├── MobileCommandSheet ← 命令面板
+  │       └── GlobalModals       ← 弹窗层
+  │
+  └── layoutMode === 'browser'
       └── <BrowserLayout>
           ├── AppSidebar         ← 左侧栏（工作区 + 会话）
           ├── StatusBar          ← 顶部状态栏
@@ -262,7 +298,7 @@ App.vue
 ```
 页面加载
   ↓
-detectMode() → 设置 isVscodeMode
+detectMode() → 设置 layoutMode（browser / vscode / mobile）
   ↓
 registerThemeTransition() → 注册主题切换涟漪动画
   ↓
@@ -274,7 +310,9 @@ uiStore.setActiveWorkspace(currentDir) → 选中当前工作区（覆盖 localS
   ↓
 sessionStore.fetchSessions(currentDir) → GET /api/v1/sessions?project=xxx → 当前工作区会话
   ↓
-自动选中或创建会话
+自动选中或创建会话（优先 URL 参数 ?session=xxx）
+  ↓
+配置检查 → GET /api/v1/config/status → llm_configured 为 false 时弹出 ConfigWarningDialog
   ↓
 右侧面板默认展示 Files tab
   ↓
@@ -371,13 +409,13 @@ const routes = [
 
 ### 6.3 右侧面板（RightPanel.vue）
 
-**Tab 标签**（全部 6 个，始终可见）：
+**Tab 标签**（全部 7 个，始终可见）：
 
 ```
-📁 Files  ⚡ Skills  🧠 Memory  📊 Dashboard  ⚙ Settings  🖥 Terminal
+📁 Files  ⚡ Skills  🧠 Memory  📊 Dashboard  ⚙ Settings  🖥 Terminal  📡 MCP  🔄 Background
 ```
 
-所有 6 个 Tab 始终可见，不区分模式。面板组件通过 `defineAsyncComponent` 懒加载。
+所有 7 个 Tab 始终可见，不区分模式。面板组件通过 `defineAsyncComponent` 懒加载。
 
 ### 6.4 文件面板（FilesPanel.vue）
 
@@ -454,10 +492,12 @@ const routes = [
 | 状态 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `theme` | `'light' | 'dark'` | 当前主题，持久化 localStorage |
-| `isVscodeMode` | `boolean` | 是否为 VSCode 模式 |
+| `layoutMode` | `'browser' | 'vscode' | 'mobile'` | 当前布局模式 |
 | `activeWorkspace` | `string | null` | 当前选中工作区，持久化 localStorage |
 | `activeRightTab` | `RightTabType` | 右侧面板激活 Tab，默认 `'files'` |
 | `rightPanelVisible` | `boolean` | 右侧面板是否可见 |
+| `sidebarCollapsed` | `boolean` | 左侧栏是否折叠，持久化 localStorage |
+| `activity` | `string` | 当前活动状态文本（如 "Thinking..."、"Running exec_python"） |
 | `workspaceList` | `WorkspaceEntry[]` | 工作区列表 |
 | `toasts` | `Toast[]` | 浮动提示列表 |
 | `activeModal` | `ModalType` | 当前激活弹窗 |
@@ -494,7 +534,7 @@ const routes = [
 - `updateSessionState(id, state)` — 更新会话状态
 - `updateTokenUsage(id, usage)` — 更新 Token 用量
 
-**关键 getters**：`isProcessing`, `isAwaitingApproval`, `isPaused`, `isArchived`, `sessionStatus`, `canPause`, `canResume`, `canCancel`
+**关键 getters**：`isProcessing`（兼容 thinking/tool_executing/processing）、`isThinking`、`isToolExecuting`、`isAwaitingApproval`、`isPaused`、`isArchived`、`isSessionActive`、`sessionStatus`、`canPause`（tool_executing 时可用）、`canResume`、`canCancel`、`yoloEnabled`（trustLevel === 'elevated'）
 
 ### 7.3 chat Store
 
@@ -544,6 +584,17 @@ const routes = [
 
 管理命令面板状态：`openPalette()`, `closePalette()`, `executeCommand()`
 
+### 7.9 background Store
+
+管理后台进程输出和状态：
+
+| 状态 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `processes` | `BackgroundProcess[]` | 后台进程列表 |
+| `outputs` | `Record<string, string[]>` | 进程输出内容 |
+
+**Actions**：`addOutput(processId, line)` — 追加后台进程输出行
+
 ---
 
 ## 八、StatusBar — 顶部状态栏
@@ -552,11 +603,13 @@ const routes = [
 - 会话名称（可点击重命名，支持 inline 编辑 + Enter 确认）
 - 会话状态指示器（圆点 + 文字）：
   - 🟢 Idle（空闲）
-  - 🔵 Processing（处理中，带脉冲动画）
+  - 🔵 Thinking（思考中，LLM 生成内容，带脉冲动画）
+  - 🟣 ToolExecuting（工具执行中，带转动动画）
   - 🟡 AwaitingApproval（等待审批）
   - ⏸️ Paused（已暂停）
   - ✅ Completed（已完成）
   - 📦 Archived（已归档）
+- 活动状态文本：`uiStore.activity`（如 "Thinking..."、"Running exec_python"）
 - 连接状态：🟢 已连接 / 🔴 未连接
 - 主题切换按钮：🌙（暗色模式）/ ☀️（亮色模式），涟漪动画从按钮位置扩散
 
@@ -570,21 +623,27 @@ const routes = [
 
 | 事件 | 前端处理 |
 | :--- | :--- |
-| `thinking` | `chatStore.startStreaming()` |
+| `thinking` | `chatStore.startStreaming()` + `uiStore.setActivity('Thinking...')` |
 | `streaming_token` | `chatStore.appendStreamChunk()` |
-| `streaming_complete` | 等待 message_complete |
-| `message_complete` | `chatStore.finishStreaming()` + 更新会话状态 |
+| `streaming_complete` | 等待 `message_complete` |
+| `message_complete` | `chatStore.finishStreaming()` + `uiStore.clearActivity()` + 更新会话状态 |
 | `token_usage` | `sessionStore.updateTokenUsage()` |
 | `tool_call_request` | `chatStore.appendToolCallMessage()` |
-| `tool_result` | `chatStore.updateToolCallStatus()` |
-| `tool_progress` | `chatStore.updateToolCallStatus('executing')` |
+| `tool_result` | `chatStore.updateToolCallStatus()` + 后台进程注册（`exec_python` background mode） |
+| `tool_progress` | `chatStore.updateToolProgress(id, stage)` |
+| `tool_chunk` | 工具流式输出，实时追加到工具调用卡片 |
 | `approval_required` | `approvalStore.setApproval()` |
-| `approval_auto` | Toast 通知 |
+| `approval_auto` | Toast 通知（`yolo` 策略时跳过通知） |
 | `approval_resolved` | `approvalStore.clearApproval()` |
-| `session_state_change` | `sessionStore.updateSessionState()` |
-| `context_compressed` | Toast 通知 |
-| `file_state_warning` | Toast 通知 |
+| `session_state_change` | `sessionStore.updateSessionState()`（`cancelled`/`tool_limit_reached`/`error` 原因做特殊处理） |
+| `context_compressed` | Toast 通知 + 追加系统消息 |
+| `file_state_warning` | 追加系统消息 |
 | `error` | Toast 通知 |
+| `loop.completed_with_reason` | 循环完成时播放提示音（`useAudio`） |
+| `background_output` | `backgroundStore.addOutput(processId, line)` |
+| `skill_solidified` | `skillsStore.fetchSkills()` 刷新 |
+| `memory_updated` | `memoryStore.fetchMemories()` 刷新 |
+| `mcp_tool_discovered` | `mcpStore.fetchTools()` 刷新 |
 
 **SSE 事件分发**：在 `App.vue` 中统一管理，事件触发后同时调用对应 Store 的 action。
 
@@ -595,6 +654,7 @@ const routes = [
 | 方法 | 路径 | 前端用途 |
 | :--- | :--- | :--- |
 | GET | `/api/v1/version` | 版本号 |
+| GET | `/api/v1/config/status` | 检查 LLM 配置状态（初始化时调用） |
 | GET | `/api/v1/current-workspace` | 获取当前工作目录 |
 | POST | `/api/v1/current-workspace` | 切换工作目录（切换工作区时调用） |
 | GET | `/api/v1/workspace` | 获取工作区列表 |
@@ -630,19 +690,24 @@ const routes = [
 
 | 决策 | 方案 | 理由 |
 | :--- | :--- | :--- |
-| 模式分流 | URL 参数 `?mode=vscode` + `acquireVsCodeApi` | 零侵入，同一份代码，部署简单 |
+| 模式分流 | `layoutMode` 三态（browser/vscode/mobile）+ URL 参数 + touch 检测 | 零侵入，同一份代码，一次部署 |
 | 布局 | 三栏面板模式 | 聊天是主场不可离开，面板是辅助 |
+| 移动端 | MobileLayout + 触摸优化组件 | 自动检测，适配小屏设备 |
 | 路由 | vue-router 仅 `/chat` 路由 | 功能切换走右侧面板 Tab，不跳转页面 |
 | 工作区初始化 | `current-workspace` API 决定默认选中 | 确保前端与后端进程当前目录一致 |
 | 工作区切换 | 前端 + 后端同步（`POST /api/v1/current-workspace`） | 后端 `os.Chdir()` 切换目录 |
 | 工作区删除 | 输入路径精确匹配确认 | 防止误删，不可恢复 |
 | 会话删除 | 简单确认弹窗 | 单会话删除风险可控 |
+| 配置检查 | 初始化时 `GET /api/v1/config/status` | LLM 未配置时弹出警告，防止空跑 |
+| URL 会话参数 | 优先 `?session=xxx` 选中会话 | 支持外部链接直达特定会话 |
 | scope 分层 | `global` + `workspace:<id>` | Skills 和 Memory 支持全局和项目两层 |
 | 文件预览 | 5MB 上限 + 150+ 扩展名白名单 + 无后缀 ≤1MB 文本 | 安全可控，覆盖主流编程语言 |
 | 图片预览 | 后端 base64 返回 `data:image/xxx;base64,...` | 避免额外请求，一次性加载 |
 | 主题切换 | 涟漪动画从按钮位置扩散 | 视觉连贯，双向统一 |
-| 审批弹窗 | 双模式都支持 | 审批是对话流程的一部分 |
+| 审批弹窗 | 三模式都支持 | 审批是对话流程的一部分 |
 | SSE 事件分发 | App.vue 统一处理 + 写入对应 Store | 无论哪个面板，数据都能实时刷新 |
+| 信任级别 | `low` / `normal` / `elevated` 三态 | `elevated` 即 YOLO 模式，自动批准所有工具 |
+| 后台进程 | `backgroundStore` 独立管理 | 进程输出通过 SSE `background_output` 事件实时推送 |
 | AppHeader | 已移除 | StatusBar 已显示会话名称，冗余 |
 | StatusBar 位置 | 顶部（聊天区域上方） | 会话状态一目了然 |
 | 样式 | 手写 CSS，零 UI 框架 | 轻量、可控、无依赖 |

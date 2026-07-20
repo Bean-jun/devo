@@ -120,22 +120,24 @@ background: Python itself IS the long-running process. The tool returns immediat
   Write code that blocks directly:
     subprocess.run(["npm", "run", "dev"])        # Python blocks on the dev server
     uvicorn.run(app, host="0.0.0.0", port=8000) # Python runs the server itself
-  CRITICAL - do NOT use subprocess.Popen in background mode. It is rejected by PreCheck.
-  Every Popen-based pattern is wrong, including these common variants:
-    # WRONG - classic spawn-and-exit
-    p = subprocess.Popen([...], start_new_session=True); print(p.pid); exit()
-    # WRONG - read startup output then exit (spawn-and-exit in disguise)
-    p = subprocess.Popen([...], stdout=subprocess.PIPE)
-    while ...: line = p.stdout.readline(); if "ready" in line: break
-    # WRONG - sleep + poll + exit
-    p = subprocess.Popen([...]); time.sleep(5); print(p.poll())
-  The ONLY correct primitive is 'subprocess.run([...])' blocking. Do not redirect stdout
-  to a file or PIPE - let the child inherit Python's stdout so the runtime can stream it
-  to the frontend. Python MUST block; if it exits, the background process is unregistered
-  and any grandchild is orphaned and unstoppable via stop_background_process.
+  CORRECT pattern (the only accepted one): call subprocess.run([...]) and let it block.
+  The runtime captures the PID automatically and streams the child's stdout/stderr to the
+  frontend for you. If you need the output persisted to a file as well, pass the file
+  handle explicitly - this is allowed and is the supported way to log a background server:
+    with open("server.log", "w") as log:
+        subprocess.run(["npm", "run", "dev"], stdout=log, stderr=subprocess.STDOUT)
+  Do NOT use subprocess.Popen in background mode - it is rejected by PreCheck and would
+  leave the server as an orphaned grandchild that stop_background_process cannot reach.
+  Python MUST block; if it exits, the background process is unregistered and any
+  grandchild is orphaned and unstoppable via stop_background_process.
   To stop later: use stop_background_process with the returned PID, or list_background_processes
   to discover active PIDs. To verify readiness: poll an HTTP endpoint in a SEPARATE sync
   exec_python call - do not try to capture startup output from within the background call.
+
+Cross-platform note: on Windows, commands that resolve to .cmd/.bat scripts (npm, npx,
+  yarn, gradlew, activate) cannot be run directly via subprocess list args - wrap them
+  with cmd /c, e.g. subprocess.run(["cmd", "/c", "npm", "run", "dev"]). Real .exe
+  binaries (python, node, git, go) can be called directly.
 
 Never use os.system(). Always use subprocess with list arguments.
 

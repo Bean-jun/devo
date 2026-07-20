@@ -79,7 +79,7 @@ Devo 采用 **"本地核心 + 可选团队服务"** 的混合部署模式。
 | **唯一标识** | 会话 ID |
 | **消息历史** | 完整有序的消息列表（用户、助手、系统、工具调用结果） |
 | **工作目录路径** | 会话关联的本地项目目录，创建会话时必须提供合法路径，系统只在该目录范围内操作 |
-| **代理循环状态** | Idle / Processing / AwaitingApproval / Paused / Completed / Archived |
+| **代理循环状态** | Idle / Thinking / ToolExecuting / AwaitingApproval / Paused / Completed / Archived |
 | **元数据** | 创建时间、最后活跃时间、会话标题、当前信任级别、审批策略配置、子进程 PID、工具调用上限（tool_call_limit，默认 50）、当前工具调用计数等 |
 | **上下文压缩状态** | 记录已压缩的消息范围、摘要内容，用于保证长会话的连续性 |
 | **事件总线和事件历史** | 会话专属的实时事件发布通道及已发送事件的滚动历史，用于 SSE 重连补推 |
@@ -95,17 +95,18 @@ Devo 采用 **"本地核心 + 可选团队服务"** 的混合部署模式。
 | 状态 | 说明 |
 | :--- | :--- |
 | `Idle` | 等待用户输入 |
-| `Processing` | 代理循环正在运行，SSE 持续推送事件 |
+| `Thinking` | LLM 正在思考/推理，尚未决定调用工具 |
+| `ToolExecuting` | 工具正在执行中 |
 | `AwaitingApproval` | 暂停等待用户审批某个操作，设有超时计时器 |
 | `Paused` | 用户主动暂停或 SSE 连接全部断开，代理循环挂起，可恢复 |
 | `Completed` | 用户标记完成 |
 | `Archived` | 归档，不可再交互 |
 
 状态流转规则：
-- **暂停与恢复**：当代理处于 `Processing` 状态时，用户可通过接口**主动暂停**，系统将当前步骤执行完安全收尾后转入 `Paused`；若会话的所有 SSE 连接均断开（客户端离线），系统自动将会话置为 `Paused` 并挂起循环。恢复时，用户重新连接 SSE 后通过接口**显式恢复**，或直接发送新消息，代理将从中断点继续循环。
-- **取消**：用户在任意 `Processing` 或 `AwaitingApproval` 状态下可通过 HTTP 接口强制取消当前循环，状态重置为 `Idle`，LLM 上下文中的未完成工具调用视为失效。
-- **审批超时**：在 `AwaitingApproval` 状态下若超出配置时间仍未收到审批决策，系统自动视为"拒绝"，并回到 `Processing` 状态继续循环，同时向 LLM 注入拒绝反馈。超时后收到的补交审批请求将被忽略。
-- **完成与会话归档**：用户可将 `Idle`、`Paused` 或 `Completed` 状态的会话标记为 `Completed`；若正在 `Processing` 则系统先执行取消逻辑再切换。`Completed` 状态的会话可进一步归档为 `Archived`。
+- **暂停与恢复**：当代理处于 `Thinking` 或 `ToolExecuting` 状态时，用户可通过接口**主动暂停**，系统将当前步骤执行完安全收尾后转入 `Paused`；若会话的所有 SSE 连接均断开（客户端离线），系统自动将会话置为 `Paused` 并挂起循环。恢复时，用户重新连接 SSE 后通过接口**显式恢复**，或直接发送新消息，代理将从中断点继续循环。
+- **取消**：用户在任意 `Thinking`、`ToolExecuting` 或 `AwaitingApproval` 状态下可通过 HTTP 接口强制取消当前循环，状态重置为 `Idle`，LLM 上下文中的未完成工具调用视为失效。
+- **审批超时**：在 `AwaitingApproval` 状态下若超出配置时间仍未收到审批决策，系统自动视为"拒绝"，并回到 `Thinking` 状态继续循环，同时向 LLM 注入拒绝反馈。超时后收到的补交审批请求将被忽略。
+- **完成与会话归档**：用户可将 `Idle`、`Paused` 或 `Completed` 状态的会话标记为 `Completed`；若正在 `Thinking` 或 `ToolExecuting` 则系统先执行取消逻辑再切换。`Completed` 状态的会话可进一步归档为 `Archived`。
 - **工具调用上限暂停**：当循环因达到工具调用上限而终止时，状态切回 `Idle`，并推送 `session_state_change` 事件（`reason: tool_limit_reached`）。用户可通过发送“继续”或直接输入新消息，系统将注入中断上下文并重置工具调用计数器，自动恢复循环。详见 2.5。
 - **归档后的约束**：处于 `Archived` 状态的会话，拒绝以下操作并返回 409（Conflict）：
   - 发送新消息（`POST /messages`）
@@ -140,11 +141,11 @@ Devo 采用 **"本地核心 + 可选团队服务"** 的混合部署模式。
 - 不恢复任何文件快照，因为系统不保存它们。
 
 **崩溃恢复**：
-- 服务启动时，扫描持久化存储中所有非终态会话（`Idle`、`Processing`、`AwaitingApproval`、`Paused`）。
-- 对状态为 `Processing` 或 `AwaitingApproval` 的会话，执行**崩溃恢复重置**：
+- 服务启动时，扫描持久化存储中所有非终态会话（`Idle`、`Thinking`、`ToolExecuting`、`AwaitingApproval`、`Paused`）。
+- 对状态为 `Thinking`、`ToolExecuting` 或 `AwaitingApproval` 的会话，执行**崩溃恢复重置**：
   1. 将状态强制切回 `Idle`。
   2. 在消息历史中插入一条系统消息，内容为：*"系统检测到上次服务异常中断，当前会话已重置。未完成的工具调用已丢弃，请检查文件状态。"*
-  3. 清理可能残留的孤儿子进程（通过会话元数据中记录的子进程 PID 进行终止，这些子进程为 Python 解释器进程）。
+  3. 不清理子进程（PID 可能已被操作系统回收，强行终止可能误杀无关进程）。未完成的工具调用已丢弃，用户需自行检查文件状态。
   4. 异步触发会话存档更新，反映崩溃重置后的状态。
   5. 若有活跃 SSE 连接，推送 `session_state_change` 事件通知前端（`reason: error`）。
 - `Paused` 状态的会话保持不变（因其子进程已安全收尾）。
@@ -209,10 +210,10 @@ Token 计量器嵌入在代理循环中，由任务处理层的 LLM 客户端封
 
 ### 2.7 上下文压缩
 
-为避免长对话超出 LLM 最大上下文窗口，核心层内置**滑动窗口 + 摘要**机制：
+为避免长对话超出 LLM 最大上下文窗口，核心层内置**基于 Token 预算的渐进式压缩**机制：
 
-- 系统设定一个上下文消息数量阈值（可配置）和 Token 总量预算。
-- 当消息历史超出阈值时，对最早的消息段进行压缩：
+- 系统设定一个 Token 总量预算。当消息历史的 Token 使用量超过预算的 80% 时触发压缩。
+- 压缩采用**渐进式批量处理**（每批最多 10 条消息），逐批压缩最旧的消息段：
   - 保留所有系统消息、回滚记录和工具调用结果的关键元数据。
   - 将用户和助手的连续对话片段交由 LLM 生成一段简洁摘要。
   - 将摘要以系统消息形式插入历史头部，并删除已被摘要覆盖的原始消息。
@@ -248,13 +249,14 @@ Token 计量器嵌入在代理循环中，由任务处理层的 LLM 客户端封
 
 #### 2.10.1 操作风险分级
 
-所有需要审批的操作按风险等级分为三级，系统预设默认审批策略：
+所有需要审批的操作按风险等级分为四级，系统预设默认审批策略：
 
 | 风险等级 | 操作类型 | 默认策略 | 理由 |
 | :--- | :--- | :--- | :--- |
-| **高** | `execute_command`（执行命令） | `always_ask` | 命令执行风险最大，是安全的最后防线。 |
+| **高** | `exec_python`（执行命令） | `always_ask` | 命令执行风险最大，是安全的最后防线。 |
 | **中** | `file_write_new`、`file_write_overwrite`、`file_edit`（文件写入） | `always_ask` | 涉及代码修改，但有 diff 可供审查，用户可在熟悉后自行降级。 |
-| **低** | `memory_update`（记忆更新）、`solidify_skill`（技能固化）、网络访问（仅限读取操作） | `auto_approve` | 记忆和技能是"学习"行为，打断感强；它们有独立的撤销机制（手动删除记忆/技能），风险可控。自动批准后通过 SSE 推送通知事件，保持透明但不打断工作流。 |
+| **低** | `list_background_processes`、`stop_background_process`（后台进程管理） | `session_trust` | 后台进程管理操作风险较低，同一会话内自动批准。 |
+| **无** | `memory_update`（记忆更新）、`solidify_skill`（技能固化）、`use_skill`（技能加载） | `auto_approve` | 无需审批。记忆和技能是"学习"行为，打断感强；它们有独立的撤销机制（手动删除记忆/技能），风险可控。自动批准后通过 SSE 推送通知事件，保持透明但不打断工作流。 |
 
 #### 2.10.2 审批策略配置
 
@@ -267,7 +269,15 @@ Token 计量器嵌入在代理循环中，由任务处理层的 LLM 客户端封
 | `full_trust` | 永久自动批准（跨会话）。 |
 | `auto_approve` | 自动批准，但通过 SSE 推送通知事件告知用户。 |
 
-用户可通过 `PUT /api/v1/sessions/{id}/approval-policy` 接口在运行时动态调整各操作类型的审批策略。配置存储在会话元数据中。
+此外，系统支持**全局信任级别**（`TrustLevel`），用于快速切换审批模式：
+
+| 信任级别 | 行为 |
+| :--- | :--- |
+| `TrustLow` | 严格模式，所有高风险操作必须审批。 |
+| `TrustNormal` | 正常模式，按操作类型策略审批（默认）。 |
+| `TrustElevated` | **YOLO 模式**：所有工具自动批准，无需任何审批。适用于高度信任的快速迭代场景。 |
+
+用户可通过 `PUT /api/v1/sessions/{id}/trust` 接口在运行时动态调整全局信任级别。配置存储在会话元数据中。
 
 #### 2.10.3 审批超时与审批中的文件差异展示
 
@@ -277,7 +287,7 @@ Token 计量器嵌入在代理循环中，由任务处理层的 LLM 客户端封
   - `file_write_new`：新建文件
   - `file_write_overwrite`：完全覆盖已有文件
   - `file_edit`：精确编辑（查找替换或 Patch）
-  - `execute_command`：执行命令
+  - `exec_python`：执行命令
   - `memory_update`：更新记忆
   - `solidify_skill`：固化技能
 
@@ -286,7 +296,7 @@ Token 计量器嵌入在代理循环中，由任务处理层的 LLM 客户端封
 系统支持多个会话同时存在且独立运行。隔离原则：
 - **事件通道隔离**：每个会话拥有独立的事件总线实例，不同会话的 SSE 流完全隔离。
 - **工具执行上下文隔离**：任务处理层为每个会话维护独立的工作上下文（工作目录、环境变量集合）。
-- **Python 执行器隔离**：每次 `execute_command` 调用启动独立子进程，不共享进程空间。
+- **Python 执行器隔离**：每次 `exec_python` 调用启动独立子进程，不共享进程空间。
 - **文件操作互斥**：对同一工作目录的写操作通过文件锁串行化。会话存档文件的写入操作同样加锁串行化。
 - **资源限制**：可配置单个会话的最大并发工具调用数和子进程数。
 
@@ -440,8 +450,12 @@ Skills 管理器负责统一管理三种来源的技能，并在构建上下文�
 | `edit_file` | 精确编辑文件，通过查找替换（`old_str`→`new_str`）或 unified diff patch 应用修改 | 是 | 中 | 强制限定路径在工作目录内；审批事件携带模拟生成的 diff |
 | `read_file` | 读取工作目录下的文件内容 | 否 | - | 强制限定路径在工作目录内 |
 | `list_files` | 列出目录结构 | 否 | - | 强制限定路径在工作目录内 |
-| `execute_command` | 在工作目录中执行任意 shell 命令 | 是 | 高 | 执行前路径越界检查 + 命令黑名单过滤；统一通过 Python 中介执行 |
+| `glob` | 按 glob 模式匹配文件 | 否 | - | 强制限定在工作目录内搜索 |
 | `search_codebase` | 在项目中搜索文本或模式 | 否 | - | 强制限定在工作目录内搜索 |
+| `exec_python` | 在工作目录中执行任意 shell 命令 | 是 | 高 | 执行前路径越界检查 + 命令黑名单过滤；统一通过 Python 中介执行 |
+| `use_skill` | 加载指定 Skill 获取详细指令 | 否 | 无 | 仅读取 Skills 内容，不修改文件系统 |
+| `list_background_processes` | 列出当前会话的后台进程 | 否 | 低 | 仅读取进程信息 |
+| `stop_background_process` | 停止指定的后台进程 | 是 | 低 | 仅终止当前会话的子进程 |
 
 **`edit_file` 工具详细设计**：
 - **参数**：
@@ -449,7 +463,10 @@ Skills 管理器负责统一管理三种来源的技能，并在构建上下文�
   - `mode`：`"replace"` 或 `"patch"`。
   - 若 `mode="replace"`，需提供 `old_str`（待替换的精确原文本）和 `new_str`（替换文本）。系统在文件中定位 `old_str`，若匹配不唯一则拒绝执行并返回错误。
   - 若 `mode="patch"`，需提供 `patch`（标准 unified diff 文本）。系统在工作目录下使用内部补丁引擎应用该 diff。
-- **审批时的 diff 生成**：在推送审批请求前，系统读取文件当前内容，模拟应用编辑并生成新旧内容 diff，附加到 `approval_required` 事件的 `details.diff` 中。
+- **审批时的 diff 生成**：在推送审批请求前，系统通过 `PreviewDiff` 接口读取文件当前内容，模拟应用编辑并生成新旧内容 unified diff。Diff 附加到 `approval_required` 事件的 `details.diff` 字段中，供前端渲染高亮对比视图。
+  - 对于 `mode="replace"`：系统定位 `old_str` 在文件中的位置，将其替换为 `new_str`，生成替换前后的 diff。
+  - 对于 `mode="patch"`：系统在内存中模拟应用 patch，生成应用前后的 diff。
+  - 若 `old_str` 匹配不唯一或 patch 无法应用，`PreviewDiff` 返回错误，审批事件中附带错误信息而非 diff。
 
 **`write_file` 工具的审批增强**：
 - 当目标文件已存在时，任务处理层在准备审批事件时，自动读取文件的当前内容，与待写入内容计算 diff（unified diff 格式），并将 diff 附加到事件的 `details.diff` 中。新建文件时无需 diff。
@@ -483,7 +500,7 @@ MCP 客户端管理器位于任务处理层，负责：
 
 ### 3.3 沙箱执行器：原生环境 + Python 统一执行
 
-`execute_command` 工具的所有命令统一通过 Python 中介执行。Python 提供跨平台一致的执行环境、安全的命令转义层、以及可审计的执行记录。
+`exec_python` 工具的所有命令统一通过 Python 中介执行。Python 提供跨平台一致的执行环境、安全的命令转义层、以及可审计的执行记录。
 
 **设计原则**：
 - **统一性优先**：所有命令都走 Python 中介，不区分"简单"和"复杂"命令，确保跨平台行为一致。
@@ -505,7 +522,7 @@ MCP 客户端管理器位于任务处理层，负责：
    - 设置执行超时（由 Agent 传入的超时参数控制）。
    - 将执行结果（exit code, stdout, stderr, 是否超时）以 JSON 格式打印到 stdout。
 4. **结果返回**：Go 代码捕获 Python 子进程的 stdout（执行结果 JSON），解析后返回给核心层。
-5. **子进程 PID 记录**：Python 解释器进程的 PID 记录到会话元数据中，用于崩溃恢复时的孤儿子进程清理。
+5. **子进程 PID 记录**：Python 解释器进程的 PID 记录到会话元数据中，用于审计和状态追踪。
 6. **执行审计**：所有通过 Python 中介执行的命令内容，作为系统消息记录在会话历史中，并反映在会话存档中。用户可在审批界面和存档中查看完整的执行上下文。
 
 **平台能力矩阵**：
@@ -554,7 +571,7 @@ MCP 客户端管理器位于任务处理层，负责：
 | `GET` | `/api/v1/sessions` | 列出会话列表。支持 `?status=active\|completed\|archived\|all`、`?project=<path>`、`?limit=20&offset=0`。响应：会话摘要数组，每条含 `id`、`title`、`project_path`、`state`、`created_at`、`last_active_at`。 |
 | `POST` | `/api/v1/sessions` | 创建会话。请求体需指定工作目录路径（必填）。系统校验路径存在且可访问，否则返回 400。可选：传入自定义提示词片段、审批超时时间、审批策略覆盖、工具调用上限 `tool_call_limit`（默认 50）。 |
 | `GET` | `/api/v1/sessions/{id}` | 获取会话状态、元数据、当前信任级别和审批策略配置，以及当前工具调用计数与上限。 |
-| `POST` | `/api/v1/sessions/{id}/complete` | 将状态从非终态切换为 `Completed`。若为 `Processing` 则先执行取消逻辑。自动触发经验固化器。 |
+| `POST` | `/api/v1/sessions/{id}/complete` | 将状态从非终态切换为 `Completed`。若为 `Thinking` 或 `ToolExecuting` 则先执行取消逻辑。自动触发经验固化器。 |
 | `POST` | `/api/v1/sessions/{id}/archive` | 将 `Completed` 会话切换为 `Archived`。若当前状态非 `Completed` 则返回 409。 |
 | `POST` | `/api/v1/sessions/{id}/messages` | 发送用户消息，触发代理循环。若会话为 `Paused` 状态则自动恢复。若上一轮因 `tool_limit_reached` 终止，系统自动注入中断上下文并重置工具调用计数器。 |
 | `GET` | `/api/v1/sessions/{id}/messages` | 获取消息历史（支持分页和范围查询）。 |
@@ -565,7 +582,7 @@ MCP 客户端管理器位于任务处理层，负责：
 | `POST` | `/api/v1/sessions/{id}/resume` | 从 `Paused` 状态恢复代理循环。 |
 | `GET` | `/api/v1/sessions/{id}/files` | 浏览工作目录文件结构，读取文件内容。所有返回路径均为相对于工作目录的路径。 |
 | `PUT` | `/api/v1/sessions/{id}/trust` | 动态修改当前会话的全局审批信任级别。 |
-| `PUT` | `/api/v1/sessions/{id}/approval-policy` | 动态修改当前会话的按操作类型审批策略。请求体示例：`{"file_write": "session_trust", "execute_command": "always_ask", "memory_update": "auto_approve"}`。 |
+| `PUT` | `/api/v1/sessions/{id}/approval-policy` | 动态修改当前会话的按操作类型审批策略。请求体示例：`{"file_write": "session_trust", "exec_python": "always_ask", "memory_update": "auto_approve"}`。 |
 | `PUT` | `/api/v1/sessions/{id}/config` | 动态调整会话配置，包括工具调用上限 `tool_call_limit`。运行时调整即时生效。 |
 | `GET` | `/api/v1/sessions/{id}/usage` | 获取会话 Token 消耗汇总，包含 `total_input_tokens`、`total_output_tokens`、`total_tokens`、`compression_count` 及可选的步骤明细。 |
 | `GET` | `/api/v1/sessions/{id}/archive` | 下载会话的存档文件（Markdown 格式）。若存档文件不存在则返回 404。 |
@@ -596,19 +613,21 @@ MCP 客户端管理器位于任务处理层，负责：
 | 事件类型 | 触发时机 | 关键负载字段 |
 | :--- | :--- | :--- |
 | `thinking` | 代理开始分析用户请求，或循环中进入思考步骤 | `message`: 描述当前思考重点 |
+| `streaming_token` | LLM 流式输出单个 Token | `token`: 文本片段 |
+| `streaming_complete` | LLM 流式输出完成 | `message_id`, `full_text` |
 | `tool_call_request` | LLM 发出工具调用但还未执行（可能需审批） | `tool_name`, `params`, `requires_approval`, `risk_level` |
+| `tool_progress` | 工具执行过程中推送进度描述 | `step_description`, `tool_name` |
 | `tool_result` | 工具执行完成 | `tool_name`, `success`, `summary`（结果摘要） |
-| `approval_required` | 某个操作需要用户审批 | `approval_id`, `operation_type`（含 `file_write_new`、`file_write_overwrite`、`file_edit`、`execute_command`、`memory_update`、`solidify_skill`）, `risk_level`, `details`（含 `diff` 字段用于文件编辑操作，含 `command_context` 用于命令执行操作）, `timeout` |
+| `background_output` | 后台进程产生输出 | `process_id`, `output` |
+| `approval_required` | 某个操作需要用户审批 | `approval_id`, `operation_type`（含 `file_write_new`、`file_write_overwrite`、`file_edit`、`exec_python`、`memory_update`、`solidify_skill`）, `risk_level`, `details`（含 `diff` 字段用于文件编辑操作，含 `command_context` 用于命令执行操作）, `timeout` |
 | `approval_auto` | 某操作按策略自动批准，通知用户 | `operation_type`, `summary` |
 | `approval_resolved` | 审批被响应或超时 | `approval_id`, `decision`, `source`（`user`/`timeout`） |
-| `repair_attempt` | 代理检测到错误并尝试修复 | `attempt_number`, `error_summary` |
-| `progress` | 当前步骤进度描述 | `step_description` |
 | `token_usage` | 每次 LLM 调用完成后 | `step`, `input_tokens`, `output_tokens`, `session_total_tokens` |
 | `context_compressed` | 上下文发生压缩 | `compressed_count`（压缩掉的消息数）, `tokens_removed` |
 | `file_state_warning` | 回滚后检测到文件与对话可能不一致 | `message`: 警告详情 |
 | `archive_updated` | 会话存档文件已更新 | `archive_path`, `last_message_id`（最后写入的消息 ID） |
 | `error` | 发生异常或不可恢复错误 | `code`, `message` |
-| `session_state_change` | 会话状态变更（Idle/Processing/Paused/Completed/Archived） | `old_state`, `new_state`, `reason`（`completed` / `cancelled` / `tool_limit_reached` / `error`） |
+| `session_state_change` | 会话状态变更（Idle/Thinking/ToolExecuting/Paused/Completed/Archived） | `old_state`, `new_state`, `reason`（`completed` / `cancelled` / `tool_limit_reached` / `error`） |
 | `message_complete` | LLM 文本回复完成 | `message_id`, `full_text`, `total_step_tokens` |
 | `memory_updated` | 长期记忆发生变更 | `memory_type`, `key`, `summary` |
 | `memory_update_request` | 系统建议更新记忆，请求用户审批 | `memory_type`, `key`, `suggested_content` |
@@ -623,14 +642,14 @@ MCP 客户端管理器位于任务处理层，负责：
 - `error`：不可恢复错误。
 
 `approval_required` 事件的 `details` 字段增强：
-- 对于命令执行操作（`operation_type: execute_command`），`details` 包含 `command_context` 字段，展示 Python 中介执行该命令的方式和执行上下文，增强用户对命令执行的信任。
+- 对于命令执行操作（`operation_type: exec_python`），`details` 包含 `command_context` 字段，展示 Python 中介执行该命令的方式和执行上下文，增强用户对命令执行的信任。
 - 对于文件编辑操作，`details` 包含 `diff` 字段，展示统一 diff 格式的新旧内容对比。
 
 前端根据事件类型更新界面，实现实时反馈。所有控制指令（取消、审批、暂停等）通过 REST API 发送，与 SSE 事件流在服务端通过同一会话状态协调，无需额外同步机制。
 
 ### 4.3 暂停/恢复语义
 
-- **暂停**：由用户主动调用 `pause` 接口，或在 `Processing` 状态下所有 SSE 连接均断开时自动触发。系统完成当前正在执行的原子步骤后进入 `Paused` 状态，通过 SSE（若仍有连接）或下次重连时的事件历史告知前端。
+- **暂停**：由用户主动调用 `pause` 接口，或在 `Thinking` 或 `ToolExecuting` 状态下所有 SSE 连接均断开时自动触发。系统完成当前正在执行的原子步骤后进入 `Paused` 状态，通过 SSE（若仍有连接）或下次重连时的事件历史告知前端。
 - **恢复**：用户重新连接 SSE 后调用 `resume`，或直接发送新消息（`POST messages`），系统从暂停点继续循环。恢复后系统会重新向 LLM 确认上一步骤的状态，确保不会重复执行已完成的工具调用。
 
 ### 4.4 取消操作的处理流程
@@ -686,7 +705,7 @@ MCP 客户端管理器位于任务处理层，负责：
 - **会话存档隐私**：会话存档文件存储在本地项目目录或 `~/.devo/` 下，与数据库保持单向同步。用户可手动编辑存档以移除敏感信息，编辑不影响系统内部记录。
 - **MCP 安全**：仅建议连接本地或私有 MCP 服务器，避免工具泛滥带来的风险。
 - **团队服务安全**：团队服务端仅接收 Token 消耗摘要和会话元数据，不上传任何代码内容、命令输出或完整对话。项目路径在上报前做哈希脱敏处理。远程协作功能需用户明确授权开启。
-- **崩溃安全**：服务异常崩溃后，系统启动时自动扫描并重置非终态会话，清理孤儿子进程（Python 解释器进程），并插入系统消息告知用户。会话不会永久卡死在中间状态。
+- **崩溃安全**：服务异常崩溃后，系统启动时自动扫描并重置非终态会话，并插入系统消息告知用户。会话不会永久卡死在中间状态。不清理遗留子进程（PID 可能已被操作系统回收，强行终止可能误杀无关进程）。
 - **工具调用上限安全**：工具调用上限防止死循环或失控任务无限消耗 Token。达到上限后系统主动暂停并告知用户，用户可选择继续或放弃，预算完全可控。
 - **原生环境风险**：Agent 以当前用户权限运行，依赖用户审批和信任。后续版本可引入操作系统级用户隔离。
 - **工作目录限制**：Python 执行器确保命令在工作目录内运行，并检查文件路径越界。
@@ -699,9 +718,9 @@ MCP 客户端管理器位于任务处理层，负责：
 - **工具集可扩展**：只需在任务处理层注册新工具，在系统提示词中添加定义，并实现路径安全逻辑。MCP 客户端管理器支持动态接入外部工具。`edit_file` 和 `write_file` 的双工具模式可根据场景扩展更多编辑原语（如 `delete_lines`、`insert_after` 等）。
 - **Skills 可扩展**：支持项目内、全局、社区三种来源，经验固化器可持续生成私有技能。Skills 市场可扩展为组织级或公共注册表。
 - **记忆与进化可扩展**：长期记忆管理器可更换后端（向量数据库等），经验固化器可升级分析模型以支持更复杂的技能提炼。
-- **审批策略可扩展**：当前风险分级为三级（高/中/低），可扩展为更细粒度的多级分类；审批策略配置可从会话级扩展为用户级、团队级默认模板；可增加基于文件模式、操作时间的上下文感知审批规则。
+- **审批策略可扩展**：当前风险分级为四级（高/中/低/无），可扩展为更细粒度的多级分类；审批策略配置可从会话级扩展为用户级、团队级默认模板；可增加基于文件模式、操作时间的上下文感知审批规则。
 - **执行器可替换**：当前基于 Python 中介的统一执行器可替换为容器（Docker/Podman）或轻量级虚拟机方案，实现更强的隔离。`Executor` 接口抽象化后，可支持多种执行后端。
-- **平台扩展**：当前 Windows 上资源限制标记为"不支持"。后续版本可通过 Windows Job Objects API 补齐此能力，使 `execute_command` 在 Windows 上也具备完整的内存和 CPU 限制。
+- **平台扩展**：当前 Windows 上资源限制标记为"不支持"。后续版本可通过 Windows Job Objects API 补齐此能力，使 `exec_python` 在 Windows 上也具备完整的内存和 CPU 限制。
 - **上下文压缩策略可替换**：压缩逻辑基于接口设计，可更换为更复杂的摘要模型。
 - **持久化存储**：可用其他数据库替换，实现 `SessionStore` 接口。
 - **传输层可替换**：当前采用 SSE + REST，若未来出现需要高频双向推送的场景，可升级为 WebSocket，不影响核心层与任务处理层。
