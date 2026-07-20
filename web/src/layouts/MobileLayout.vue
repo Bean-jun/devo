@@ -366,7 +366,7 @@ function handleNewSessionFromPicker() {
             type="text"
             placeholder="输入会话名称（可选）"
             @keydown.enter="confirmNewSession"
-            @keydown.escape="cancelNewSession"
+            @keydown.escape.stop="cancelNewSession"
           />
           <div class="dialog-actions">
             <button class="dialog-btn-cancel" @click="cancelNewSession">取消</button>

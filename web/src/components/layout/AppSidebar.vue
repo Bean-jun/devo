@@ -259,7 +259,7 @@ function cancelNewSession(e?: Event) {
             :class="{ 'confirm-input-error': confirmError }"
             placeholder="输入路径以确认..."
             @keydown.enter="confirmDelete"
-            @keydown.escape="cancelDelete"
+            @keydown.escape.stop="cancelDelete"
           />
           <p v-if="confirmError" class="confirm-error">{{ confirmError }}</p>
         </template>
@@ -302,7 +302,7 @@ function cancelNewSession(e?: Event) {
           class="new-session-input"
           placeholder="输入名称（可选）"
           @keydown.enter="confirmNewSession"
-          @keydown.escape="cancelNewSession"
+          @keydown.escape.stop="cancelNewSession"
         />
         <div class="confirm-actions">
           <button class="confirm-btn confirm-btn-cancel" @click="cancelNewSession">取消</button>

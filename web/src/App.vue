@@ -15,6 +15,7 @@ import { useCommand } from '@/composables/useCommand'
 import { usePlatform } from '@/composables/usePlatform'
 import { useThemeTransition } from '@/composables/useThemeTransition'
 import { useAudio } from '@/composables/useAudio'
+import { decideDoubleEsc } from '@/utils/doubleEsc'
 import { API_BASE } from '@/utils/constants'
 import VscodeLayout from '@/layouts/VscodeLayout.vue'
 import BrowserLayout from '@/layouts/BrowserLayout.vue'
@@ -36,6 +37,9 @@ const { playCompletedSound } = useAudio()
 ;(window as any).__chatStore = chatStore
 
 const initialized = ref(false)
+
+const lastEscAt = ref(0)
+const DOUBLE_ESC_WINDOW = 500
 
 watch(
   () => uiStore.theme,
@@ -441,10 +445,28 @@ useKeyboard([
       const state = sessionStore.currentSession.state?.toLowerCase()
       if (state === 'tool_executing') {
         pauseSession()
-      } else if (state === 'paused') {
+        return
+      }
+      if (state === 'paused') {
         cancelSession()
-      } else if (state === 'thinking' || state === 'processing' || state === 'awaiting_approval') {
+        return
+      }
+      if (state === 'thinking' || state === 'processing' || state === 'awaiting_approval') {
         cancelSession()
+        return
+      }
+      const decision = decideDoubleEsc({
+        state,
+        now: Date.now(),
+        lastEscAt: lastEscAt.value,
+        windowMs: DOUBLE_ESC_WINDOW,
+      })
+      if (decision === 'trigger') {
+        lastEscAt.value = 0
+        uiStore.setActiveModal('rollback-picker')
+      } else if (decision === 'arm') {
+        lastEscAt.value = Date.now()
+        uiStore.showToast('info', '再按一次 ESC 打开回滚', DOUBLE_ESC_WINDOW + 200)
       }
     },
   },

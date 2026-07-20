@@ -133,7 +133,7 @@ const serverPort = computed(() => window.location.port)
         v-model="renameValue"
         class="session-name-input"
         @keydown.enter="confirmRename"
-        @keydown.escape="cancelRename"
+        @keydown.escape.stop="cancelRename"
         @blur="confirmRename"
       />
       <span v-else class="session-name" :title="sessionName" @dblclick="startRename">{{ sessionName }}</span>
