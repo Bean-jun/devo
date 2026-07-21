@@ -18,6 +18,8 @@ interface VirtualScrollReturn {
   offsetY: Ref<number>
   /** 滚动到指定索引 */
   scrollToIndex: (index: number, smooth?: boolean) => void
+  /** 滚动到底部，使用内存中的 totalHeight 计算目标位置，避免 DOM 高度滞后 */
+  scrollToBottom: (smooth?: boolean) => void
   /** 当 item 渲染后调用，记录实际高度 */
   updateItemHeight: (index: number, height: number) => void
 }
@@ -159,7 +161,7 @@ export function useVirtualScroll(
   function isAtBottom(): boolean {
     const el = containerRef.value
     if (!el) return false
-    return el.scrollHeight - el.scrollTop - el.clientHeight < 50
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 100
   }
 
   function updateItemHeight(index: number, height: number): void {
@@ -172,19 +174,7 @@ export function useVirtualScroll(
     recalculateHeight()
 
     if (wasAtBottom) {
-      const el = containerRef.value
-      if (el) {
-        isProgrammaticScroll = true
-        if (programmaticScrollTimer) {
-          clearTimeout(programmaticScrollTimer)
-        }
-        el.scrollTop = el.scrollHeight
-        programmaticScrollTimer = setTimeout(() => {
-          isProgrammaticScroll = false
-          programmaticScrollTimer = null
-          updateVisibleRange()
-        }, 50)
-      }
+      scrollToBottom(false)
     } else {
       updateVisibleRange()
     }
@@ -216,12 +206,36 @@ export function useVirtualScroll(
     }, resetDelay)
   }
 
+  function scrollToBottom(smooth = false): void {
+    const el = containerRef.value
+    if (!el) return
+
+    recalculateHeight()
+
+    const targetTop = Math.max(0, totalHeight.value - el.clientHeight)
+
+    isProgrammaticScroll = true
+    if (programmaticScrollTimer) {
+      clearTimeout(programmaticScrollTimer)
+    }
+
+    el.scrollTo({ top: targetTop, behavior: smooth ? 'smooth' : 'auto' })
+
+    const resetDelay = smooth ? 400 : 50
+    programmaticScrollTimer = setTimeout(() => {
+      isProgrammaticScroll = false
+      programmaticScrollTimer = null
+      updateVisibleRange()
+    }, resetDelay)
+  }
+
   return {
     containerRef,
     visibleRange,
     totalHeight,
     offsetY,
     scrollToIndex,
+    scrollToBottom,
     updateItemHeight,
   }
 }

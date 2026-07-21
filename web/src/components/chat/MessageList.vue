@@ -77,6 +77,7 @@ const {
   totalHeight,
   offsetY,
   scrollToIndex,
+  scrollToBottom: scrollContainerToBottom,
   updateItemHeight,
 } = useVirtualScroll(itemCount, { estimateHeight: 200, bufferSize: 5 })
 
@@ -91,9 +92,7 @@ function checkNearBottom(): void {
 }
 
 function scrollToBottom(smooth = true): void {
-  const lastIdx = itemCount.value - 1
-  if (lastIdx < 0) return
-  scrollToIndex(lastIdx, smooth)
+  scrollContainerToBottom(smooth)
   showScrollToBottom.value = false
   isNearBottom.value = true
 }
