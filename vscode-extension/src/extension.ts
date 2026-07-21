@@ -12,7 +12,6 @@ interface DevoInstance {
   process: cp.ChildProcess | null
   port: number | null
   panel: vscode.WebviewPanel | null
-  statusBarItem: vscode.StatusBarItem
 }
 
 const instances: DevoInstance[] = []
@@ -33,22 +32,11 @@ export function activate(context: vscode.ExtensionContext) {
 async function createNewInstance(context: vscode.ExtensionContext) {
   const instanceId = nextInstanceId++
 
-  const statusBarItem = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right,
-    100 - instances.length
-  )
-  statusBarItem.command = 'devo.open'
-  statusBarItem.text = `$(hubot) Devo # ${instanceId}`
-  statusBarItem.tooltip = `Open Devo Instance ${instanceId}`
-  statusBarItem.show()
-  context.subscriptions.push(statusBarItem)
-
   const instance: DevoInstance = {
     id: instanceId,
     process: null,
     port: null,
     panel: null,
-    statusBarItem,
   }
   instances.push(instance)
 
@@ -64,7 +52,6 @@ async function createNewInstance(context: vscode.ExtensionContext) {
   }
 
   createPanel(instance, context)
-  updateStatusBar(instance)
 }
 
 function createPanel(instance: DevoInstance, context: vscode.ExtensionContext) {
@@ -107,7 +94,6 @@ function cleanupInstance(instance: DevoInstance) {
     }
   }
 
-  instance.statusBarItem.dispose()
   removeInstance(instance)
 }
 
@@ -124,8 +110,6 @@ function handleProcessCrash(instance: DevoInstance, code: number | null) {
   instance.port = null
 
   outputChannel.appendLine(`[instance-${instanceId}] Process crashed with code ${code}`)
-
-  updateStatusBar(instance)
 
   if (instance.panel) {
     instance.panel.webview.html = getCrashContent(code, instanceId)
@@ -144,21 +128,6 @@ function handleProcessCrash(instance: DevoInstance, code: number | null) {
       vscode.commands.executeCommand('devo.open')
     }
   })
-}
-
-function updateStatusBar(instance: DevoInstance) {
-  const instanceId = instance.id
-  if (instance.process && instance.port) {
-    instance.statusBarItem.text = `$(pass) Devo # ${instanceId}`
-    instance.statusBarItem.tooltip = `Devo # ${instanceId} running on port ${instance.port}`
-    instance.statusBarItem.backgroundColor = undefined
-  } else {
-    instance.statusBarItem.text = `$(error) Devo # ${instanceId}`
-    instance.statusBarItem.tooltip = `Devo # ${instanceId} stopped`
-    instance.statusBarItem.backgroundColor = new vscode.ThemeColor(
-      'statusBarItem.errorBackground'
-    )
-  }
 }
 
 function getWebviewContent(port: number, instanceId: number): string {
@@ -327,6 +296,39 @@ async function startDevoProcess(
     })
 
     instance.process.on('error', (err) => {
+      instance.process = null
+      instance.port = null
+      outputChannel.appendLine(`[instance-${instanceId}] Error: ${err.message}`)
+      reject(new Error(`Cannot start devo: ${err.message}.`))
+    })
+
+    instance.process.on('close', (code) => {
+      outputChannel.appendLine(`[instance-${instanceId}] Process exited with code ${code}`)
+      if (instance.port === null) {
+        reject(new Error(`Devo exited with code ${code} before port was assigned`))
+      } else {
+        handleProcessCrash(instance, code)
+      }
+    })
+
+    waitForHealth(instance.port!, 30000)
+      .then(() => {
+        outputChannel.appendLine(`[instance-${instanceId}] Server started successfully`)
+        resolve()
+      })
+      .catch((err) => {
+        outputChannel.appendLine(`[instance-${instanceId}] Startup timed out after 30 seconds`)
+        reject(err)
+      })
+  })
+}
+
+export function deactivate() {
+  outputChannel?.appendLine('[deactivate] Deactivating extension, cleaning up all instances...')
+  for (const instance of [...instances]) {
+    cleanupInstance(instance)
+  }
+}('error', (err) => {
       instance.process = null
       instance.port = null
       outputChannel.appendLine(`[instance-${instanceId}] Error: ${err.message}`)

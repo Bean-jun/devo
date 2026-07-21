@@ -2,8 +2,9 @@
   "name": "devo",
   "displayName": "Devo - AI Coding Agent",
   "description": "AI coding agent that runs in VS Code",
-  "version": "0.1.0-67cb404-dirty",
+  "version": "0.1.0-5e9d1b7",
   "publisher": "devo",
+  "icon": "favicon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -29,7 +30,7 @@
       {
         "command": "devo.open",
         "title": "Open Devo",
-        "icon": "$(hubot)"
+        "icon": "favicon.svg"
       }
     ]
   },

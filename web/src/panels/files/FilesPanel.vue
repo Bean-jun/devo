@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useSessionStore } from '@/stores/session'
-import { useUiStore } from '@/stores/ui'
 import { API_BASE } from '@/utils/constants'
 import { getLanguageFromExtension } from '@/utils/languageMap'
-import MonacoEditor from '@/components/editor/MonacoEditor.vue'
+import HighlightPreview from '@/components/editor/HighlightPreview.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 
 const sessionStore = useSessionStore()
-const uiStore = useUiStore()
 
 interface TreeNode {
   name: string
@@ -35,7 +33,6 @@ const isResizingPreview = ref(false)
 const panelRef = ref<HTMLElement | null>(null)
 let previewRafId = 0
 
-const monacoTheme = computed(() => (uiStore.theme === 'dark' ? 'vs-dark' : 'vs') as 'vs' | 'vs-dark')
 const selectedLanguage = computed(() => {
   if (!selectedPath.value) return 'plaintext'
   return getLanguageFromExtension(selectedPath.value)
@@ -364,12 +361,10 @@ onUnmounted(() => {
           <div v-if="isLoadingContent" class="preview-loading">加载中...</div>
           <img v-else-if="selectedIsImage" :src="selectedContent ?? ''" class="preview-image" />
           <pre v-else-if="isPreviewError" class="preview-content"><code>{{ selectedContent }}</code></pre>
-          <MonacoEditor
+          <HighlightPreview
             v-else
             :content="selectedContent ?? ''"
             :language="selectedLanguage"
-            :theme="monacoTheme"
-            :readonly="true"
             :auto-height="true"
             :min-height="80"
             :max-height="600"
