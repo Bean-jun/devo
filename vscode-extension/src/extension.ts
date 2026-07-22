@@ -328,37 +328,4 @@ export function deactivate() {
   for (const instance of [...instances]) {
     cleanupInstance(instance)
   }
-}('error', (err) => {
-      instance.process = null
-      instance.port = null
-      outputChannel.appendLine(`[instance-${instanceId}] Error: ${err.message}`)
-      reject(new Error(`Cannot start devo: ${err.message}.`))
-    })
-
-    instance.process.on('close', (code) => {
-      outputChannel.appendLine(`[instance-${instanceId}] Process exited with code ${code}`)
-      if (instance.port === null) {
-        reject(new Error(`Devo exited with code ${code} before port was assigned`))
-      } else {
-        handleProcessCrash(instance, code)
-      }
-    })
-
-    waitForHealth(instance.port!, 30000)
-      .then(() => {
-        outputChannel.appendLine(`[instance-${instanceId}] Server started successfully`)
-        resolve()
-      })
-      .catch((err) => {
-        outputChannel.appendLine(`[instance-${instanceId}] Startup timed out after 30 seconds`)
-        reject(err)
-      })
-  })
-}
-
-export function deactivate() {
-  outputChannel?.appendLine('[deactivate] Deactivating extension, cleaning up all instances...')
-  for (const instance of [...instances]) {
-    cleanupInstance(instance)
-  }
 }

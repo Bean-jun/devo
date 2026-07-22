@@ -41,6 +41,16 @@ export function useVirtualScroll(
 
   let isProgrammaticScroll = false
   let programmaticScrollTimer: ReturnType<typeof setTimeout> | null = null
+  let containerPaddingY = 0
+
+  function refreshContainerPadding(): void {
+    const el = containerRef.value
+    if (!el) return
+    const style = window.getComputedStyle(el)
+    const pt = parseFloat(style.paddingTop) || 0
+    const pb = parseFloat(style.paddingBottom) || 0
+    containerPaddingY = pt + pb
+  }
 
   function recalculateHeight(): void {
     const count = itemCount.value
@@ -113,6 +123,7 @@ export function useVirtualScroll(
   let resizeObserver: ResizeObserver | null = null
 
   onMounted(() => {
+    refreshContainerPadding()
     recalculateHeight()
     updateVisibleRange()
 
@@ -126,6 +137,7 @@ export function useVirtualScroll(
       el.addEventListener('scroll', scrollHandler, { passive: true })
       resizeObserver = new ResizeObserver(() => {
         if (isProgrammaticScroll) return
+        refreshContainerPadding()
         recalculateHeight()
         updateVisibleRange()
       })
@@ -212,7 +224,10 @@ export function useVirtualScroll(
 
     recalculateHeight()
 
-    const targetTop = Math.max(0, totalHeight.value - el.clientHeight)
+    // 用内存里的 totalHeight 算目标，避免 DOM 还没 flush 时 el.scrollHeight 读到旧值。
+    // 加上容器 padding Y：scrollHeight = paddingTop + totalHeight + paddingBottom，
+    // clientHeight 含 padding（spec），所以 max scrollTop = totalHeight + paddingY - clientHeight。
+    const targetTop = Math.max(0, totalHeight.value + containerPaddingY - el.clientHeight)
 
     isProgrammaticScroll = true
     if (programmaticScrollTimer) {
