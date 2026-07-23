@@ -62,6 +62,7 @@ async function confirmRollback() {
     )
     if (!res.ok) throw new Error('回滚失败')
     chatStore.rollbackTo(selectedIndex.value)
+    uiStore.setPendingCommand(targetMsg.msg.content)
     uiStore.showToast('info', '消息已回滚')
     uiStore.setActiveModal(null)
   } catch (err) {
