@@ -1,19 +1,33 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { mount, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick } from 'vue'
 import InputArea from '@/components/chat/InputArea.vue'
+
+async function setEditorText(editor: DOMWrapper<HTMLElement>, text: string): Promise<void> {
+  const el = editor.element as HTMLElement
+  el.textContent = text
+  await nextTick()
+  await editor.trigger('input')
+  await nextTick()
+}
+
+function getEditor(wrapper: ReturnType<typeof mount>): DOMWrapper<HTMLElement> {
+  return wrapper.find('[data-test="message-input"]')
+}
 
 describe('InputArea', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    document.execCommand = vi.fn(() => true)
   })
 
-  it('should render textarea and send button', () => {
+  it('should render editor and send button', () => {
     const wrapper = mount(InputArea, {
       props: { isDisabled: false, isProcessing: false },
     })
 
-    expect(wrapper.find('textarea').exists()).toBe(true)
+    expect(getEditor(wrapper).exists()).toBe(true)
     expect(wrapper.find('.btn-send').exists()).toBe(true)
   })
 
@@ -21,10 +35,10 @@ describe('InputArea', () => {
     const wrapper = mount(InputArea, {
       props: { isDisabled: false, isProcessing: false },
     })
-    const textarea = wrapper.find('textarea')
+    const editor = getEditor(wrapper)
 
-    await textarea.setValue('Hello, world!')
-    await textarea.trigger('keydown', { key: 'Enter', shiftKey: false })
+    await setEditorText(editor, 'Hello, world!')
+    await editor.trigger('keydown', { key: 'Enter', shiftKey: false })
 
     expect(wrapper.emitted('send')).toBeTruthy()
     expect(wrapper.emitted('send')![0]).toEqual(['Hello, world!'])
@@ -34,24 +48,24 @@ describe('InputArea', () => {
     const wrapper = mount(InputArea, {
       props: { isDisabled: false, isProcessing: false },
     })
-    const textarea = wrapper.find('textarea')
+    const editor = getEditor(wrapper)
 
-    await textarea.setValue('Hello')
-    await textarea.trigger('keydown', { key: 'Enter', shiftKey: true })
+    await setEditorText(editor, 'Hello')
+    await editor.trigger('keydown', { key: 'Enter', shiftKey: true })
 
     expect(wrapper.emitted('send')).toBeFalsy()
   })
 
-  it('should clear textarea after sending', async () => {
+  it('should clear editor after sending', async () => {
     const wrapper = mount(InputArea, {
       props: { isDisabled: false, isProcessing: false },
     })
-    const textarea = wrapper.find('textarea')
+    const editor = getEditor(wrapper)
 
-    await textarea.setValue('Test message')
-    await textarea.trigger('keydown', { key: 'Enter', shiftKey: false })
+    await setEditorText(editor, 'Test message')
+    await editor.trigger('keydown', { key: 'Enter', shiftKey: false })
 
-    expect((textarea.element as HTMLTextAreaElement).value).toBe('')
+    expect((editor.element as HTMLElement).textContent).toBe('')
   })
 
   it('should show stop button when isProcessing is true', () => {
@@ -63,22 +77,21 @@ describe('InputArea', () => {
     expect(wrapper.find('.btn-send').exists()).toBe(false)
   })
 
-  it('should disable input when isDisabled is true', () => {
+  it('should reflect disabled state via is-disabled class when isDisabled is true', () => {
     const wrapper = mount(InputArea, {
       props: { isDisabled: true, isProcessing: false },
     })
 
-    const textarea = wrapper.find('textarea')
-    expect(textarea.attributes('disabled')).toBeDefined()
+    expect(getEditor(wrapper).classes()).toContain('is-disabled')
   })
 
   it('should show character count', async () => {
     const wrapper = mount(InputArea, {
       props: { isDisabled: false, isProcessing: false },
     })
-    const textarea = wrapper.find('textarea')
+    const editor = getEditor(wrapper)
 
-    await textarea.setValue('Hi')
+    await setEditorText(editor, 'Hi')
 
     const counter = wrapper.find('[data-test="char-count"]')
     expect(counter.text()).toContain('2')
@@ -88,22 +101,33 @@ describe('InputArea', () => {
     const wrapper = mount(InputArea, {
       props: { isDisabled: false, isProcessing: false },
     })
-    const textarea = wrapper.find('textarea')
+    const editor = getEditor(wrapper)
 
-    await textarea.setValue('')
-    await textarea.trigger('keydown', { key: '/' })
+    await editor.trigger('keydown', { key: '/' })
 
     expect(wrapper.emitted('openCommand')).toBeTruthy()
+  })
+
+  it('should not emit openCommand on / when input is not empty', async () => {
+    const wrapper = mount(InputArea, {
+      props: { isDisabled: false, isProcessing: false },
+    })
+    const editor = getEditor(wrapper)
+
+    await setEditorText(editor, 'existing text')
+    await editor.trigger('keydown', { key: '/' })
+
+    expect(wrapper.emitted('openCommand')).toBeFalsy()
   })
 
   it('should not send empty message', async () => {
     const wrapper = mount(InputArea, {
       props: { isDisabled: false, isProcessing: false },
     })
-    const textarea = wrapper.find('textarea')
+    const editor = getEditor(wrapper)
 
-    await textarea.setValue('   ')
-    await textarea.trigger('keydown', { key: 'Enter', shiftKey: false })
+    await setEditorText(editor, '   ')
+    await editor.trigger('keydown', { key: 'Enter', shiftKey: false })
 
     expect(wrapper.emitted('send')).toBeFalsy()
   })
@@ -122,10 +146,10 @@ describe('InputArea', () => {
     const wrapper = mount(InputArea, {
       props: { isDisabled: false, isProcessing: false },
     })
-    const textarea = wrapper.find('textarea')
+    const editor = getEditor(wrapper)
 
-    await textarea.setValue('/new my session')
-    await textarea.trigger('keydown', { key: 'Enter', shiftKey: false })
+    await setEditorText(editor, '/new my session')
+    await editor.trigger('keydown', { key: 'Enter', shiftKey: false })
 
     expect(wrapper.emitted('executeCommand')).toBeTruthy()
     expect(wrapper.emitted('executeCommand')![0]).toEqual(['/new my session'])
@@ -136,12 +160,71 @@ describe('InputArea', () => {
     const wrapper = mount(InputArea, {
       props: { isDisabled: false, isProcessing: false },
     })
-    const textarea = wrapper.find('textarea')
+    const editor = getEditor(wrapper)
 
-    await textarea.setValue('/pause')
-    await textarea.trigger('keydown', { key: 'Enter', shiftKey: false })
+    await setEditorText(editor, '/pause')
+    await editor.trigger('keydown', { key: 'Enter', shiftKey: false })
 
     expect(wrapper.emitted('executeCommand')).toBeTruthy()
     expect(wrapper.emitted('executeCommand')![0]).toEqual(['/pause'])
+  })
+
+  it('should preserve multi-line content without folding', async () => {
+    const wrapper = mount(InputArea, {
+      props: { isDisabled: false, isProcessing: false },
+    })
+    const editor = getEditor(wrapper)
+
+    const multiLineText = 'line1\nline2\nline3\nline4'
+    await setEditorText(editor, multiLineText)
+
+    expect((editor.element as HTMLElement).textContent).toBe(multiLineText)
+    expect((editor.element as HTMLElement).textContent).not.toContain('已粘贴')
+  })
+
+  it('should send multi-line content verbatim on Enter', async () => {
+    const wrapper = mount(InputArea, {
+      props: { isDisabled: false, isProcessing: false },
+    })
+    const editor = getEditor(wrapper)
+
+    const multiLineText = 'line1\nline2\nline3\nline4'
+    await setEditorText(editor, multiLineText)
+    await editor.trigger('keydown', { key: 'Enter', shiftKey: false })
+
+    expect(wrapper.emitted('send')).toBeTruthy()
+    expect(wrapper.emitted('send')![0]).toEqual([multiLineText])
+  })
+
+  it('should send large text without folding', async () => {
+    const wrapper = mount(InputArea, {
+      props: { isDisabled: false, isProcessing: false },
+    })
+    const editor = getEditor(wrapper)
+
+    const largeText = Array.from({ length: 50 }, (_, i) => `line ${i + 1}`).join('\n')
+    await setEditorText(editor, largeText)
+    await editor.trigger('keydown', { key: 'Enter', shiftKey: false })
+
+    expect(wrapper.emitted('send')![0]).toEqual([largeText])
+  })
+
+  it('should show placeholder class when empty', () => {
+    const wrapper = mount(InputArea, {
+      props: { isDisabled: false, isProcessing: false },
+    })
+
+    expect(getEditor(wrapper).classes()).toContain('is-empty')
+  })
+
+  it('should hide placeholder class when text is present', async () => {
+    const wrapper = mount(InputArea, {
+      props: { isDisabled: false, isProcessing: false },
+    })
+    const editor = getEditor(wrapper)
+
+    await setEditorText(editor, 'some text')
+
+    expect(editor.classes()).not.toContain('is-empty')
   })
 })

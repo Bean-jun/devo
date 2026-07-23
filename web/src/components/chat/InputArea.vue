@@ -7,6 +7,14 @@ import { useUiStore } from '@/stores/ui'
 import { MAX_MESSAGE_LENGTH } from '@/utils/constants'
 import { estimateTokens, formatTokenCount } from '@/utils/formatters'
 import AppIcon from '@/components/common/AppIcon.vue'
+import {
+  useInputSegments,
+  createPasteSegment,
+  parseDOMToSegments,
+  chipLabel,
+  shouldFoldPaste,
+  type PasteSegment,
+} from '@/composables/useInputSegments'
 
 const props = defineProps<{
   isDisabled: boolean
@@ -21,22 +29,32 @@ const emit = defineEmits<{
   executeCommand: [text: string]
 }>()
 
-const inputText = ref('')
-const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const editorRef = ref<HTMLDivElement | null>(null)
 const commandStore = useCommandStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
 
+const {
+  segments,
+  nextPasteId,
+  reset,
+  setText,
+  serialize,
+  totalLength,
+  isEmpty,
+} = useInputSegments()
+
+const pasteMap = ref(new Map<number, PasteSegment>())
+const isComposing = ref(false)
+let isPatchingDOM = false
+
 const inputHistory: string[] = []
 let historyIndex = -1
 
-const pastedFullText = ref('')
-const pasteLabel = ref('')
-const PASTE_THRESHOLD = 200
-
-const charCount = computed(() => inputText.value.length)
-const tokenEstimate = computed(() => estimateTokens(inputText.value))
-const canSend = computed(() => inputText.value.trim().length > 0 && !props.isDisabled)
+const charCount = computed(() => totalLength())
+const tokenEstimate = computed(() => estimateTokens(serialize()))
+const canSend = computed(() => !isEmpty() && !props.isDisabled)
+const showPlaceholder = computed(() => isEmpty())
 
 const contextUsage = computed(() => {
   const tokens = sessionStore.currentSession?.currentContextTokens ?? 0
@@ -57,33 +75,138 @@ const { fps } = useFps()
 
 const workingDir = computed(() => sessionStore.currentSession?.workingDirectory ?? '')
 
-function focusTextarea(): void {
+function focusEditor(): void {
   nextTick(() => {
-    textareaRef.value?.focus()
+    editorRef.value?.focus()
   })
 }
 
-onMounted(focusTextarea)
+onMounted(() => {
+  renderEditor()
+  focusEditor()
+})
 
-watch(() => uiStore.focusInputCounter, focusTextarea)
+watch(() => uiStore.focusInputCounter, focusEditor)
 
 watch(() => commandStore.isOpen, (open) => {
-  if (!open) focusTextarea()
+  if (!open) focusEditor()
 })
 
 watch(() => uiStore.pendingCommand, (cmd) => {
   if (cmd) {
-    inputText.value = cmd
+    setText(cmd)
     uiStore.clearPendingCommand()
-    focusTextarea()
+    renderEditor()
+    moveCursorToEnd()
+    focusEditor()
   }
 })
+
+function renderEditor(): void {
+  const editor = editorRef.value
+  if (!editor) return
+  isPatchingDOM = true
+  editor.textContent = ''
+  for (const seg of segments.value) {
+    if (seg.kind === 'text') {
+      if (seg.value) editor.appendChild(document.createTextNode(seg.value))
+    } else {
+      const span = document.createElement('span')
+      span.contentEditable = 'false'
+      span.dataset.pasteId = String(seg.id)
+      span.className = 'paste-chip'
+      span.textContent = chipLabel(seg)
+      editor.appendChild(span)
+    }
+  }
+  nextTick(() => {
+    isPatchingDOM = false
+    autoResize()
+  })
+}
+
+function syncFromDOM(): void {
+  const editor = editorRef.value
+  if (!editor) return
+  segments.value = parseDOMToSegments(editor, pasteMap.value)
+}
+
+function handleInput(): void {
+  if (isPatchingDOM) return
+  if (isComposing.value) return
+  syncFromDOM()
+  autoResize()
+}
+
+function handlePaste(e: ClipboardEvent): void {
+  if (isComposing.value) return
+  const pasted = e.clipboardData?.getData('text') || ''
+  if (!pasted) return
+
+  e.preventDefault()
+
+  const editor = editorRef.value
+  if (!editor) return
+
+  const sel = window.getSelection()
+  if (!sel || !sel.rangeCount) return
+
+  const range = sel.getRangeAt(0)
+  range.deleteContents()
+
+  if (shouldFoldPaste(pasted)) {
+    const id = nextPasteId()
+    const pasteSeg = createPasteSegment(id, pasted)
+    pasteMap.value.set(id, pasteSeg)
+
+    const span = document.createElement('span')
+    span.contentEditable = 'false'
+    span.dataset.pasteId = String(id)
+    span.className = 'paste-chip'
+    span.textContent = chipLabel(pasteSeg)
+
+    range.insertNode(span)
+
+    const newRange = document.createRange()
+    newRange.setStartAfter(span)
+    newRange.collapse(true)
+    sel.removeAllRanges()
+    sel.addRange(newRange)
+  } else {
+    document.execCommand('insertText', false, pasted)
+  }
+
+  syncFromDOM()
+  autoResize()
+}
+
+function insertNewline(): void {
+  const editor = editorRef.value
+  if (!editor) return
+  editor.focus()
+  document.execCommand('insertLineBreak')
+  syncFromDOM()
+  autoResize()
+}
+
+function handleCompositionStart(): void {
+  isComposing.value = true
+}
+
+function handleCompositionEnd(): void {
+  isComposing.value = false
+  syncFromDOM()
+  autoResize()
+}
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
-    send()
-  } else if (e.key === '/' && inputText.value === '') {
+    if (!isComposing.value) send()
+  } else if (e.key === 'Enter' && e.shiftKey) {
+    e.preventDefault()
+    insertNewline()
+  } else if (e.key === '/' && isEmpty()) {
     e.preventDefault()
     emit('openCommand')
   } else if (e.key === 'ArrowUp' && e.shiftKey) {
@@ -95,86 +218,65 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
-function pushHistory(text: string) {
+function moveCursorToEnd(): void {
+  const editor = editorRef.value
+  if (!editor) return
+  const range = document.createRange()
+  range.selectNodeContents(editor)
+  range.collapse(false)
+  const sel = window.getSelection()
+  if (!sel) return
+  sel.removeAllRanges()
+  sel.addRange(range)
+}
+
+function pushHistory(text: string): void {
   if (!text) return
   if (inputHistory.length > 0 && inputHistory[inputHistory.length - 1] === text) return
   inputHistory.push(text)
   historyIndex = inputHistory.length
 }
 
-function historyPrev() {
+function historyPrev(): void {
   if (inputHistory.length === 0) return
   if (historyIndex > 0) {
     historyIndex--
-    inputText.value = inputHistory[historyIndex]
+    setText(inputHistory[historyIndex])
+    renderEditor()
+    moveCursorToEnd()
   }
 }
 
-function historyNext() {
+function historyNext(): void {
   if (inputHistory.length === 0) return
   if (historyIndex < inputHistory.length - 1) {
     historyIndex++
-    inputText.value = inputHistory[historyIndex]
+    setText(inputHistory[historyIndex])
+    renderEditor()
+    moveCursorToEnd()
   } else {
     historyIndex = inputHistory.length
-    inputText.value = ''
+    setText('')
+    renderEditor()
   }
 }
 
-function send() {
-  const rawText = inputText.value.trim()
-  if (!rawText || !canSend.value) return
-
-  const text = (pastedFullText.value && rawText === pasteLabel.value)
-    ? pastedFullText.value
-    : rawText
-
+function send(): void {
+  if (!canSend.value) return
+  const text = serialize()
   pushHistory(text)
   if (text.startsWith('/')) {
     emit('executeCommand', text)
   } else {
     emit('send', text)
   }
-  inputText.value = ''
-  pastedFullText.value = ''
-  pasteLabel.value = ''
-  autoResize()
+  reset()
+  pasteMap.value.clear()
+  renderEditor()
 }
 
-function handlePaste(e: ClipboardEvent) {
-  const pasted = e.clipboardData?.getData('text') || ''
-  if (!pasted) return
-
-  const textarea = textareaRef.value
-  if (!textarea) return
-
-  const currentText = inputText.value
-  const start = textarea.selectionStart
-  const end = textarea.selectionEnd
-
-  const newText = currentText.slice(0, start) + pasted + currentText.slice(end)
-  const lines = newText.split('\n')
-
-  if (newText.length > PASTE_THRESHOLD || lines.length > 3) {
-    e.preventDefault()
-    pastedFullText.value = newText
-    const prefix = currentText.slice(0, start)
-    const suffix = currentText.slice(end)
-    pasteLabel.value = prefix + `[已粘贴 ${lines.length} 行文本]` + suffix
-    inputText.value = pasteLabel.value
-  }
-}
-
-watch(inputText, (val) => {
-  if (pasteLabel.value && val !== pasteLabel.value) {
-    pastedFullText.value = ''
-    pasteLabel.value = ''
-  }
-  autoResize()
-})
-
-function autoResize() {
-  const el = textareaRef.value
+function autoResize(): void {
+  const el = editorRef.value
   if (!el) return
   el.style.height = 'auto'
   el.style.height = Math.min(el.scrollHeight, 200) + 'px'
@@ -184,17 +286,20 @@ function autoResize() {
 <template>
   <div class="input-area">
     <div class="input-wrapper">
-      <textarea
-        ref="textareaRef"
-        v-model="inputText"
+      <div
+        ref="editorRef"
         class="input-field"
+        :class="{ 'is-empty': showPlaceholder, 'is-disabled': isDisabled }"
+        contenteditable="true"
         data-test="message-input"
-        placeholder="输入消息，或按 / 使用命令..."
-        :disabled="isDisabled"
-        :maxlength="MAX_MESSAGE_LENGTH"
-        rows="1"
+        role="textbox"
+        aria-multiline="true"
+        data-placeholder="输入消息，或按 / 使用命令..."
+        @input="handleInput"
         @keydown="handleKeydown"
         @paste="handlePaste"
+        @compositionstart="handleCompositionStart"
+        @compositionend="handleCompositionEnd"
       />
 
       <div class="input-actions">
@@ -323,7 +428,7 @@ function autoResize() {
   width: 100%;
   min-height: 24px;
   max-height: 200px;
-  resize: none;
+  overflow-y: auto;
   font-size: var(--font-size-base);
   line-height: 1.5;
   color: var(--color-text-primary);
@@ -331,15 +436,36 @@ function autoResize() {
   border: none;
   outline: none;
   padding: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-.input-field::placeholder {
+.input-field.is-empty::before {
+  content: attr(data-placeholder);
   color: var(--color-text-tertiary);
+  pointer-events: none;
 }
 
-.input-field:disabled {
+.input-field.is-disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.paste-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  margin: 0 2px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  user-select: none;
+  vertical-align: baseline;
+  cursor: default;
 }
 
 .input-actions {
