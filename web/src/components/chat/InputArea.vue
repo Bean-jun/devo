@@ -285,51 +285,62 @@ function autoResize(): void {
 
 <template>
   <div class="input-area">
-    <div class="input-wrapper">
-      <div
-        ref="editorRef"
-        class="input-field"
-        :class="{ 'is-empty': showPlaceholder, 'is-disabled': isDisabled }"
-        contenteditable="true"
-        data-test="message-input"
-        role="textbox"
-        aria-multiline="true"
-        data-placeholder="输入消息，或按 / 使用命令..."
-        @input="handleInput"
-        @keydown="handleKeydown"
-        @paste="handlePaste"
-        @compositionstart="handleCompositionStart"
-        @compositionend="handleCompositionEnd"
-      />
+    <div class="input-row">
+      <button
+        class="command-btn"
+        aria-label="命令面板"
+        data-test="command-btn"
+        @click="emit('openCommand')"
+      >
+        <span class="command-btn-text">/</span>
+      </button>
 
-      <div class="input-actions">
-        <span class="input-info">
-          <span v-if="charCount > 0" class="char-count" data-test="char-count">
-            {{ charCount }} / {{ MAX_MESSAGE_LENGTH }}
-            <span class="token-estimate">~{{ tokenEstimate }} tokens</span>
+      <div class="input-wrapper">
+        <div
+          ref="editorRef"
+          class="input-field"
+          :class="{ 'is-empty': showPlaceholder, 'is-disabled': isDisabled }"
+          contenteditable="true"
+          data-test="message-input"
+          role="textbox"
+          aria-multiline="true"
+          data-placeholder="输入消息，或按 / 使用命令..."
+          @input="handleInput"
+          @keydown="handleKeydown"
+          @paste="handlePaste"
+          @compositionstart="handleCompositionStart"
+          @compositionend="handleCompositionEnd"
+        />
+
+        <div class="input-actions">
+          <span class="input-info">
+            <span v-if="charCount > 0" class="char-count" data-test="char-count">
+              {{ charCount }} / {{ MAX_MESSAGE_LENGTH }}
+              <span class="token-estimate">~{{ tokenEstimate }} tokens</span>
+            </span>
           </span>
-        </span>
 
-        <button
-          v-if="isProcessing"
-          class="btn-stop"
-          data-test="stop-button"
-          aria-label="停止"
-          @click="emit('stop')"
-        >
-          <AppIcon name="stop" :size="14" class="stop-icon" />
-          停止
-        </button>
+          <button
+            v-if="isProcessing"
+            class="btn-stop"
+            data-test="stop-button"
+            aria-label="停止"
+            @click="emit('stop')"
+          >
+            <AppIcon name="stop" :size="14" class="stop-icon" />
+            停止
+          </button>
 
-        <button
-          v-else
-          class="btn-send"
-          :disabled="!canSend"
-          aria-label="发送"
-          @click="send"
-        >
-          发送
-        </button>
+          <button
+            v-else
+            class="btn-send"
+            :disabled="!canSend"
+            aria-label="发送"
+            @click="send"
+          >
+            发送
+          </button>
+        </div>
       </div>
     </div>
     <div class="input-footer">
@@ -406,9 +417,49 @@ function autoResize(): void {
   color: #ff9500 !important;
 }
 
-.input-wrapper {
+.input-row {
   max-width: 800px;
   margin: 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-sm);
+}
+
+.command-btn {
+  flex-shrink: 0;
+  width: 36px;
+  min-height: 36px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.command-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+.command-btn:active {
+  transform: scale(0.95);
+}
+
+.command-btn-text {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.input-wrapper {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
