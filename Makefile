@@ -24,7 +24,7 @@ DESKTOP_BIN_DIR := $(ELECTRON_DIR)\resources\bin
 # ========== Build ==========
 all: build
 
-build: build-web build-go vsix-win desktop
+build: build-web build-go vsix desktop
 	@echo [OK] Build complete
 
 # ========== Frontend ==========
@@ -40,23 +40,26 @@ build-go:
 	set GOOS=windows&& set GOARCH=amd64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(GO_ENTRY)
 	upx -9 $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe
 	@echo [BUILD]   Linux (amd64)...
-	set GOOS=linux&& set GOARCH=amd64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(GO_ENTRY)
+	set GOOS=linux&& set GOARCH=amd64&& set CGO_ENABLED=0&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(GO_ENTRY)
 	upx -9 $(BUILD_DIR)\$(APP_NAME)-linux-amd64
 	@echo [BUILD]   macOS (amd64)...
-	set GOOS=darwin&& set GOARCH=amd64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
+	set GOOS=darwin&& set GOARCH=amd64&& set CGO_ENABLED=0&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
 	upx -9 $(BUILD_DIR)\$(APP_NAME)-darwin-amd64 --force-macos
 	@echo [BUILD]   macOS (arm64)...
-	set GOOS=darwin&& set GOARCH=arm64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
+	set GOOS=darwin&& set GOARCH=arm64&& set CGO_ENABLED=0&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
 	upx -9 $(BUILD_DIR)\$(APP_NAME)-darwin-arm64 --force-macos
 	@echo [OK] 3 platforms (4 binaries) built
 
 # ========== VS Code Extension ==========
-vsix-win:
+vsix:
 	@echo [VSIX] Syncing version $(FULL_VERSION) to extension...
-	cd $(VSIX_DIR) && node -e "var p=require('./package.json');p.version='$(FULL_VERSION)';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
-	@echo [VSIX] Copying binary to extension...
+	cd $(VSIX_DIR) && node -e "var p=require('./package.json');p.version='$(VERSION)';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+	@echo [VSIX] Copying binaries to extension...
 	@if not exist $(VSIX_DIR)\bin mkdir $(VSIX_DIR)\bin
-	copy $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe $(VSIX_DIR)\bin\$(APP_NAME).exe /Y
+	copy $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe $(VSIX_DIR)\bin\$(APP_NAME)-windows-amd64.exe /Y
+	copy $(BUILD_DIR)\$(APP_NAME)-linux-amd64 $(VSIX_DIR)\bin\$(APP_NAME)-linux-amd64 /Y
+	copy $(BUILD_DIR)\$(APP_NAME)-darwin-amd64 $(VSIX_DIR)\bin\$(APP_NAME)-darwin-amd64 /Y
+	copy $(BUILD_DIR)\$(APP_NAME)-darwin-arm64 $(VSIX_DIR)\bin\$(APP_NAME)-darwin-arm64 /Y
 	@echo [VSIX] Packaging extension...
 	cd $(VSIX_DIR) && npm run vsix
 	cmd /c "move $(VSIX_DIR)\$(APP_NAME)-*.vsix $(BUILD_DIR)\"
@@ -65,10 +68,14 @@ vsix-win:
 # ========== Desktop (Electron) ==========
 
 desktop:
-	@echo [DESKTOP] Copying binary to Electron resources...
-	cd $(ELECTRON_DIR) && node -e "var p=require('./package.json');p.version='$(FULL_VERSION)';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+	@echo [DESKTOP] Syncing version...
+	cd $(ELECTRON_DIR) && node -e "var p=require('./package.json');p.version='$(VERSION)';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+	@echo [DESKTOP] Copying binaries to Electron resources...
 	@if not exist $(DESKTOP_BIN_DIR) mkdir $(DESKTOP_BIN_DIR)
-	copy $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe $(DESKTOP_BIN_DIR)\$(APP_NAME).exe /Y
+	copy $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe $(DESKTOP_BIN_DIR)\$(APP_NAME)-windows-amd64.exe /Y
+	copy $(BUILD_DIR)\$(APP_NAME)-linux-amd64 $(DESKTOP_BIN_DIR)\$(APP_NAME)-linux-amd64 /Y
+	copy $(BUILD_DIR)\$(APP_NAME)-darwin-amd64 $(DESKTOP_BIN_DIR)\$(APP_NAME)-darwin-amd64 /Y
+	copy $(BUILD_DIR)\$(APP_NAME)-darwin-arm64 $(DESKTOP_BIN_DIR)\$(APP_NAME)-darwin-arm64 /Y
 	@echo [DESKTOP] Installing Electron dependencies...
 	cd $(ELECTRON_DIR) && npm install
 	@echo [DESKTOP] Cleaning previous Electron dist...

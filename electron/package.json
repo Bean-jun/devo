@@ -23,6 +23,16 @@
       "target": "portable",
       "icon": "resources/icon.png"
     },
+    "mac": {
+      "target": "dmg",
+      "icon": "resources/icon.png",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "resources/icon.png",
+      "category": "Development"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true

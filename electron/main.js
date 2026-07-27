@@ -30,14 +30,27 @@ function findFreePort() {
 // ====================== Go 二进制路径 ======================
 function getDevoPath() {
   const platform = process.platform;
-  const binaryName = platform === "win32" ? "devo.exe" : "devo";
+  const arch = process.arch;
+  let binaryName;
 
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, "bin", binaryName);
+  if (platform === "win32") {
+    binaryName = "devo-windows-amd64.exe";
+  } else if (platform === "linux") {
+    binaryName = "devo-linux-amd64";
+  } else if (platform === "darwin") {
+    binaryName = arch === "arm64" ? "devo-darwin-arm64" : "devo-darwin-amd64";
+  } else {
+    binaryName = "devo";
   }
 
-  const bundledPath = path.join(__dirname, "resources", "bin", binaryName);
+  const bundledPath = app.isPackaged
+    ? path.join(process.resourcesPath, "bin", binaryName)
+    : path.join(__dirname, "resources", "bin", binaryName);
+
   if (fs.existsSync(bundledPath)) {
+    if (platform !== "win32") {
+      try { fs.chmodSync(bundledPath, 0o755); } catch {}
+    }
     return bundledPath;
   }
 

@@ -216,10 +216,29 @@ function findFreePort(): Promise<number> {
 
 function getDevoPath(context: vscode.ExtensionContext): string {
   const platform = process.platform
-  const binaryName = platform === 'win32' ? 'devo.exe' : 'devo'
+  const arch = process.arch
+  let binaryName: string
+
+  if (platform === 'win32') {
+    binaryName = 'devo-windows-amd64.exe'
+  } else if (platform === 'linux') {
+    binaryName = 'devo-linux-amd64'
+  } else if (platform === 'darwin') {
+    binaryName = arch === 'arm64' ? 'devo-darwin-arm64' : 'devo-darwin-amd64'
+  } else {
+    binaryName = 'devo'
+  }
+
   const bundledPath = path.join(context.extensionPath, 'bin', binaryName)
 
   if (fs.existsSync(bundledPath)) {
+    if (platform !== 'win32') {
+      try {
+        fs.chmodSync(bundledPath, 0o755)
+      } catch {
+        // chmod may fail in some edge cases, but spawn will still try
+      }
+    }
     return bundledPath
   }
 
