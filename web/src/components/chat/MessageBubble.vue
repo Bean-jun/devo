@@ -78,7 +78,10 @@ async function copyContent() {
       </div>
 
       <details v-if="message.role === 'assistant' && message.reasoning" class="reasoning-collapse" data-test="reasoning-collapse">
-        <summary class="reasoning-summary">💭 思考过程</summary>
+        <summary class="reasoning-summary">
+          <AppIcon name="brain" :size="14" class="reasoning-summary-icon" />
+          思考过程
+        </summary>
         <pre class="reasoning-text">{{ message.reasoning }}</pre>
       </details>
 
@@ -321,13 +324,18 @@ async function copyContent() {
 }
 
 .reasoning-summary::before {
-  content: '▶ ';
+  content: '▸ ';
   font-size: 10px;
   opacity: 0.7;
 }
 
 .reasoning-collapse[open] .reasoning-summary::before {
-  content: '▼ ';
+  content: '▾ ';
+}
+
+.reasoning-summary-icon {
+  vertical-align: middle;
+  margin-right: 2px;
 }
 
 .reasoning-text {

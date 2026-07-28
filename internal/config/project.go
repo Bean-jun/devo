@@ -63,7 +63,8 @@ func SaveProjectConfig(projectDir string, cfg *Config) error {
 		existing["approval_policy"] = approvalData
 	}
 
-	if cfg.LLM.APIKey != "" || cfg.LLM.BaseURL != "" || cfg.LLM.Model != "" {
+	if cfg.LLM.APIKey != "" || cfg.LLM.BaseURL != "" || cfg.LLM.Model != "" ||
+		cfg.LLM.EnableReasoning || cfg.LLM.ReasoningEffort != "" {
 		llmData, err := json.Marshal(cfg.LLM)
 		if err != nil {
 			return fmt.Errorf("marshal llm: %w", err)
@@ -152,7 +153,8 @@ func SaveGlobalConfig(cfg *Config) error {
 		_ = json.Unmarshal(data, &existing)
 	}
 
-	if cfg.LLM.APIKey != "" || cfg.LLM.BaseURL != "" || cfg.LLM.Model != "" {
+	if cfg.LLM.APIKey != "" || cfg.LLM.BaseURL != "" || cfg.LLM.Model != "" ||
+		cfg.LLM.EnableReasoning || cfg.LLM.ReasoningEffort != "" {
 		llmData, err := json.Marshal(cfg.LLM)
 		if err != nil {
 			return fmt.Errorf("marshal llm: %w", err)

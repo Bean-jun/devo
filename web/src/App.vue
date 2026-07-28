@@ -9,6 +9,7 @@ import { useSkillsStore } from '@/stores/skills'
 import { useMemoryStore } from '@/stores/memory'
 import { useMcpStore } from '@/stores/mcp'
 import { useBackgroundStore } from '@/stores/background'
+import { useReasoningStore } from '@/stores/reasoning'
 import { useSSE } from '@/composables/useSSE'
 import { useKeyboard } from '@/composables/useKeyboard'
 import { useCommand } from '@/composables/useCommand'
@@ -30,6 +31,7 @@ const skillsStore = useSkillsStore()
 const memoryStore = useMemoryStore()
 const mcpStore = useMcpStore()
 const backgroundStore = useBackgroundStore()
+const reasoningStore = useReasoningStore()
 const { detectMode, isVscodeMode, isMobileMode } = usePlatform()
 const { startTransition } = useThemeTransition()
 const { playCompletedSound } = useAudio()
@@ -85,6 +87,8 @@ onMounted(async () => {
   }
 
   initialized.value = true
+
+  reasoningStore.fetchConfig()
 
   try {
     const res = await fetch(`${API_BASE}/config/status`)

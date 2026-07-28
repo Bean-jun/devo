@@ -65,9 +65,10 @@ describe('ThinkingIndicator', () => {
 
     const wrapper = mount(ThinkingIndicator)
 
-    expect(wrapper.find('.toggle-icon').text()).toBe('▶')
+    const toggleIcon = wrapper.findComponent('.toggle-icon') as any
+    expect(toggleIcon.props('name')).toBe('caret-right')
     await wrapper.find('[data-test="reasoning-toggle"]').trigger('click')
-    expect(wrapper.find('.toggle-icon').text()).toBe('▼')
+    expect(toggleIcon.props('name')).toBe('caret-down')
     expect(wrapper.find('.reasoning-text').text()).toContain('展开后能看到我')
   })
 

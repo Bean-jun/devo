@@ -5,6 +5,7 @@ import { useUiStore } from '@/stores/ui'
 import { useKeyboard } from '@/composables/useKeyboard'
 import { STATUS_LABELS, STATUS_COLORS } from '@/utils/constants'
 import AppIcon from '@/components/common/AppIcon.vue'
+import ReasoningEffortToggle from '@/components/chat/ReasoningEffortToggle.vue'
 
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
@@ -161,6 +162,7 @@ const serverPort = computed(() => window.location.port)
       <span class="activity-text">{{ activityText }}</span>
     </div>
     <div class="statusbar-right">
+      <ReasoningEffortToggle />
       <button class="theme-toggle" :title="themeLabel" @click="toggleTheme">
         <AppIcon :name="themeIconName" :size="16" />
       </button>

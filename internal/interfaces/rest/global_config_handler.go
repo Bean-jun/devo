@@ -8,8 +8,15 @@ import (
 	"devo/internal/core/approval"
 )
 
+type llmConfigResponse struct {
+	BaseURL         string `json:"base_url,omitempty"`
+	Model           string `json:"model,omitempty"`
+	EnableReasoning bool   `json:"enable_reasoning,omitempty"`
+	ReasoningEffort string `json:"reasoning_effort,omitempty"`
+}
+
 type getGlobalConfigResponse struct {
-	LLM                  config.LLMConfig  `json:"llm,omitempty"`
+	LLM                  llmConfigResponse `json:"llm,omitempty"`
 	ApprovalPolicy       map[string]string `json:"approval_policy,omitempty"`
 	Skills               []string          `json:"skills,omitempty"`
 	MCP                  []string          `json:"mcp,omitempty"`
@@ -37,7 +44,12 @@ func (h *Handler) GetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, getGlobalConfigResponse{
-		LLM:                  cfg.LLM,
+		LLM: llmConfigResponse{
+			BaseURL:         cfg.LLM.BaseURL,
+			Model:           cfg.LLM.Model,
+			EnableReasoning: cfg.LLM.EnableReasoning,
+			ReasoningEffort: cfg.LLM.ReasoningEffort,
+		},
 		ApprovalPolicy:       cfg.ApprovalPolicy,
 		Skills:               cfg.Skills,
 		MCP:                  cfg.MCP,
@@ -61,7 +73,22 @@ func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.LLM != nil {
-		cfg.LLM = *req.LLM
+		if req.LLM.APIKey != "" {
+			cfg.LLM.APIKey = req.LLM.APIKey
+		}
+		if req.LLM.BaseURL != "" {
+			cfg.LLM.BaseURL = req.LLM.BaseURL
+		}
+		if req.LLM.Model != "" {
+			cfg.LLM.Model = req.LLM.Model
+		}
+		if req.LLM.ExtraHeaders != nil {
+			cfg.LLM.ExtraHeaders = req.LLM.ExtraHeaders
+		}
+		cfg.LLM.EnableReasoning = req.LLM.EnableReasoning
+		if req.LLM.ReasoningEffort != "" {
+			cfg.LLM.ReasoningEffort = req.LLM.ReasoningEffort
+		}
 	}
 	if req.ApprovalPolicy != nil {
 		cfg.ApprovalPolicy = req.ApprovalPolicy
@@ -93,7 +120,12 @@ func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 	h.LoadUserApprovalPolicy()
 
 	writeJSON(w, http.StatusOK, getGlobalConfigResponse{
-		LLM:                  cfg.LLM,
+		LLM: llmConfigResponse{
+			BaseURL:         cfg.LLM.BaseURL,
+			Model:           cfg.LLM.Model,
+			EnableReasoning: cfg.LLM.EnableReasoning,
+			ReasoningEffort: cfg.LLM.ReasoningEffort,
+		},
 		ApprovalPolicy:       cfg.ApprovalPolicy,
 		Skills:               cfg.Skills,
 		MCP:                  cfg.MCP,

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const chatStore = useChatStore()
 
@@ -19,7 +20,7 @@ function toggleReasoning() {
   <div class="thinking-indicator" data-test="thinking-indicator">
     <div v-if="hasReasoning" class="reasoning-section" data-test="reasoning-section">
       <div class="reasoning-header" @click="toggleReasoning" data-test="reasoning-toggle">
-        <span class="reasoning-icon">💭</span>
+        <AppIcon name="brain" :size="16" class="reasoning-icon" />
         <span class="reasoning-title">
           {{ isReasoningActive ? '正在思考...' : '思考过程' }}
         </span>
@@ -28,7 +29,11 @@ function toggleReasoning() {
           <span class="dot"></span>
           <span class="dot"></span>
         </span>
-        <span class="toggle-icon">{{ reasoningExpanded ? '▼' : '▶' }}</span>
+        <AppIcon
+          :name="reasoningExpanded ? 'caret-down' : 'caret-right'"
+          :size="12"
+          class="toggle-icon"
+        />
       </div>
       <div v-show="reasoningExpanded" class="reasoning-content" data-test="reasoning-content">
         <pre class="reasoning-text">{{ chatStore.streamingReasoning }}</pre>
@@ -89,7 +94,7 @@ function toggleReasoning() {
 }
 
 .reasoning-icon {
-  font-size: var(--font-size-base);
+  flex-shrink: 0;
 }
 
 .reasoning-title {
@@ -98,7 +103,7 @@ function toggleReasoning() {
 }
 
 .toggle-icon {
-  font-size: 10px;
+  flex-shrink: 0;
   opacity: 0.7;
 }
 
