@@ -1,5 +1,7 @@
 ﻿export type SSEEventType =
   | 'thinking'
+  | 'reasoning_token'
+  | 'reasoning_complete'
   | 'streaming_token'
   | 'streaming_complete'
   | 'tool_call_request'
@@ -29,6 +31,10 @@ export interface SSEEvent {
 export interface SSEEventData {
   content?: string
   token?: string
+  reasoning?: string
+  fullReasoning?: string
+  full_reasoning?: string
+  reasoning_tokens?: number
   messageId?: string
   toolCall?: import('./tool').ToolCall
   tool_name?: string

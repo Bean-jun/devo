@@ -109,6 +109,118 @@ describe('ChatStore', () => {
     })
   })
 
+  describe('reasoning streaming', () => {
+    it('should start reasoning', () => {
+      const store = useChatStore()
+
+      store.startReasoning()
+
+      expect(store.isReasoningActive).toBe(true)
+      expect(store.streamingReasoning).toBe('')
+    })
+
+    it('should append reasoning chunks', () => {
+      const store = useChatStore()
+
+      store.startReasoning()
+      store.appendReasoningChunk('thinking ')
+      store.appendReasoningChunk('about it')
+
+      expect(store.streamingReasoning).toBe('thinking about it')
+      expect(store.hasStreamingReasoning).toBe(true)
+    })
+
+    it('should finish reasoning but keep streaming content', () => {
+      const store = useChatStore()
+
+      store.startStreaming()
+      store.startReasoning()
+      store.appendReasoningChunk('done thinking')
+      store.appendStreamChunk('answer')
+      store.finishReasoning()
+
+      expect(store.isReasoningActive).toBe(false)
+      expect(store.isStreaming).toBe(true)
+      expect(store.streamingReasoning).toBe('done thinking')
+      expect(store.streamingContent).toBe('answer')
+    })
+
+    it('should persist reasoning into message when finishing', () => {
+      const store = useChatStore()
+
+      store.startStreaming()
+      store.startReasoning()
+      store.appendReasoningChunk('思考过程')
+      store.finishReasoning()
+      store.appendStreamChunk('最终答案')
+      store.finishStreaming({ input: 5, output: 3 })
+
+      expect(store.messages).toHaveLength(1)
+      expect(store.messages[0].content).toBe('最终答案')
+      expect(store.messages[0].reasoning).toBe('思考过程')
+      expect(store.messages[0].tokenUsage).toEqual({ input: 5, output: 3 })
+    })
+
+    it('should accept reasoning argument to finishStreaming overriding streamed reasoning', () => {
+      const store = useChatStore()
+
+      store.startStreaming()
+      store.startReasoning()
+      store.appendReasoningChunk('流式思考')
+      store.finishReasoning()
+      store.finishStreaming({ input: 1, output: 1 }, '完整思考')
+
+      expect(store.messages[0].reasoning).toBe('完整思考')
+    })
+
+    it('should not persist message if neither content nor reasoning exists', () => {
+      const store = useChatStore()
+
+      store.startStreaming()
+      store.startReasoning()
+      store.finishReasoning()
+      store.finishStreaming()
+
+      expect(store.messages).toHaveLength(0)
+    })
+
+    it('should still persist message if only reasoning exists without content', () => {
+      const store = useChatStore()
+
+      store.startStreaming()
+      store.startReasoning()
+      store.appendReasoningChunk('只有思考没有正文')
+      store.finishReasoning()
+      store.finishStreaming()
+
+      expect(store.messages).toHaveLength(1)
+      expect(store.messages[0].content).toBe('')
+      expect(store.messages[0].reasoning).toBe('只有思考没有正文')
+    })
+
+    it('should clear reasoning state on clearMessages', () => {
+      const store = useChatStore()
+
+      store.startStreaming()
+      store.startReasoning()
+      store.appendReasoningChunk('abc')
+      store.clearMessages()
+
+      expect(store.isStreaming).toBe(false)
+      expect(store.isReasoningActive).toBe(false)
+      expect(store.streamingReasoning).toBe('')
+      expect(store.streamingContent).toBe('')
+    })
+
+    it('should include reasoning in appendAssistantMessage', () => {
+      const store = useChatStore()
+
+      const msg = store.appendAssistantMessage('hi', { input: 1, output: 1 }, 'reasoning here')
+
+      expect(msg.reasoning).toBe('reasoning here')
+    })
+  })
+
   describe('updateToolCallStatus', () => {
     it('should update tool call status', () => {
       const store = useChatStore()
@@ -597,6 +709,44 @@ describe('ChatStore', () => {
       await store.fetchMessages('sess-abc-123')
 
       expect(store.messages[0].sessionId).toBe('sess-abc-123')
+    })
+
+    it('should parse reasoning from assistant messages', async () => {
+      const store = useChatStore()
+      const messages = [
+        { id: 'msg-1', role: 'user', content: 'Q', created_at: '2026-01-01T12:00:00Z' },
+        {
+          id: 'msg-2',
+          role: 'assistant',
+          content: 'A',
+          reasoning: '思考过程',
+          created_at: '2026-01-01T12:00:01Z',
+        },
+      ]
+
+      mockApiResponse({ messages, total: 2 })
+
+      await store.fetchMessages('sess-001')
+
+      expect(store.messages[1].reasoning).toBe('思考过程')
+    })
+
+    it('should set reasoning to undefined when backend message has no reasoning field', async () => {
+      const store = useChatStore()
+      const messages = [
+        {
+          id: 'msg-1',
+          role: 'assistant',
+          content: 'no thinking',
+          created_at: '2026-01-01T12:00:00Z',
+        },
+      ]
+
+      mockApiResponse({ messages, total: 1 })
+
+      await store.fetchMessages('sess-001')
+
+      expect(store.messages[0].reasoning).toBeUndefined()
     })
   })
 })

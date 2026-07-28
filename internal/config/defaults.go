@@ -6,6 +6,7 @@ const (
 	DefaultLLMBaseURL          = "https://api.openai.com/v1"
 	DefaultLLMModel            = "gpt-4o"
 	DefaultApprovalTimeoutSecs = 300
+	DefaultReasoningEffort     = "medium"
 )
 
 func DefaultApprovalPolicy() map[approval.OperationType]approval.PolicyLevel {

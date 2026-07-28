@@ -8,7 +8,9 @@ import { API_BASE } from '@/utils/constants'
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<Message[]>([])
   const isStreaming = ref(false)
+  const isReasoningActive = ref(false)
   const streamingContent = ref('')
+  const streamingReasoning = ref('')
   const streamingMessageId = ref<string | null>(null)
   const initialFetchDone = ref(false)
   const fetchError = ref<string | null>(null)
@@ -17,6 +19,7 @@ export const useChatStore = defineStore('chat', () => {
   const messageCount = computed(() => messages.value.length)
   const canRollback = computed(() => messages.value.length > 0)
   const hasStreamingMessage = computed(() => isStreaming.value && streamingMessageId.value !== null)
+  const hasStreamingReasoning = computed(() => streamingReasoning.value.length > 0)
 
   function appendMessage(message: Message): void {
     messages.value.push(message)
@@ -34,12 +37,13 @@ export const useChatStore = defineStore('chat', () => {
     return msg
   }
 
-  function appendAssistantMessage(content: string, tokenUsage?: { input: number; output: number }): Message {
+  function appendAssistantMessage(content: string, tokenUsage?: { input: number; output: number }, reasoning?: string): Message {
     const msg: Message = {
       id: generateId(),
       sessionId: '',
       role: 'assistant',
       content,
+      reasoning,
       timestamp: new Date().toISOString(),
       tokenUsage,
     }
@@ -78,24 +82,40 @@ export const useChatStore = defineStore('chat', () => {
     streamingMessageId.value = generateId()
   }
 
+  function startReasoning(): void {
+    isReasoningActive.value = true
+    streamingReasoning.value = ''
+  }
+
   function appendStreamChunk(content: string): void {
     streamingContent.value += content
   }
 
-  function finishStreaming(tokenUsage?: { input: number; output: number }): void {
-    if (streamingContent.value) {
+  function appendReasoningChunk(content: string): void {
+    streamingReasoning.value += content
+  }
+
+  function finishReasoning(): void {
+    isReasoningActive.value = false
+  }
+
+  function finishStreaming(tokenUsage?: { input: number; output: number }, reasoning?: string): void {
+    if (streamingContent.value || reasoning || streamingReasoning.value) {
       const msg: Message = {
         id: streamingMessageId.value ?? generateId(),
         sessionId: '',
         role: 'assistant',
         content: streamingContent.value,
+        reasoning: reasoning || streamingReasoning.value || undefined,
         timestamp: new Date().toISOString(),
         tokenUsage,
       }
       messages.value.push(msg)
     }
     isStreaming.value = false
+    isReasoningActive.value = false
     streamingContent.value = ''
+    streamingReasoning.value = ''
     streamingMessageId.value = null
   }
 
@@ -153,7 +173,9 @@ export const useChatStore = defineStore('chat', () => {
   function clearMessages(): void {
     messages.value = []
     isStreaming.value = false
+    isReasoningActive.value = false
     streamingContent.value = ''
+    streamingReasoning.value = ''
     streamingMessageId.value = null
     initialFetchDone.value = false
     fetchError.value = null
@@ -218,6 +240,7 @@ export const useChatStore = defineStore('chat', () => {
           sessionId,
           role: m.role || 'user',
           content: m.content || '',
+          reasoning: m.reasoning || undefined,
           timestamp: m.created_at || new Date().toISOString(),
         }
 
@@ -242,7 +265,9 @@ export const useChatStore = defineStore('chat', () => {
   return {
     messages,
     isStreaming,
+    isReasoningActive,
     streamingContent,
+    streamingReasoning,
     streamingMessageId,
     initialFetchDone,
     fetchError,
@@ -250,13 +275,17 @@ export const useChatStore = defineStore('chat', () => {
     messageCount,
     canRollback,
     hasStreamingMessage,
+    hasStreamingReasoning,
     appendMessage,
     appendUserMessage,
     appendAssistantMessage,
     appendSystemMessage,
     appendToolCallMessage,
     startStreaming,
+    startReasoning,
     appendStreamChunk,
+    appendReasoningChunk,
+    finishReasoning,
     finishStreaming,
     updateToolCallStatus,
     updateToolProgress,

@@ -55,6 +55,7 @@ type Message struct {
 	ID         string     `json:"id"`
 	Role       Role       `json:"role"`
 	Content    string     `json:"content"`
+	Reasoning  string     `json:"reasoning,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
 	CreatedAt  time.Time  `json:"created_at"`

@@ -1,6 +1,8 @@
 package agentloop
 
 import (
+	"strings"
+
 	"devo/internal/core/session"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
@@ -33,4 +35,7 @@ type LoopContext struct {
 
 	// TerminationReason 记录 loop 最终结束的原因
 	TerminationReason string
+
+	// ReasoningBuilder 累计本轮 LLM 流式输出的思考过程
+	ReasoningBuilder strings.Builder
 }

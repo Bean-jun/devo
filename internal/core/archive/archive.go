@@ -58,6 +58,10 @@ func (am *ArchiveManager) AppendUserMessage(sessionID string, content string) er
 }
 
 func (am *ArchiveManager) AppendAssistantMessage(sessionID string, content string) error {
+	return am.AppendAssistantMessageWithReasoning(sessionID, content, "")
+}
+
+func (am *ArchiveManager) AppendAssistantMessageWithReasoning(sessionID string, content string, reasoning string) error {
 	sess, err := am.store.Get(sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
@@ -71,8 +75,18 @@ func (am *ArchiveManager) AppendAssistantMessage(sessionID string, content strin
 		return err
 	}
 
-	entry := fmt.Sprintf("\n### 助手\n%s\n", content)
-	return am.appendToFile(archivePath, entry)
+	var b strings.Builder
+	if reasoning != "" {
+		b.WriteString("\n### 助手\n")
+		b.WriteString("<details>\n<summary>💭 思考过程</summary>\n\n")
+		b.WriteString(reasoning)
+		b.WriteString("\n\n</details>\n\n")
+		b.WriteString(content)
+		b.WriteString("\n")
+	} else {
+		b.WriteString(fmt.Sprintf("\n### 助手\n%s\n", content))
+	}
+	return am.appendToFile(archivePath, b.String())
 }
 
 func (am *ArchiveManager) AppendToolCall(sessionID string, toolName string, params map[string]interface{}) error {
@@ -224,7 +238,16 @@ func (am *ArchiveManager) renderArchive(sess *session.Session, msgs []session.Me
 					b.WriteString(fmt.Sprintf("\n**[工具调用: %s]**%s\n", tc.ToolName, paramsStr))
 				}
 			}
-			if msg.Content != "" {
+			if msg.Reasoning != "" {
+				b.WriteString("\n### 助手\n")
+				b.WriteString("<details>\n<summary>💭 思考过程</summary>\n\n")
+				b.WriteString(msg.Reasoning)
+				b.WriteString("\n\n</details>\n\n")
+				if msg.Content != "" {
+					b.WriteString(msg.Content)
+					b.WriteString("\n")
+				}
+			} else if msg.Content != "" {
 				b.WriteString(fmt.Sprintf("\n### 助手\n%s\n", msg.Content))
 			}
 		} else if msg.Role == session.RoleTool {

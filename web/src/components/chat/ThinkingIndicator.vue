@@ -1,19 +1,45 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
 
 const chatStore = useChatStore()
 
 const hasContent = computed(() => chatStore.streamingContent.length > 0)
+const hasReasoning = computed(() => chatStore.streamingReasoning.length > 0)
+const isReasoningActive = computed(() => chatStore.isReasoningActive)
+
+const reasoningExpanded = ref(false)
+
+function toggleReasoning() {
+  reasoningExpanded.value = !reasoningExpanded.value
+}
 </script>
 
 <template>
   <div class="thinking-indicator" data-test="thinking-indicator">
+    <div v-if="hasReasoning" class="reasoning-section" data-test="reasoning-section">
+      <div class="reasoning-header" @click="toggleReasoning" data-test="reasoning-toggle">
+        <span class="reasoning-icon">💭</span>
+        <span class="reasoning-title">
+          {{ isReasoningActive ? '正在思考...' : '思考过程' }}
+        </span>
+        <span v-if="isReasoningActive" class="thinking-dots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </span>
+        <span class="toggle-icon">{{ reasoningExpanded ? '▼' : '▶' }}</span>
+      </div>
+      <div v-show="reasoningExpanded" class="reasoning-content" data-test="reasoning-content">
+        <pre class="reasoning-text">{{ chatStore.streamingReasoning }}</pre>
+      </div>
+    </div>
+
     <div class="streaming-bubble">
       <div class="bubble-header">
         <span class="bubble-role">
           Devo
-          <span class="thinking-dots">
+          <span v-if="!hasContent && isReasoningActive" class="thinking-dots">
             <span class="dot"></span>
             <span class="dot"></span>
             <span class="dot"></span>
@@ -24,7 +50,7 @@ const hasContent = computed(() => chatStore.streamingContent.length > 0)
       <div v-if="hasContent" class="bubble-content">
         <pre class="streaming-text">{{ chatStore.streamingContent }}<span class="cursor-blink">|</span></pre>
       </div>
-      <div v-else class="bubble-content bubble-empty">
+      <div v-else-if="!isReasoningActive" class="bubble-content bubble-empty">
         <span class="empty-hint">正在思考...</span>
       </div>
     </div>
@@ -35,6 +61,66 @@ const hasContent = computed(() => chatStore.streamingContent.length > 0)
 .thinking-indicator {
   margin-bottom: var(--space-lg);
   animation: fadeIn var(--transition-fast) ease;
+}
+
+.reasoning-section {
+  margin-bottom: var(--space-sm);
+  border: 1px dashed var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-tertiary);
+  opacity: 0.9;
+  overflow: hidden;
+}
+
+.reasoning-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  transition: background var(--transition-fast) ease;
+}
+
+.reasoning-header:hover {
+  background: var(--color-bg-hover);
+}
+
+.reasoning-icon {
+  font-size: var(--font-size-base);
+}
+
+.reasoning-title {
+  font-weight: 600;
+  flex: 1;
+}
+
+.toggle-icon {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.reasoning-content {
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px dashed var(--color-border-light);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.reasoning-text {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: 1.6;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: none;
+  border: none;
 }
 
 .streaming-bubble {

@@ -77,6 +77,11 @@ async function copyContent() {
         </div>
       </div>
 
+      <details v-if="message.role === 'assistant' && message.reasoning" class="reasoning-collapse" data-test="reasoning-collapse">
+        <summary class="reasoning-summary">💭 思考过程</summary>
+        <pre class="reasoning-text">{{ message.reasoning }}</pre>
+      </details>
+
       <div
         v-if="message.role === 'assistant'"
         class="bubble-content markdown-body"
@@ -291,5 +296,53 @@ async function copyContent() {
   margin: var(--space-md) 0;
   border: none;
   border-top: 1px solid var(--color-border-light);
+}
+
+.reasoning-collapse {
+  margin: 0 0 var(--space-sm) 0;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px dashed var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-tertiary);
+}
+
+.reasoning-summary {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  padding: 2px 0;
+}
+
+.reasoning-summary::-webkit-details-marker {
+  display: none;
+}
+
+.reasoning-summary::before {
+  content: '▶ ';
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.reasoning-collapse[open] .reasoning-summary::before {
+  content: '▼ ';
+}
+
+.reasoning-text {
+  margin: var(--space-xs) 0 0 0;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: 1.6;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: none;
+  border: none;
+  max-height: 400px;
+  overflow-y: auto;
 }
 </style>

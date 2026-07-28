@@ -5,6 +5,7 @@ export interface Message {
   sessionId: string
   role: MessageRole
   content: string
+  reasoning?: string
   timestamp: string
   tokenUsage?: TokenUsage
   toolCall?: ToolCall

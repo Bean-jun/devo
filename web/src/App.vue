@@ -133,7 +133,29 @@ function connectSSE(sessionId: string) {
     uiStore.setActivity(_data.message || '思考中...')
   })
 
+  onEvent('reasoning_token', (data: any) => {
+    if (!chatStore.isReasoningActive) {
+      chatStore.startReasoning()
+    }
+    const chunk = data.token || data.reasoning || ''
+    if (chunk) {
+      chatStore.appendReasoningChunk(chunk)
+      uiStore.setActivity('思考中: ' + truncateForActivity(chunk))
+    }
+  })
+
+  onEvent('reasoning_complete', (data: any) => {
+    chatStore.finishReasoning()
+    const full = data.full_reasoning || data.fullReasoning || ''
+    if (full && chatStore.streamingReasoning === '') {
+      chatStore.appendReasoningChunk(full)
+    }
+  })
+
   onEvent('streaming_token', (data: any) => {
+    if (!chatStore.isStreaming) {
+      chatStore.startStreaming()
+    }
     chatStore.appendStreamChunk(data.content || data.token || '')
     uiStore.setActivity(data.content || data.token || '')
   })
@@ -157,16 +179,17 @@ function connectSSE(sessionId: string) {
 
   onEvent('message_complete', (data: any) => {
     const hadStreamingContent = chatStore.streamingContent !== ''
+    const fullReasoning = data.full_reasoning || data.fullReasoning || undefined
     chatStore.finishStreaming({
       input: data.input_tokens ?? 0,
       output: data.output_tokens ?? 0,
-    })
+    }, fullReasoning)
     const fullText = data.full_text || ''
     if (fullText && !hadStreamingContent) {
       chatStore.appendAssistantMessage(fullText, {
         input: data.input_tokens ?? 0,
         output: data.output_tokens ?? 0,
-      })
+      }, fullReasoning)
     }
     if (sessionStore.currentSession) {
       const currentState = sessionStore.currentSession.state?.toLowerCase()
@@ -371,6 +394,13 @@ function connectSSE(sessionId: string) {
   onEvent('error', (data: any) => {
     uiStore.showToast('error', data.message || '发生错误')
   })
+}
+
+function truncateForActivity(text: string, max = 40): string {
+  if (!text) return ''
+  const trimmed = text.trim().replace(/\s+/g, ' ')
+  if (trimmed.length <= max) return trimmed
+  return trimmed.slice(0, max) + '...'
 }
 
 async function pauseSession() {

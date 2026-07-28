@@ -17,6 +17,16 @@ export const mockAssistantMessage: Message = {
   tokenUsage: { input: 50, output: 30 },
 }
 
+export const mockAssistantMessageWithReasoning: Message = {
+  id: 'msg-002-r',
+  sessionId: 'sess-001',
+  role: 'assistant',
+  content: 'Sure! Here is a function.',
+  reasoning: '用户想要一个函数。我应该用 TypeScript 写一个 hello 函数，返回 "Hello"。',
+  timestamp: '2026-01-01T12:00:05Z',
+  tokenUsage: { input: 50, output: 30 },
+}
+
 export const mockSystemMessage: Message = {
   id: 'msg-003',
   sessionId: 'sess-001',

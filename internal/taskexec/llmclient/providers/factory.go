@@ -15,16 +15,24 @@ func NewClient(cfg *config.GlobalConfig, registry *tools.Registry) llmclient.Cli
 		return llmclient.NewMockClient()
 	}
 
+	var reasoningEffort string
+	if cfg.LLM.EnableReasoning {
+		reasoningEffort = cfg.LLM.ReasoningEffort
+	}
+
 	client := openai.New(openai.Config{
-		BaseURL: cfg.LLM.BaseURL,
-		APIKey:  cfg.LLM.APIKey,
-		Model:   cfg.LLM.Model,
-		Headers: cfg.LLM.ExtraHeaders,
+		BaseURL:         cfg.LLM.BaseURL,
+		APIKey:          cfg.LLM.APIKey,
+		Model:           cfg.LLM.Model,
+		Headers:         cfg.LLM.ExtraHeaders,
+		ReasoningEffort: reasoningEffort,
 	}, registry)
 
 	logging.Info(context.Background(), "using llm",
 		"base_url", cfg.LLM.BaseURL,
 		"model", cfg.LLM.Model,
+		"reasoning_enabled", cfg.LLM.EnableReasoning,
+		"reasoning_effort", reasoningEffort,
 	)
 	return client
 }

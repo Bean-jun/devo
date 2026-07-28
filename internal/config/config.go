@@ -4,13 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type LLMConfig struct {
-	APIKey       string            `json:"api_key"`
-	BaseURL      string            `json:"base_url"`
-	Model        string            `json:"model"`
-	ExtraHeaders map[string]string `json:"extra_headers,omitempty"`
+	APIKey          string            `json:"api_key"`
+	BaseURL         string            `json:"base_url"`
+	Model           string            `json:"model"`
+	ExtraHeaders    map[string]string `json:"extra_headers,omitempty"`
+	EnableReasoning bool              `json:"enable_reasoning,omitempty"`
+	ReasoningEffort string            `json:"reasoning_effort,omitempty"`
 }
 
 type Config struct {
@@ -99,6 +102,17 @@ func applyEnvOverrides(cfg *Config) {
 			cfg.LLM.ExtraHeaders = headers
 		}
 	}
+	if v := os.Getenv("DEVO_LLM_ENABLE_REASONING"); v != "" {
+		switch strings.ToLower(v) {
+		case "1", "true", "yes", "on":
+			cfg.LLM.EnableReasoning = true
+		case "0", "false", "no", "off":
+			cfg.LLM.EnableReasoning = false
+		}
+	}
+	if v := os.Getenv("DEVO_LLM_REASONING_EFFORT"); v != "" {
+		cfg.LLM.ReasoningEffort = v
+	}
 	if v := os.Getenv("DEVO_DB_PATH"); v != "" {
 		cfg.DBPath = v
 	}
@@ -107,6 +121,15 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("DEVO_LOG_LEVEL"); v != "" {
 		cfg.LogLevel = v
+	}
+}
+
+func parseBool(v string) bool {
+	switch strings.ToLower(v) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -120,6 +143,9 @@ func ApplyDefaults(cfg *Config) {
 	}
 	if cfg.LLM.Model == "" {
 		cfg.LLM.Model = DefaultLLMModel
+	}
+	if cfg.LLM.EnableReasoning && cfg.LLM.ReasoningEffort == "" {
+		cfg.LLM.ReasoningEffort = DefaultReasoningEffort
 	}
 }
 
@@ -148,6 +174,12 @@ func Merge(global, project *Config) *Config {
 	}
 	if project.LLM.ExtraHeaders != nil {
 		result.LLM.ExtraHeaders = project.LLM.ExtraHeaders
+	}
+	if project.LLM.EnableReasoning {
+		result.LLM.EnableReasoning = true
+	}
+	if project.LLM.ReasoningEffort != "" {
+		result.LLM.ReasoningEffort = project.LLM.ReasoningEffort
 	}
 	if project.DBPath != "" {
 		result.DBPath = project.DBPath

@@ -19,10 +19,11 @@ import (
 )
 
 type Config struct {
-	BaseURL string
-	APIKey  string
-	Model   string
-	Headers map[string]string
+	BaseURL         string
+	APIKey          string
+	Model           string
+	Headers         map[string]string
+	ReasoningEffort string
 }
 
 type Client struct {
@@ -74,6 +75,10 @@ func (c *Client) Complete(ctx context.Context, messages []session.Message, syste
 
 	if choice.Message.Content != "" {
 		result.Text = choice.Message.Content
+	}
+
+	if reasoning := extractReasoningFromMessage(choice.Message); reasoning != "" {
+		result.Reasoning = reasoning
 	}
 
 	if len(choice.Message.ToolCalls) > 0 {
@@ -139,6 +144,10 @@ func (c *Client) buildChatRequest(messages []session.Message, systemPrompt strin
 		reqBody.StreamOptions = &openaiStreamOptions{
 			IncludeUsage: true,
 		}
+	}
+
+	if c.config.ReasoningEffort != "" {
+		reqBody.ReasoningEffort = c.config.ReasoningEffort
 	}
 
 	if c.registry != nil {
@@ -272,7 +281,24 @@ func convertUsage(usage *openaiUsage) *tokenmeter.TokenUsage {
 	if usage.PromptTokensDetails != nil {
 		tu.CachedTokens = usage.PromptTokensDetails.CachedTokens
 	}
+	if usage.CompletionTokensDetails != nil {
+		tu.ReasoningTokens = usage.CompletionTokensDetails.ReasoningTokens
+	}
 	return tu
+}
+
+func extractReasoningFromDelta(delta openaiStreamDelta) string {
+	if delta.ReasoningContent != "" {
+		return delta.ReasoningContent
+	}
+	return delta.Reasoning
+}
+
+func extractReasoningFromMessage(msg openaiRespMessage) string {
+	if msg.ReasoningContent != "" {
+		return msg.ReasoningContent
+	}
+	return msg.Reasoning
 }
 
 func (c *Client) parseSSEStream(ctx context.Context, body io.Reader, callback llmclient.StreamCallback) error {
@@ -280,6 +306,7 @@ func (c *Client) parseSSEStream(ctx context.Context, body io.Reader, callback ll
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	var fullTextBuilder strings.Builder
+	var fullReasoningBuilder strings.Builder
 	var accumulatedToolCalls []accumulatedToolCall
 	var usage *tokenmeter.TokenUsage
 	var finishReason string
@@ -323,6 +350,15 @@ func (c *Client) parseSSEStream(ctx context.Context, body io.Reader, callback ll
 			finishReason = choiceFinishReason
 		}
 
+		if reasoningChunk := extractReasoningFromDelta(delta); reasoningChunk != "" {
+			fullReasoningBuilder.WriteString(reasoningChunk)
+			callback(llmclient.StreamEvent{
+				Type:          "reasoning_token",
+				Reasoning:     reasoningChunk,
+				FullReasoning: fullReasoningBuilder.String(),
+			})
+		}
+
 		if delta.Content != "" {
 			fullTextBuilder.WriteString(delta.Content)
 			callback(llmclient.StreamEvent{
@@ -352,6 +388,7 @@ func (c *Client) parseSSEStream(ctx context.Context, body io.Reader, callback ll
 
 	if finishReason != "" {
 		fullText := fullTextBuilder.String()
+		fullReasoning := fullReasoningBuilder.String()
 		toolCalls := make([]session.ToolCall, 0, len(accumulatedToolCalls))
 		for _, acc := range accumulatedToolCalls {
 			if acc.ID == "" {
@@ -374,11 +411,12 @@ func (c *Client) parseSSEStream(ctx context.Context, body io.Reader, callback ll
 		}
 
 		callback(llmclient.StreamEvent{
-			Type:         "done",
-			FullText:     fullText,
-			ToolCalls:    toolCalls,
-			FinishReason: finishReason,
-			TokenUsage:   usage,
+			Type:          "done",
+			FullText:      fullText,
+			FullReasoning: fullReasoning,
+			ToolCalls:     toolCalls,
+			FinishReason:  finishReason,
+			TokenUsage:    usage,
 		})
 	}
 
@@ -407,8 +445,10 @@ type openaiStreamChoice struct {
 }
 
 type openaiStreamDelta struct {
-	Content   string           `json:"content,omitempty"`
-	ToolCalls []openaiToolCall `json:"tool_calls,omitempty"`
+	Content          string           `json:"content,omitempty"`
+	ReasoningContent string           `json:"reasoning_content,omitempty"`
+	Reasoning        string           `json:"reasoning,omitempty"`
+	ToolCalls        []openaiToolCall `json:"tool_calls,omitempty"`
 }
 
 type openaiMessage struct {
@@ -431,12 +471,13 @@ type openaiFunctionCall struct {
 }
 
 type openaiChatRequest struct {
-	Model         string               `json:"model"`
-	Messages      []openaiMessage      `json:"messages"`
-	Tools         []openaiToolDef      `json:"tools,omitempty"`
-	ToolChoice    string               `json:"tool_choice,omitempty"`
-	Stream        bool                 `json:"stream,omitempty"`
-	StreamOptions *openaiStreamOptions `json:"stream_options,omitempty"`
+	Model           string               `json:"model"`
+	Messages        []openaiMessage      `json:"messages"`
+	Tools           []openaiToolDef      `json:"tools,omitempty"`
+	ToolChoice      string               `json:"tool_choice,omitempty"`
+	Stream          bool                 `json:"stream,omitempty"`
+	StreamOptions   *openaiStreamOptions `json:"stream_options,omitempty"`
+	ReasoningEffort string               `json:"reasoning_effort,omitempty"`
 }
 
 type openaiStreamOptions struct {
@@ -463,11 +504,16 @@ type openaiPromptTokensDetails struct {
 	CachedTokens int `json:"cached_tokens"`
 }
 
+type openaiCompletionTokensDetails struct {
+	ReasoningTokens int `json:"reasoning_tokens,omitempty"`
+}
+
 type openaiUsage struct {
-	PromptTokens        int                        `json:"prompt_tokens"`
-	CompletionTokens    int                        `json:"completion_tokens"`
-	TotalTokens         int                        `json:"total_tokens"`
-	PromptTokensDetails *openaiPromptTokensDetails `json:"prompt_tokens_details,omitempty"`
+	PromptTokens             int                            `json:"prompt_tokens"`
+	CompletionTokens         int                            `json:"completion_tokens"`
+	TotalTokens              int                            `json:"total_tokens"`
+	PromptTokensDetails      *openaiPromptTokensDetails      `json:"prompt_tokens_details,omitempty"`
+	CompletionTokensDetails *openaiCompletionTokensDetails `json:"completion_tokens_details,omitempty"`
 }
 
 type openaiChoice struct {
@@ -475,7 +521,9 @@ type openaiChoice struct {
 }
 
 type openaiRespMessage struct {
-	Role      string           `json:"role"`
-	Content   string           `json:"content"`
-	ToolCalls []openaiToolCall `json:"tool_calls,omitempty"`
+	Role             string           `json:"role"`
+	Content          string           `json:"content"`
+	ReasoningContent string           `json:"reasoning_content,omitempty"`
+	Reasoning        string           `json:"reasoning,omitempty"`
+	ToolCalls        []openaiToolCall `json:"tool_calls,omitempty"`
 }

@@ -42,6 +42,7 @@ type MessageModel struct {
 	SessionID     string `gorm:"size:64;index:idx_msg_session_id;not null"`
 	Role          string `gorm:"size:16"`
 	Content       string `gorm:"type:text"`
+	Reasoning     string `gorm:"type:text"`
 	ToolCallsJSON string `gorm:"type:text"`
 	ToolCallID    string `gorm:"size:64"`
 	Seq           int    `gorm:"index:idx_msg_seq"`
@@ -164,6 +165,7 @@ func (m *MessageModel) ToDomain() session.Message {
 		ID:         m.ID,
 		Role:       session.Role(m.Role),
 		Content:    m.Content,
+		Reasoning:  m.Reasoning,
 		ToolCallID: m.ToolCallID,
 		CreatedAt:  m.CreatedAt,
 	}
@@ -184,6 +186,7 @@ func fromMessage(sessionID string, seq int, m session.Message) *MessageModel {
 		SessionID:  sessionID,
 		Role:       string(m.Role),
 		Content:    m.Content,
+		Reasoning:  m.Reasoning,
 		ToolCallID: m.ToolCallID,
 		Seq:        seq,
 		CreatedAt:  m.CreatedAt,

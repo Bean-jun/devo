@@ -89,10 +89,16 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 
 func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
 	lc.EventBus.Publish("loop.thinking_started", nil)
+	lc.ReasoningBuilder.Reset()
 
 	var streamErr error
 	err := l.llmClient.CompleteStream(ctx, lc.ActiveMsgs, lc.DynamicPrompt, func(evt llmclient.StreamEvent) {
 		switch evt.Type {
+		case "reasoning_token":
+			lc.ReasoningBuilder.WriteString(evt.Reasoning)
+			lc.EventBus.Publish("reasoning_token", map[string]any{
+				"token": evt.Reasoning,
+			})
 		case "token":
 			lc.EventBus.Publish("streaming_token", map[string]any{
 				"token": evt.Token,
@@ -100,12 +106,14 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 		case "done":
 			lc.LLMResult = &llmclient.CompleteResult{
 				Text:       evt.FullText,
+				Reasoning:  evt.FullReasoning,
 				ToolCalls:  evt.ToolCalls,
 				TokenUsage: evt.TokenUsage,
 			}
 			logging.Debug(ctx, "thinking handler completed",
 				"session_id", lc.SessionID,
 				"tool_calls", len(evt.ToolCalls),
+				"reasoning_len", len(evt.FullReasoning),
 			)
 			lc.StepSeq++
 
@@ -119,7 +127,7 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 						"error", err,
 					)
 				} else {
-					lc.EventBus.Publish("token_usage", map[string]any{
+					usageData := map[string]any{
 						"step":                   lc.StepSeq,
 						"input_tokens":           evt.TokenUsage.InputTokens,
 						"output_tokens":          evt.TokenUsage.OutputTokens,
@@ -127,7 +135,11 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 						"session_input_tokens":   sess.TokenUsage.Input,
 						"session_output_tokens":  sess.TokenUsage.Output,
 						"current_context_tokens": sess.CurrentContextTokens,
-					})
+					}
+					if evt.TokenUsage.ReasoningTokens > 0 {
+						usageData["reasoning_tokens"] = evt.TokenUsage.ReasoningTokens
+					}
+					lc.EventBus.Publish("token_usage", usageData)
 				}
 
 				hash := sha256.Sum256([]byte(lc.DynamicPrompt))
@@ -147,6 +159,12 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 					"hit_rate", fmt.Sprintf("%.1f%%", hitRate),
 					"system_len", len(lc.DynamicPrompt),
 				)
+			}
+
+			if lc.ReasoningBuilder.Len() > 0 {
+				lc.EventBus.Publish("reasoning_complete", map[string]any{
+					"full_reasoning": lc.ReasoningBuilder.String(),
+				})
 			}
 
 			lc.EventBus.Publish("streaming_complete", map[string]any{
@@ -225,11 +243,12 @@ func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopS
 
 	if len(lc.ExecutedToolCallIDs) == 0 {
 		assistantMsg := session.Message{
-			ID:        session.GenerateID("msg"),
-			Role:      session.RoleAssistant,
-			Content:   lc.LLMResult.Text,
-			ToolCalls: lc.LLMResult.ToolCalls,
-			CreatedAt: time.Now(),
+			ID:         session.GenerateID("msg"),
+			Role:       session.RoleAssistant,
+			Content:    lc.LLMResult.Text,
+			Reasoning:  lc.LLMResult.Reasoning,
+			ToolCalls:  lc.LLMResult.ToolCalls,
+			CreatedAt:  time.Now(),
 		}
 		if err := l.store.AddMessage(lc.SessionID, assistantMsg); err != nil {
 			return LoopStateError, fmt.Errorf("add assistant message with tool calls: %w", err)
@@ -275,25 +294,32 @@ func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopS
 
 func (l *Loop) textResponseHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
 	assistantMsg := session.Message{
-		ID:        session.GenerateID("msg"),
-		Role:      session.RoleAssistant,
-		Content:   lc.LLMResult.Text,
-		CreatedAt: time.Now(),
+		ID:         session.GenerateID("msg"),
+		Role:       session.RoleAssistant,
+		Content:    lc.LLMResult.Text,
+		Reasoning:  lc.LLMResult.Reasoning,
+		CreatedAt:  time.Now(),
 	}
 	if err := l.store.AddMessage(lc.SessionID, assistantMsg); err != nil {
 		return LoopStateError, fmt.Errorf("add assistant message: %w", err)
 	}
 
-	l.archiveManager.AppendAssistantMessage(lc.SessionID, lc.LLMResult.Text)
+	l.archiveManager.AppendAssistantMessageWithReasoning(lc.SessionID, lc.LLMResult.Text, lc.LLMResult.Reasoning)
 
 	msgCompleteData := map[string]any{
 		"message_id":        assistantMsg.ID,
 		"full_text":         lc.LLMResult.Text,
 		"total_step_tokens": lc.TotalStepTokens,
 	}
+	if lc.LLMResult.Reasoning != "" {
+		msgCompleteData["full_reasoning"] = lc.LLMResult.Reasoning
+	}
 	if lc.LLMResult.TokenUsage != nil {
 		msgCompleteData["input_tokens"] = lc.LLMResult.TokenUsage.InputTokens
 		msgCompleteData["output_tokens"] = lc.LLMResult.TokenUsage.OutputTokens
+		if lc.LLMResult.TokenUsage.ReasoningTokens > 0 {
+			msgCompleteData["reasoning_tokens"] = lc.LLMResult.TokenUsage.ReasoningTokens
+		}
 	}
 	lc.EventBus.Publish("message_complete", msgCompleteData)
 
