@@ -174,8 +174,16 @@ func convertMessages(messages []session.Message, systemPrompt string) []openaiMe
 	for _, msg := range messages {
 		om := openaiMessage{
 			Role:       string(msg.Role),
-			Content:    msg.Content,
 			ToolCallID: msg.ToolCallID,
+		}
+
+		switch {
+		case msg.Content != "":
+			om.Content = msg.Content
+		case msg.Role == session.RoleTool:
+			om.Content = "(无输出)"
+		default:
+			om.Content = nil
 		}
 
 		if len(msg.ToolCalls) > 0 {
@@ -453,7 +461,7 @@ type openaiStreamDelta struct {
 
 type openaiMessage struct {
 	Role       string           `json:"role"`
-	Content    string           `json:"content,omitempty"`
+	Content    interface{}      `json:"content"`
 	ToolCalls  []openaiToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
 }

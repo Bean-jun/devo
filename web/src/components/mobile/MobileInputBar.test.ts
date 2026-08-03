@@ -173,12 +173,4 @@ describe('MobileInputBar', () => {
 
     expect(wrapper.find('.context-warn').exists()).toBe(true)
   })
-
-  it('should show FPS counter', () => {
-    const wrapper = mount(MobileInputBar, {
-      props: { isDisabled: false, isProcessing: false },
-    })
-
-    expect(wrapper.find('.fps-counter').exists()).toBe(true)
-  })
 })

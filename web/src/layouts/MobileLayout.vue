@@ -7,7 +7,6 @@ import { useUiStore } from '@/stores/ui'
 import { useApprovalStore } from '@/stores/approval'
 import { API_BASE } from '@/utils/constants'
 import { formatTokenCount } from '@/utils/formatters'
-import { useFps } from '@/composables/useFps'
 import type { Command } from '@/stores/command'
 import StatusBar from '@/components/layout/StatusBar.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
@@ -39,7 +38,6 @@ const infoDialogContent = ref('')
 const isProcessing = computed(() => sessionStore.isProcessing)
 
 const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
-const { fps } = useFps()
 
 function openCommandSheet() {
   showCommandSheet.value = true
@@ -282,7 +280,6 @@ function handleStatus() {
   const lines = [
     `Context: ${contextTokens}`,
     `Tokens: ${totalTokens} (↑${inputTokens} ↓${outputTokens})`,
-    `FPS: ${fps.value}`,
     `工作区: ${dir}`,
   ]
   showInfo('状态信息', lines.join('\n'))

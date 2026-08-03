@@ -64,7 +64,7 @@ function toggleReasoning() {
 
 <style scoped>
 .thinking-indicator {
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-xl);
   animation: fadeIn var(--transition-fast) ease;
 }
 
@@ -130,8 +130,7 @@ function toggleReasoning() {
 
 .streaming-bubble {
   background: var(--color-assistant-bubble);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
   max-width: 100%;
   overflow: hidden;
 }

@@ -247,7 +247,7 @@ async function handleExecuteCommand(text: string) {
   display: flex;
   min-height: 0;
   position: relative;
-  padding-bottom: var(--space-md);
+  padding-bottom: var(--space-lg);
 }
 
 .chat-empty {

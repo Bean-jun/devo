@@ -161,7 +161,6 @@ describe('MobileLayout', () => {
     expect(content).not.toBeNull()
     expect(content?.textContent).toContain('Context')
     expect(content?.textContent).toContain('Tokens')
-    expect(content?.textContent).toContain('FPS')
     expect(content?.textContent).toContain('工作区')
   })
 

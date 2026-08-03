@@ -99,7 +99,7 @@ async function copyContent() {
 
 <style scoped>
 .message-bubble {
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-xl);
   animation: fadeIn var(--transition-fast) ease;
 }
 
@@ -122,7 +122,6 @@ async function copyContent() {
 
 .message-bubble.role-assistant .bubble-inner {
   background: var(--color-assistant-bubble);
-  border: 1px solid var(--color-border-light);
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
   max-width: 85%;
 }
@@ -197,7 +196,7 @@ async function copyContent() {
 
 .bubble-content {
   font-size: var(--font-size-base);
-  line-height: 1.6;
+  line-height: 1.7;
   word-break: break-word;
 }
 
@@ -209,7 +208,7 @@ async function copyContent() {
 
 /* Markdown 内容样式 */
 .markdown-body :deep(p) {
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-md);
 }
 
 .markdown-body :deep(p:last-child) {
@@ -218,7 +217,7 @@ async function copyContent() {
 
 .markdown-body :deep(pre) {
   position: relative;
-  margin: var(--space-sm) 0;
+  margin: var(--space-md) 0;
   background: var(--color-code-bg) !important;
   border-radius: var(--radius-md);
   overflow-x: auto;
@@ -234,9 +233,10 @@ async function copyContent() {
 
 .markdown-body :deep(pre code) {
   display: block;
-  padding: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
   background: none !important;
   color: #e0e0e0;
+  line-height: 1.6;
 }
 
 /* 代码块头部：语言标签 */
@@ -255,8 +255,8 @@ async function copyContent() {
 }
 
 .markdown-body :deep(blockquote) {
-  margin: var(--space-sm) 0;
-  padding: var(--space-xs) var(--space-md);
+  margin: var(--space-md) 0;
+  padding: var(--space-sm) var(--space-lg);
   border-left: 3px solid var(--color-accent);
   background: var(--color-bg-hover);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
@@ -265,23 +265,23 @@ async function copyContent() {
 .markdown-body :deep(ul),
 .markdown-body :deep(ol) {
   padding-left: var(--space-xl);
-  margin: var(--space-sm) 0;
+  margin: var(--space-md) 0;
 }
 
 .markdown-body :deep(li) {
-  margin: var(--space-xs) 0;
+  margin: var(--space-sm) 0;
 }
 
 .markdown-body :deep(table) {
   width: 100%;
-  margin: var(--space-sm) 0;
+  margin: var(--space-md) 0;
   border-collapse: collapse;
   font-size: var(--font-size-sm);
 }
 
 .markdown-body :deep(th),
 .markdown-body :deep(td) {
-  padding: var(--space-xs) var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--color-border-light);
   text-align: left;
 }
@@ -296,7 +296,7 @@ async function copyContent() {
 }
 
 .markdown-body :deep(hr) {
-  margin: var(--space-md) 0;
+  margin: var(--space-lg) 0;
   border: none;
   border-top: 1px solid var(--color-border-light);
 }

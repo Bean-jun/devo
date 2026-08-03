@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import { useFps } from '@/composables/useFps'
 import { useCommandStore } from '@/stores/command'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
@@ -68,10 +67,6 @@ const sessionTokenUsage = computed(() => {
   const total = input + output
   return `${formatTokenCount(total)} (↑${formatTokenCount(input)} ↓${formatTokenCount(output)})`
 })
-
-const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
-
-const { fps } = useFps()
 
 const workingDir = computed(() => sessionStore.currentSession?.workingDirectory ?? '')
 
@@ -347,12 +342,6 @@ function autoResize(): void {
       <span class="footer-item">Context </span><span class="footer-item context-warn">{{ contextUsage }}</span>
       <span class="footer-sep">·</span>
       <span class="footer-item">Tokens {{ sessionTokenUsage }}</span>
-      <span class="footer-sep">·</span>
-      <span class="fps-counter" :class="{ 'fps-low': fps < 30, 'fps-good': fps >= 55 }">
-        {{ fps }} FPS
-      </span>
-      <span class="footer-sep">·</span>
-      <span class="footer-item">v{{ appVersion }}</span>
       <span v-if="workingDir" class="footer-item footer-dir">{{ workingDir }}</span>
     </div>
   </div>
@@ -362,14 +351,14 @@ function autoResize(): void {
 .input-area {
   flex-shrink: 0;
   padding: var(--space-md) var(--space-lg);
-  padding-bottom: var(--space-xs);
+  padding-bottom: var(--space-sm);
   background: var(--color-bg-primary);
   border-top: 1px solid var(--color-border-light);
 }
 
 .input-footer {
   max-width: 800px;
-  margin: var(--space-xs) auto 0;
+  margin: var(--space-sm) auto 0;
   padding: 0 var(--space-md);
   display: flex;
   align-items: center;
@@ -394,23 +383,6 @@ function autoResize(): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.fps-counter {
-  font-size: 10px;
-  color: var(--color-text-secondary);
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  transition: color var(--transition-fast);
-  opacity: 0.85;
-}
-
-.fps-counter.fps-good {
-  color: var(--color-success);
-}
-
-.fps-counter.fps-low {
-  color: var(--color-error);
 }
 
 .context-warn {

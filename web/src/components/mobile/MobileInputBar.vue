@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import { useFps } from '@/composables/useFps'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { MAX_MESSAGE_LENGTH } from '@/utils/constants'
@@ -46,8 +45,6 @@ const sessionTokenUsage = computed(() => {
   const total = input + output
   return `${formatTokenCount(total)} (↑${formatTokenCount(input)} ↓${formatTokenCount(output)})`
 })
-
-const { fps } = useFps()
 
 function focusTextarea(): void {
   nextTick(() => {
@@ -186,10 +183,6 @@ function openCommand() {
         <span class="footer-item">Context <span class="context-warn">{{ contextUsage }}</span></span>
         <span class="footer-sep">·</span>
         <span class="footer-item">Tokens {{ sessionTokenUsage }}</span>
-        <span class="footer-sep">·</span>
-        <span class="fps-counter" :class="{ 'fps-low': fps < 30, 'fps-good': fps >= 55 }" data-test="fps-counter">
-          {{ fps }} FPS
-        </span>
       </div>
     </div>
   </div>
@@ -326,24 +319,6 @@ function openCommand() {
 .footer-sep {
   opacity: 0.4;
   flex-shrink: 0;
-}
-
-.fps-counter {
-  font-size: 10px;
-  color: var(--color-text-secondary);
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  transition: color var(--transition-fast);
-  opacity: 0.85;
-  flex-shrink: 0;
-}
-
-.fps-counter.fps-good {
-  color: var(--color-success);
-}
-
-.fps-counter.fps-low {
-  color: var(--color-error);
 }
 
 .context-warn {

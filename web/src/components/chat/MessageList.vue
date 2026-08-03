@@ -270,7 +270,7 @@ defineExpose({
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
-  padding: var(--space-lg) 0;
+  padding: var(--space-2xl) 0;
 }
 
 .message-list-viewport {
@@ -281,8 +281,8 @@ defineExpose({
 .message-list-content {
   max-width: 800px;
   margin: 0 auto;
-  padding-left: var(--space-lg);
-  padding-right: var(--space-lg);
+  padding-left: var(--space-xl);
+  padding-right: var(--space-xl);
 }
 
 .empty-state {

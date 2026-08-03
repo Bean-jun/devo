@@ -164,9 +164,4 @@ test.describe('Mobile Layout', () => {
     await expect(footer).toContainText('Context')
     await expect(footer).toContainText('Tokens')
   })
-
-  test('should show FPS counter', async ({ page }) => {
-    const fps = page.locator('[data-test="fps-counter"]')
-    await expect(fps).toBeVisible()
-  })
 })

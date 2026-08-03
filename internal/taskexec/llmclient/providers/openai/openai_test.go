@@ -2,8 +2,11 @@ package openai
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 
+	"devo/internal/core/session"
 	"devo/internal/taskexec/tools"
 )
 
@@ -143,5 +146,84 @@ func TestBuildToolDefs_RegistryDynamicUpdate(t *testing.T) {
 	}
 	if result3[0].Function.Name != "use_skill" {
 		t.Errorf("expected 'use_skill', got %s", result3[0].Function.Name)
+	}
+}
+
+func TestConvertMessages_AssistantWithToolCallsHasContent(t *testing.T) {
+	msgs := []session.Message{
+		{ID: "m1", Role: session.RoleUser, Content: "hi"},
+		{
+			ID:      "m2",
+			Role:    session.RoleAssistant,
+			Content: "",
+			ToolCalls: []session.ToolCall{
+				{ID: "call_1", ToolName: "read_file", Params: map[string]interface{}{"path": "a.go"}},
+			},
+		},
+		{ID: "m3", Role: session.RoleTool, Content: "file contents", ToolCallID: "call_1"},
+	}
+
+	result := convertMessages(msgs, "system")
+
+	if len(result) != 4 {
+		t.Fatalf("expected 4 messages, got %d", len(result))
+	}
+
+	assistantMsg := result[2]
+	if assistantMsg.Role != "assistant" {
+		t.Fatalf("expected assistant role, got %s", assistantMsg.Role)
+	}
+	if assistantMsg.Content != nil {
+		t.Errorf("expected nil content for assistant with tool_calls, got %v", assistantMsg.Content)
+	}
+
+	body, err := json.Marshal(assistantMsg)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	bodyStr := string(body)
+	if !strings.Contains(bodyStr, `"content":null`) {
+		t.Errorf("expected content:null in JSON, got: %s", bodyStr)
+	}
+	if !strings.Contains(bodyStr, `"tool_calls"`) {
+		t.Errorf("expected tool_calls field in JSON, got: %s", bodyStr)
+	}
+}
+
+func TestConvertMessages_EmptyToolResultHasContent(t *testing.T) {
+	msgs := []session.Message{
+		{ID: "m1", Role: session.RoleUser, Content: "hi"},
+		{
+			ID:      "m2",
+			Role:    session.RoleAssistant,
+			Content: "",
+			ToolCalls: []session.ToolCall{
+				{ID: "call_1", ToolName: "list_files", Params: map[string]interface{}{"path": "."}},
+			},
+		},
+		{ID: "m3", Role: session.RoleTool, Content: "", ToolCallID: "call_1"},
+	}
+
+	result := convertMessages(msgs, "system")
+
+	if len(result) != 4 {
+		t.Fatalf("expected 4 messages, got %d", len(result))
+	}
+
+	toolMsg := result[3]
+	if toolMsg.Role != "tool" {
+		t.Fatalf("expected tool role, got %s", toolMsg.Role)
+	}
+	if toolMsg.Content != "(无输出)" {
+		t.Errorf("expected placeholder content, got %v", toolMsg.Content)
+	}
+
+	body, err := json.Marshal(toolMsg)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	bodyStr := string(body)
+	if !strings.Contains(bodyStr, `"content":"`) {
+		t.Errorf("expected non-empty content field in JSON, got: %s", bodyStr)
 	}
 }

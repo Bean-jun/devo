@@ -140,10 +140,10 @@ function escapeHtml(text: string): string {
 
 <style scoped>
 .tool-call-card {
-  margin-bottom: var(--space-md);
-  border: 1px solid var(--color-border);
+  margin-bottom: var(--space-lg);
+  border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);
-  background: var(--color-bg-primary);
+  background: var(--color-bg-secondary);
   overflow: hidden;
   animation: fadeIn var(--transition-fast) ease;
 }
@@ -251,7 +251,7 @@ function escapeHtml(text: string): string {
 .tool-streaming-content {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-tertiary);
   padding: var(--space-sm);
   border-radius: var(--radius-sm);
   max-height: 300px;
@@ -281,7 +281,7 @@ function escapeHtml(text: string): string {
 .tool-json {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-tertiary);
   padding: var(--space-sm);
   border-radius: var(--radius-sm);
   overflow-x: auto;
