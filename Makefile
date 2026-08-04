@@ -35,7 +35,7 @@ ELECTRON_DIR := electron
 DESKTOP_BIN_DIR := $(ELECTRON_DIR)/resources/bin
 
 # garble (Go obfuscator) - optional, fallback to go build if not installed
-# go install mvdan.cc/garble@latest
+# go install mvdan.cc/garble@v0.15.0
 GARBLE := $(shell command -v garble 2>/dev/null)
 ifeq ($(GARBLE),)
   BUILD_CMD := go
@@ -43,8 +43,9 @@ ifeq ($(GARBLE),)
   OBFUSCATED := 
 else
   BUILD_CMD := $(GARBLE)
-  BUILD_FLAGS := -literals -tiny
-  OBFUSCATED := " (obfuscated)"
+#   BUILD_FLAGS := -literals -tiny # 混淆&精简模式
+  BUILD_FLAGS := -tiny # 精简模式，不混淆，只压缩二进制文件
+  OBFUSCATED :=  (obfuscated)
 endif
 
 # upx (binary compressor) - optional, skip gracefully if not installed
@@ -66,16 +67,16 @@ build-go:
 	@echo "[BUILD] Backend$(OBFUSCATED) (version: $(FULL_VERSION))..."
 	mkdir -p $(BUILD_DIR)
 	@echo "[BUILD]   Windows (amd64)..."
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(BUILD_CMD) build $(BUILD_FLAGS) -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(GO_ENTRY)
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(BUILD_CMD) $(BUILD_FLAGS) build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(GO_ENTRY)
 	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe 2>/dev/null,)
 	@echo "[BUILD]   Linux (amd64)..."
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(BUILD_CMD) build $(BUILD_FLAGS) -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(GO_ENTRY)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(BUILD_CMD) $(BUILD_FLAGS) build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(GO_ENTRY)
 	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-linux-amd64 2>/dev/null,)
 	@echo "[BUILD]   macOS (amd64)..."
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(BUILD_CMD) build $(BUILD_FLAGS) -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(BUILD_CMD) $(BUILD_FLAGS) build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
 	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 --force-macos 2>/dev/null,)
 	@echo "[BUILD]   macOS (arm64)..."
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(BUILD_CMD) build $(BUILD_FLAGS) -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(BUILD_CMD) $(BUILD_FLAGS) build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
 	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 --force-macos 2>/dev/null,)
 	@echo "[OK] 3 platforms (4 binaries) built"
 
