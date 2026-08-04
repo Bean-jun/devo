@@ -75,17 +75,17 @@ func (l *Loop) Rollback(sessionID string, targetMessageID string) (*RollbackResu
 		return nil, fmt.Errorf("delete messages: %w", err)
 	}
 
-	sysMsg := session.Message{
-		ID:        session.GenerateID("msg"),
-		Role:      session.RoleSystem,
-		Content:   buildRollbackSystemMessage(targetMessageID, rollbackTime, adjusted, adjustmentReason),
-		CreatedAt: rollbackTime,
-	}
-	if err := l.store.AddMessage(sessionID, sysMsg); err != nil {
-		return nil, fmt.Errorf("add rollback system message: %w", err)
-	}
+	// sysMsg := session.Message{
+	// 	ID:        session.GenerateID("msg"),
+	// 	Role:      session.RoleSystem,
+	// 	Content:   buildRollbackSystemMessage(targetMessageID, rollbackTime, adjusted, adjustmentReason),
+	// 	CreatedAt: rollbackTime,
+	// }
+	// if err := l.store.AddMessage(sessionID, sysMsg); err != nil {
+	// 	return nil, fmt.Errorf("add rollback system message: %w", err)
+	// }
 
-	l.archiveManager.AppendSystemMessage(sessionID, sysMsg.Content)
+	// l.archiveManager.AppendSystemMessage(sessionID, sysMsg.Content)
 
 	fileWarnings := l.checkFileConsistency(sessionID, actualRollbackMessageID, msgs)
 	if len(fileWarnings) > 0 {
@@ -154,13 +154,13 @@ func (l *Loop) checkFileConsistency(sessionID string, rollbackMessageID string, 
 	return warnings
 }
 
-func buildRollbackSystemMessage(targetID string, rollbackTime time.Time, adjusted bool, reason string) string {
-	base := fmt.Sprintf("用户于 %s 将对话回滚至消息 %s 之前（该消息及之后的消息均被删除）。", rollbackTime.Format(time.RFC3339), targetID)
-	if adjusted && reason != "" {
-		base += " " + reason
-	}
-	return base
-}
+// func buildRollbackSystemMessage(targetID string, rollbackTime time.Time, adjusted bool, reason string) string {
+// 	base := fmt.Sprintf("用户于 %s 将对话回滚至消息 %s 之前（该消息及之后的消息均被删除）。", rollbackTime.Format(time.RFC3339), targetID)
+// 	if adjusted && reason != "" {
+// 		base += " " + reason
+// 	}
+// 	return base
+// }
 
 func buildFileWarningMessage(files []string) string {
 	msg := fmt.Sprintf("回滚完成，但检测到以下 %d 个文件可能在回滚点之后被工具修改过，文件状态可能与当前对话不一致：\n", len(files))

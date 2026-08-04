@@ -12,8 +12,31 @@ import (
 )
 
 const (
-	DefaultCompressThreshold = 60 // 默认压缩对话轮数，已废弃
-	ProgressiveBatchSize     = 10 // 渐进式压缩：每次最多压缩 10 条消息
+	ProgressiveBatchSize = 10 // 渐进式压缩：每次最多压缩 10 条消息
+	summarySystemPrompt  = `You are a specialized conversation summarizer for developer-AI coding sessions. Your task is to compress conversation history into a structured summary.
+
+Requirements:
+1. Preserve critical information:
+   - All technical decisions and their rationale (why option A over option B)
+   - File paths, function names, class names, and variable names
+   - Specific code changes and their purpose
+   - Error messages and their resolutions
+   - Unfinished tasks and pending action items
+
+2. Output format:
+   - Use concise bullet points, avoid verbose narration
+   - Group information chronologically or by topic
+   - Keep code identifiers, file names, and error messages in their original form
+
+3. Compression principles:
+   - Remove repetitive discussions and redundant back-and-forth
+   - Merge multiple interactions on the same topic
+   - Discard outdated information that has been superseded by later actions
+   - Keep the summary under 20% of the original length
+
+Output only the compressed summary, nothing else.`
+
+	summaryUserPrefix = "Summarize the following conversation segment concisely:"
 )
 
 type Compressor struct {
@@ -192,7 +215,7 @@ func (c *Compressor) generateSummary(ctx context.Context, msgs []session.Message
 		return "", nil
 	}
 
-	summaryPrompt := "请将以下对话片段压缩为一条简洁的摘要，保留关键决策、技术细节和重要上下文："
+	summaryPrompt := summaryUserPrefix
 	for _, msg := range msgs {
 		summaryPrompt += fmt.Sprintf("\n[%s]: %s", msg.Role, msg.Content)
 	}
@@ -206,7 +229,7 @@ func (c *Compressor) generateSummary(ctx context.Context, msgs []session.Message
 		},
 	}
 
-	result, err := c.llmClient.Complete(ctx, summaryReq, "你是一个专业的对话摘要生成器。请用简洁的中文或英文总结对话的关键点。")
+	result, err := c.llmClient.Complete(ctx, summaryReq, summarySystemPrompt)
 	if err != nil {
 		return "", fmt.Errorf("llm complete for summary: %w", err)
 	}
