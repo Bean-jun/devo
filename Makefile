@@ -7,10 +7,23 @@ BUILD_DIR := build
 VSIX_DIR := vscode-extension
 DB_PATH  := .env/devo.db
 
+# ========== OS Detection ==========
+UNAME_S := $(shell uname -s 2>/dev/null || echo Windows)
+ifeq ($(UNAME_S),Linux)
+  NULL_DEV := /dev/null
+  EXE_EXT  :=
+else ifeq ($(UNAME_S),Darwin)
+  NULL_DEV := /dev/null
+  EXE_EXT  :=
+else
+  NULL_DEV := NUL
+  EXE_EXT  := .exe
+endif
+
 # ========== Version ==========
-VERSION := $(shell type VERSION)
-GIT_HASH := $(shell git rev-parse --short HEAD)
-GIT_DIRTY := $(shell git status --porcelain)
+VERSION := $(shell cat VERSION 2>/dev/null || type VERSION 2>$(NULL_DEV))
+GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+GIT_DIRTY := $(shell git status --porcelain 2>/dev/null)
 ifneq ($(GIT_DIRTY),)
   DIRTY_SUFFIX := -dirty
 else
@@ -19,126 +32,143 @@ endif
 FULL_VERSION := $(VERSION)-$(GIT_HASH)$(DIRTY_SUFFIX)
 
 ELECTRON_DIR := electron
-DESKTOP_BIN_DIR := $(ELECTRON_DIR)\resources\bin
+DESKTOP_BIN_DIR := $(ELECTRON_DIR)/resources/bin
+
+# garble (Go obfuscator) - optional, fallback to go build if not installed
+# go install mvdan.cc/garble@latest
+GARBLE := $(shell command -v garble 2>/dev/null)
+ifeq ($(GARBLE),)
+  BUILD_CMD := go
+  BUILD_FLAGS := 
+  OBFUSCATED := 
+else
+  BUILD_CMD := $(GARBLE)
+  BUILD_FLAGS := -literals -tiny
+  OBFUSCATED := " (obfuscated)"
+endif
+
+# upx (binary compressor) - optional, skip gracefully if not installed
+UPX := $(shell command -v upx 2>/dev/null)
 
 # ========== Build ==========
 all: build
 
 build: build-web build-go vsix desktop
-	@echo [OK] Build complete
+	@echo "[OK] Build complete"
 
 # ========== Frontend ==========
 build-web:
-	@echo [BUILD] Frontend (version: $(FULL_VERSION))...
-	cd $(WEB_DIR) && npm install && set VITE_APP_VERSION=$(FULL_VERSION) && npm run build
+	@echo "[BUILD] Frontend (version: $(FULL_VERSION))..."
+	cd $(WEB_DIR) && npm install && VITE_APP_VERSION=$(VERSION) npm run build
 
 # ========== Backend ==========
 build-go:
-	@echo [BUILD] Backend (version: $(FULL_VERSION))...
-	@if not exist $(BUILD_DIR) mkdir $(BUILD_DIR)
-	@echo [BUILD]   Windows (amd64)...
-	set GOOS=windows&& set GOARCH=amd64&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(GO_ENTRY)
-	upx -9 $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe
-	@echo [BUILD]   Linux (amd64)...
-	set GOOS=linux&& set GOARCH=amd64&& set CGO_ENABLED=0&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(GO_ENTRY)
-	upx -9 $(BUILD_DIR)\$(APP_NAME)-linux-amd64
-	@echo [BUILD]   macOS (amd64)...
-	set GOOS=darwin&& set GOARCH=amd64&& set CGO_ENABLED=0&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
-	upx -9 $(BUILD_DIR)\$(APP_NAME)-darwin-amd64 --force-macos
-	@echo [BUILD]   macOS (arm64)...
-	set GOOS=darwin&& set GOARCH=arm64&& set CGO_ENABLED=0&& go build -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
-	upx -9 $(BUILD_DIR)\$(APP_NAME)-darwin-arm64 --force-macos
-	@echo [OK] 3 platforms (4 binaries) built
+	@echo "[BUILD] Backend$(OBFUSCATED) (version: $(FULL_VERSION))..."
+	mkdir -p $(BUILD_DIR)
+	@echo "[BUILD]   Windows (amd64)..."
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(BUILD_CMD) build $(BUILD_FLAGS) -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(GO_ENTRY)
+	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe 2>/dev/null,)
+	@echo "[BUILD]   Linux (amd64)..."
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(BUILD_CMD) build $(BUILD_FLAGS) -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(GO_ENTRY)
+	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-linux-amd64 2>/dev/null,)
+	@echo "[BUILD]   macOS (amd64)..."
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(BUILD_CMD) build $(BUILD_FLAGS) -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
+	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 --force-macos 2>/dev/null,)
+	@echo "[BUILD]   macOS (arm64)..."
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(BUILD_CMD) build $(BUILD_FLAGS) -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
+	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 --force-macos 2>/dev/null,)
+	@echo "[OK] 3 platforms (4 binaries) built"
 
 # ========== VS Code Extension ==========
 vsix:
-	@echo [VSIX] Syncing version $(FULL_VERSION) to extension...
+	@echo "[VSIX] Syncing version $(FULL_VERSION) to extension..."
 	cd $(VSIX_DIR) && node -e "var p=require('./package.json');p.version='$(VERSION)';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
-	@echo [VSIX] Copying binaries to extension...
-	@if not exist $(VSIX_DIR)\bin mkdir $(VSIX_DIR)\bin
-	copy $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe $(VSIX_DIR)\bin\$(APP_NAME)-windows-amd64.exe /Y
-	copy $(BUILD_DIR)\$(APP_NAME)-linux-amd64 $(VSIX_DIR)\bin\$(APP_NAME)-linux-amd64 /Y
-	copy $(BUILD_DIR)\$(APP_NAME)-darwin-amd64 $(VSIX_DIR)\bin\$(APP_NAME)-darwin-amd64 /Y
-	copy $(BUILD_DIR)\$(APP_NAME)-darwin-arm64 $(VSIX_DIR)\bin\$(APP_NAME)-darwin-arm64 /Y
-	@echo [VSIX] Packaging extension...
-	cd $(VSIX_DIR) && npm run vsix
-	cmd /c "move $(VSIX_DIR)\$(APP_NAME)-*.vsix $(BUILD_DIR)\"
-	@echo [OK] VSIX package: $(BUILD_DIR)\$(APP_NAME)-*.vsix
+	@echo "[VSIX] Copying binaries to extension..."
+	mkdir -p $(VSIX_DIR)/bin
+	cp $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(VSIX_DIR)/bin/$(APP_NAME)-windows-amd64.exe
+	cp $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(VSIX_DIR)/bin/$(APP_NAME)-linux-amd64
+	cp $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(VSIX_DIR)/bin/$(APP_NAME)-darwin-amd64
+	cp $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(VSIX_DIR)/bin/$(APP_NAME)-darwin-arm64
+	@echo "[VSIX] Packaging extension..."
+	cd $(VSIX_DIR) && npm install && npm run vsix
+	mv $(VSIX_DIR)/$(APP_NAME)-*.vsix $(BUILD_DIR)/
+	@echo "[OK] VSIX package: $(BUILD_DIR)/$(APP_NAME)-*.vsix"
 
 # ========== Desktop (Electron) ==========
 
 desktop:
-	@echo [DESKTOP] Syncing version...
+	@echo "[DESKTOP] Syncing version..."
 	cd $(ELECTRON_DIR) && node -e "var p=require('./package.json');p.version='$(VERSION)';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
-	@echo [DESKTOP] Copying binaries to Electron resources...
-	@if not exist $(DESKTOP_BIN_DIR) mkdir $(DESKTOP_BIN_DIR)
-	copy $(BUILD_DIR)\$(APP_NAME)-windows-amd64.exe $(DESKTOP_BIN_DIR)\$(APP_NAME)-windows-amd64.exe /Y
-	copy $(BUILD_DIR)\$(APP_NAME)-linux-amd64 $(DESKTOP_BIN_DIR)\$(APP_NAME)-linux-amd64 /Y
-	copy $(BUILD_DIR)\$(APP_NAME)-darwin-amd64 $(DESKTOP_BIN_DIR)\$(APP_NAME)-darwin-amd64 /Y
-	copy $(BUILD_DIR)\$(APP_NAME)-darwin-arm64 $(DESKTOP_BIN_DIR)\$(APP_NAME)-darwin-arm64 /Y
-	@echo [DESKTOP] Installing Electron dependencies...
+	@echo "[DESKTOP] Copying binaries to Electron resources..."
+	mkdir -p $(DESKTOP_BIN_DIR)
+	cp $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(DESKTOP_BIN_DIR)/$(APP_NAME)-windows-amd64.exe
+	cp $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(DESKTOP_BIN_DIR)/$(APP_NAME)-linux-amd64
+	cp $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(DESKTOP_BIN_DIR)/$(APP_NAME)-darwin-amd64
+	cp $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(DESKTOP_BIN_DIR)/$(APP_NAME)-darwin-arm64
+	@echo "[DESKTOP] Installing Electron dependencies..."
 	cd $(ELECTRON_DIR) && npm install
-	@echo [DESKTOP] Cleaning previous Electron dist...
-	@if exist $(ELECTRON_DIR)\dist rd /s /q $(ELECTRON_DIR)\dist
-	@echo [DESKTOP] Packaging Electron app...
+	@echo "[DESKTOP] Cleaning previous Electron dist..."
+	rm -rf $(ELECTRON_DIR)/dist
+	@echo "[DESKTOP] Packaging Electron app..."
 	cd $(ELECTRON_DIR) && npm run package
-	cmd /c "move $(ELECTRON_DIR)\dist\$(APP_NAME)-*.exe $(BUILD_DIR)\"
-	@echo [OK] Desktop package complete
+	mv $(ELECTRON_DIR)/dist/$(APP_NAME)-*.exe $(BUILD_DIR)/ 2>/dev/null || true
+	mv $(ELECTRON_DIR)/dist/$(APP_NAME)-* $(BUILD_DIR)/ 2>/dev/null || true
+	@echo "[OK] Desktop package complete"
 
 # ========== Development ==========
 dev:
-	@echo [DEV] Starting frontend + backend...
-	start cmd /c "cd $(WEB_DIR) && npm run dev"
+	@echo "[DEV] Starting frontend + backend..."
+	cd $(WEB_DIR) && npm run dev &
 	go run $(GO_ENTRY) --web --port 8080
 
 dev-web:
-	@echo [DEV] Frontend dev server...
+	@echo "[DEV] Frontend dev server..."
 	cd $(WEB_DIR) && npm run dev
 
 # ========== Run ==========
 run-web: build
-	@echo [RUN] Web mode...
-	$(BUILD_DIR)/$(APP_NAME).exe --web --port 8080
+	@echo "[RUN] Web mode..."
+	$(BUILD_DIR)/$(APP_NAME)$(EXE_EXT) --web --port 8080
 
 run-tui: build
-	@echo [RUN] TUI mode...
-	$(BUILD_DIR)/$(APP_NAME).exe --tui
+	@echo "[RUN] TUI mode..."
+	$(BUILD_DIR)/$(APP_NAME)$(EXE_EXT) --tui
 
 # ========== Test ==========
 test: test-web test-go
 
 test-web:
-	@echo [TEST] Frontend unit tests...
+	@echo "[TEST] Frontend unit tests..."
 	cd $(WEB_DIR) && npm test
 
 test-e2e:
-	@echo [TEST] E2E tests...
+	@echo "[TEST] E2E tests..."
 	cd $(WEB_DIR) && npm run test:e2e
 
 test-go:
-	@echo [TEST] Backend tests...
+	@echo "[TEST] Backend tests..."
 	go test ./...
 
 # ========== Lint ==========
 lint:
-	@echo [LINT] Frontend...
+	@echo "[LINT] Frontend..."
 	cd $(WEB_DIR) && npm run lint
-	@echo [LINT] Backend...
+	@echo "[LINT] Backend..."
 	go vet ./...
 
 # ========== Clean ==========
 clean:
-	@echo [CLEAN] Removing build artifacts...
+	@echo "[CLEAN] Removing build artifacts..."
 	rm -rf $(BUILD_DIR)
 	rm -rf $(WEB_DIR)/dist
-	rm -rf $(VSIX_DIR)\bin
-	rm -f $(VSIX_DIR)\*.vsix
-	rm -f $(BUILD_DIR)\*.vsix
-	rm -rf $(ELECTRON_DIR)\node_modules
-	rm -rf $(ELECTRON_DIR)\dist
+	rm -rf $(VSIX_DIR)/bin
+	rm -f $(VSIX_DIR)/*.vsix
+	rm -f $(BUILD_DIR)/*.vsix
+	rm -rf $(ELECTRON_DIR)/node_modules
+	rm -rf $(ELECTRON_DIR)/dist
 	rm -rf $(DESKTOP_BIN_DIR)
 	rm -f $(DB_PATH)
-	@echo [OK] Clean complete
+	@echo "[OK] Clean complete"
 
 # ========== Help ==========
 help:

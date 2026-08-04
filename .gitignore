@@ -13,3 +13,5 @@ build/
 tests/mock_server/requests/
 vscode-extension/bin/*
 vscode-extension/dist/*
+
+web/tsconfig.tsbuildinfo
