@@ -96,7 +96,7 @@ export const useUiStore = defineStore('ui', () => {
   const focusInputCounter = ref(0)
   const pendingCommand = ref<string | null>(null)
   const theme = ref<ThemeType>(loadTheme())
-  const layoutMode = ref<'browser' | 'vscode' | 'mobile'>('browser')
+  const layoutMode = ref<'browser' | 'mobile'>('browser')
 
   const activeWorkspace = ref<string | null>(loadActiveWorkspace())
   const activeRightTab = ref<RightTabType>('files')
@@ -171,7 +171,7 @@ export const useUiStore = defineStore('ui', () => {
     saveTheme(theme.value)
   }
 
-  function setLayoutMode(mode: 'browser' | 'vscode' | 'mobile'): void {
+  function setLayoutMode(mode: 'browser' | 'mobile'): void {
     layoutMode.value = mode
   }
 

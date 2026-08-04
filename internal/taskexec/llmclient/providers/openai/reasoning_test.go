@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"devo/internal/config"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
@@ -16,10 +17,10 @@ import (
 
 type stubTool struct{}
 
-func (s *stubTool) Name() string                                       { return "stub" }
-func (s *stubTool) Description() string                                { return "stub tool" }
-func (s *stubTool) RiskLevel() tools.RiskLevel                          { return tools.RiskLevelNone }
-func (s *stubTool) ParamsSchema() map[string]interface{}                 { return nil }
+func (s *stubTool) Name() string                         { return "stub" }
+func (s *stubTool) Description() string                  { return "stub tool" }
+func (s *stubTool) RiskLevel() tools.RiskLevel           { return tools.RiskLevelNone }
+func (s *stubTool) ParamsSchema() map[string]interface{} { return nil }
 func (s *stubTool) Execute(context.Context, string, map[string]interface{}, tools.StreamWriter) error {
 	return nil
 }
@@ -54,7 +55,7 @@ func TestParseSSEStream_ReasoningContent(t *testing.T) {
 	server := newSSEServer(t, chunks)
 	defer server.Close()
 
-	cfg := Config{BaseURL: server.URL, APIKey: "test"}
+	cfg := Config{LLMConfig: &config.LLMConfig{BaseURL: server.URL, APIKey: "test"}}
 	c := New(cfg, nil)
 
 	var reasoningTokens []string
@@ -115,7 +116,7 @@ func TestParseSSEStream_ReasoningField(t *testing.T) {
 	server := newSSEServer(t, chunks)
 	defer server.Close()
 
-	cfg := Config{BaseURL: server.URL, APIKey: "test"}
+	cfg := Config{LLMConfig: &config.LLMConfig{BaseURL: server.URL, APIKey: "test"}}
 	c := New(cfg, nil)
 
 	var reasoning []string
@@ -140,7 +141,7 @@ func TestParseSSEStream_NoReasoning(t *testing.T) {
 	server := newSSEServer(t, chunks)
 	defer server.Close()
 
-	cfg := Config{BaseURL: server.URL, APIKey: "test"}
+	cfg := Config{LLMConfig: &config.LLMConfig{BaseURL: server.URL, APIKey: "test"}}
 	c := New(cfg, nil)
 
 	var reasoningEvents int
@@ -162,17 +163,17 @@ func TestComplete_NonStreamWithReasoningContent(t *testing.T) {
 		"choices": []map[string]any{
 			{
 				"message": map[string]any{
-					"role":             "assistant",
-					"content":          "final answer",
+					"role":              "assistant",
+					"content":           "final answer",
 					"reasoning_content": "thinking process",
 				},
 			},
 		},
 		"usage": map[string]any{
-			"prompt_tokens":                5,
-			"completion_tokens":            3,
-			"total_tokens":                 8,
-			"completion_tokens_details":    map[string]any{"reasoning_tokens": 2},
+			"prompt_tokens":             5,
+			"completion_tokens":         3,
+			"total_tokens":              8,
+			"completion_tokens_details": map[string]any{"reasoning_tokens": 2},
 		},
 	}
 	body, _ := json.Marshal(respBody)
@@ -184,7 +185,7 @@ func TestComplete_NonStreamWithReasoningContent(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{BaseURL: server.URL, APIKey: "test"}
+	cfg := Config{LLMConfig: &config.LLMConfig{BaseURL: server.URL, APIKey: "test"}}
 	c := New(cfg, nil)
 
 	result, err := c.Complete(context.Background(), []session.Message{
@@ -205,13 +206,13 @@ func TestComplete_NonStreamWithReasoningContent(t *testing.T) {
 }
 
 func TestBuildChatRequest_ReasoningEffort(t *testing.T) {
-	c := New(Config{ReasoningEffort: "high"}, nil)
+	c := New(Config{LLMConfig: &config.LLMConfig{EnableReasoning: true, ReasoningEffort: "high"}}, nil)
 	req := c.buildChatRequest(nil, "sys", false)
 	if req.ReasoningEffort != "high" {
 		t.Errorf("expected reasoning_effort 'high', got %q", req.ReasoningEffort)
 	}
 
-	c2 := New(Config{}, nil)
+	c2 := New(Config{LLMConfig: &config.LLMConfig{}}, nil)
 	req2 := c2.buildChatRequest(nil, "sys", false)
 	if req2.ReasoningEffort != "" {
 		t.Errorf("expected empty reasoning_effort, got %q", req2.ReasoningEffort)
@@ -240,9 +241,9 @@ func TestExtractReasoningFromDelta_PrefersReasoningContent(t *testing.T) {
 
 func TestConvertUsage_ReasoningTokens(t *testing.T) {
 	usage := &openaiUsage{
-		PromptTokens:             100,
-		CompletionTokens:         50,
-		TotalTokens:              150,
+		PromptTokens:            100,
+		CompletionTokens:        50,
+		TotalTokens:             150,
 		CompletionTokensDetails: &openaiCompletionTokensDetails{ReasoningTokens: 30},
 	}
 	tu := convertUsage(usage)

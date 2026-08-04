@@ -13,6 +13,7 @@ type llmConfigResponse struct {
 	Model           string `json:"model,omitempty"`
 	EnableReasoning bool   `json:"enable_reasoning,omitempty"`
 	ReasoningEffort string `json:"reasoning_effort,omitempty"`
+	MaxTokens       int    `json:"max_tokens,omitempty"`
 }
 
 type getGlobalConfigResponse struct {
@@ -49,6 +50,7 @@ func (h *Handler) GetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 			Model:           cfg.LLM.Model,
 			EnableReasoning: cfg.LLM.EnableReasoning,
 			ReasoningEffort: cfg.LLM.ReasoningEffort,
+			MaxTokens:       cfg.LLM.MaxTokens,
 		},
 		ApprovalPolicy:       cfg.ApprovalPolicy,
 		Skills:               cfg.Skills,
@@ -67,52 +69,58 @@ func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg, _ := config.LoadGlobal()
-	if cfg == nil {
-		cfg = &config.Config{}
+	if h.cfg == nil {
+		cfg, _ := config.LoadGlobal()
+		if cfg == nil {
+			cfg = &config.Config{}
+		}
+		h.cfg = cfg
 	}
 
 	if req.LLM != nil {
 		if req.LLM.APIKey != "" {
-			cfg.LLM.APIKey = req.LLM.APIKey
+			h.cfg.LLM.APIKey = req.LLM.APIKey
 		}
 		if req.LLM.BaseURL != "" {
-			cfg.LLM.BaseURL = req.LLM.BaseURL
+			h.cfg.LLM.BaseURL = req.LLM.BaseURL
 		}
 		if req.LLM.Model != "" {
-			cfg.LLM.Model = req.LLM.Model
+			h.cfg.LLM.Model = req.LLM.Model
 		}
 		if req.LLM.ExtraHeaders != nil {
-			cfg.LLM.ExtraHeaders = req.LLM.ExtraHeaders
+			h.cfg.LLM.ExtraHeaders = req.LLM.ExtraHeaders
 		}
-		cfg.LLM.EnableReasoning = req.LLM.EnableReasoning
+		h.cfg.LLM.EnableReasoning = req.LLM.EnableReasoning
 		if req.LLM.ReasoningEffort != "" {
-			cfg.LLM.ReasoningEffort = req.LLM.ReasoningEffort
+			h.cfg.LLM.ReasoningEffort = req.LLM.ReasoningEffort
+		}
+		if req.LLM.MaxTokens > 0 {
+			h.cfg.LLM.MaxTokens = req.LLM.MaxTokens
 		}
 	}
 	if req.ApprovalPolicy != nil {
-		cfg.ApprovalPolicy = req.ApprovalPolicy
+		h.cfg.ApprovalPolicy = req.ApprovalPolicy
 	}
 	if req.Skills != nil {
-		cfg.Skills = req.Skills
+		h.cfg.Skills = req.Skills
 	}
 	if req.MCP != nil {
-		cfg.MCP = req.MCP
+		h.cfg.MCP = req.MCP
 	}
 	if req.ToolCallLimit != nil {
-		cfg.ToolCallLimit = *req.ToolCallLimit
+		h.cfg.ToolCallLimit = *req.ToolCallLimit
 	}
 	if req.MaxContextTokens != nil {
-		cfg.MaxContextTokens = *req.MaxContextTokens
+		h.cfg.MaxContextTokens = *req.MaxContextTokens
 	}
 	if req.KeepRecent != nil {
-		cfg.KeepRecent = *req.KeepRecent
+		h.cfg.KeepRecent = *req.KeepRecent
 	}
 	if req.ContextCompressRatio != nil {
-		cfg.ContextCompressRatio = *req.ContextCompressRatio
+		h.cfg.ContextCompressRatio = *req.ContextCompressRatio
 	}
 
-	if err := config.SaveGlobalConfig(cfg); err != nil {
+	if err := config.SaveGlobalConfig(h.cfg); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save global config: "+err.Error())
 		return
 	}
@@ -121,18 +129,19 @@ func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, getGlobalConfigResponse{
 		LLM: llmConfigResponse{
-			BaseURL:         cfg.LLM.BaseURL,
-			Model:           cfg.LLM.Model,
-			EnableReasoning: cfg.LLM.EnableReasoning,
-			ReasoningEffort: cfg.LLM.ReasoningEffort,
+			BaseURL:         h.cfg.LLM.BaseURL,
+			Model:           h.cfg.LLM.Model,
+			EnableReasoning: h.cfg.LLM.EnableReasoning,
+			ReasoningEffort: h.cfg.LLM.ReasoningEffort,
+			MaxTokens:       h.cfg.LLM.MaxTokens,
 		},
-		ApprovalPolicy:       cfg.ApprovalPolicy,
-		Skills:               cfg.Skills,
-		MCP:                  cfg.MCP,
-		ToolCallLimit:        cfg.ToolCallLimit,
-		MaxContextTokens:     cfg.MaxContextTokens,
-		KeepRecent:           cfg.KeepRecent,
-		ContextCompressRatio: cfg.ContextCompressRatio,
+		ApprovalPolicy:       h.cfg.ApprovalPolicy,
+		Skills:               h.cfg.Skills,
+		MCP:                  h.cfg.MCP,
+		ToolCallLimit:        h.cfg.ToolCallLimit,
+		MaxContextTokens:     h.cfg.MaxContextTokens,
+		KeepRecent:           h.cfg.KeepRecent,
+		ContextCompressRatio: h.cfg.ContextCompressRatio,
 	})
 }
 

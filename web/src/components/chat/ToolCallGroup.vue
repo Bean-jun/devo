@@ -66,6 +66,7 @@ function toggle() {
 
 <style scoped>
 .tool-call-group {
+  max-width: 85%;
   margin-bottom: var(--space-lg);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);

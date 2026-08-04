@@ -18,7 +18,13 @@ func (t *GlobTool) Name() string {
 }
 
 func (t *GlobTool) Description() string {
-	return "Find files matching a glob pattern (e.g., '**/*.go', 'src/*.ts')"
+	return `Fast file pattern matching tool that works with any codebase size.
+
+Usage:
+- Supports glob patterns like "**/*.go", "src/**/*.ts", "**/*_test.go".
+- Combine with list_files to explore unknown directories before narrowing with glob.
+- Returns matching file paths sorted by modification time.
+- Use path parameter to restrict search to a specific subdirectory.`
 }
 
 func (t *GlobTool) RiskLevel() RiskLevel {
@@ -35,7 +41,7 @@ func (t *GlobTool) ParamsSchema() map[string]interface{} {
 			},
 			"path": map[string]interface{}{
 				"type":        "string",
-				"description": "搜索根目录（相对于工作目录），默认为工作目录",
+				"description": "Search root directory relative to working directory, defaults to working directory",
 			},
 		},
 		"required": []string{"pattern"},

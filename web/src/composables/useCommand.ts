@@ -102,6 +102,13 @@ export function useCommand() {
       mobileLabel: '🧠 记忆管理',
     },
     {
+      id: 'background',
+      name: '/background',
+      description: '后台任务',
+      group: 'panel',
+      mobileLabel: '🔄 后台任务',
+    },
+    {
       id: 'dashboard',
       name: '/dashboard',
       description: '仪表盘',

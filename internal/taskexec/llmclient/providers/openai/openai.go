@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -19,11 +20,7 @@ import (
 )
 
 type Config struct {
-	BaseURL         string
-	APIKey          string
-	Model           string
-	Headers         map[string]string
-	ReasoningEffort string
+	LLMConfig *config.LLMConfig
 }
 
 type Client struct {
@@ -33,16 +30,27 @@ type Client struct {
 }
 
 func New(cfg Config, registry *tools.Registry) *Client {
-	if cfg.BaseURL == "" {
-		cfg.BaseURL = config.DefaultLLMBaseURL
+	if cfg.LLMConfig == nil {
+		cfg.LLMConfig = &config.LLMConfig{}
 	}
-	if cfg.Model == "" {
-		cfg.Model = config.DefaultLLMModel
+	if cfg.LLMConfig.BaseURL == "" {
+		cfg.LLMConfig.BaseURL = config.DefaultLLMBaseURL
+	}
+	if cfg.LLMConfig.Model == "" {
+		cfg.LLMConfig.Model = config.DefaultLLMModel
 	}
 	return &Client{
 		config: cfg,
 		httpClient: &http.Client{
-			Timeout: 120 * time.Second,
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ResponseHeaderTimeout: 60 * time.Second,
+				IdleConnTimeout:       90 * time.Second,
+			},
 		},
 		registry: registry,
 	}
@@ -101,7 +109,7 @@ func (c *Client) CompleteStream(ctx context.Context, messages []session.Message,
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := c.config.BaseURL + "/chat/completions"
+	url := c.config.LLMConfig.BaseURL + "/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyJSON))
 	if err != nil {
 		callback(llmclient.StreamEvent{Type: "error", Err: err})
@@ -109,10 +117,10 @@ func (c *Client) CompleteStream(ctx context.Context, messages []session.Message,
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.config.APIKey)
+	req.Header.Set("Authorization", "Bearer "+c.config.LLMConfig.APIKey)
 	req.Header.Set("Accept", "text/event-stream")
 
-	for key, value := range c.config.Headers {
+	for key, value := range c.config.LLMConfig.ExtraHeaders {
 		req.Header.Set(key, value)
 	}
 
@@ -134,8 +142,9 @@ func (c *Client) CompleteStream(ctx context.Context, messages []session.Message,
 }
 
 func (c *Client) buildChatRequest(messages []session.Message, systemPrompt string, stream bool) *openaiChatRequest {
+	llmCfg := c.config.LLMConfig
 	reqBody := &openaiChatRequest{
-		Model:    c.config.Model,
+		Model:    llmCfg.Model,
 		Messages: convertMessages(messages, systemPrompt),
 	}
 
@@ -146,8 +155,13 @@ func (c *Client) buildChatRequest(messages []session.Message, systemPrompt strin
 		}
 	}
 
-	if c.config.ReasoningEffort != "" {
-		reqBody.ReasoningEffort = c.config.ReasoningEffort
+	if llmCfg.EnableReasoning && llmCfg.ReasoningEffort != "" {
+		reqBody.ReasoningEffort = llmCfg.ReasoningEffort
+	}
+
+	if llmCfg.MaxTokens > 0 {
+		reqBody.MaxTokens = llmCfg.MaxTokens
+		// reqBody.MaxCompletionTokens = llmCfg.MaxTokens
 	}
 
 	if c.registry != nil {
@@ -227,16 +241,16 @@ func buildToolDefs(toolList []tools.Tool) []openaiToolDef {
 }
 
 func (c *Client) doChatRequest(ctx context.Context, bodyJSON []byte) ([]byte, error) {
-	url := c.config.BaseURL + "/chat/completions"
+	url := c.config.LLMConfig.BaseURL + "/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyJSON))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.config.APIKey)
+	req.Header.Set("Authorization", "Bearer "+c.config.LLMConfig.APIKey)
 
-	for key, value := range c.config.Headers {
+	for key, value := range c.config.LLMConfig.ExtraHeaders {
 		req.Header.Set(key, value)
 	}
 
@@ -486,6 +500,8 @@ type openaiChatRequest struct {
 	Stream          bool                 `json:"stream,omitempty"`
 	StreamOptions   *openaiStreamOptions `json:"stream_options,omitempty"`
 	ReasoningEffort string               `json:"reasoning_effort,omitempty"`
+	MaxTokens       int                  `json:"max_tokens,omitempty"`
+	// MaxCompletionTokens int                  `json:"max_completion_tokens,omitempty"`
 }
 
 type openaiStreamOptions struct {
@@ -517,10 +533,10 @@ type openaiCompletionTokensDetails struct {
 }
 
 type openaiUsage struct {
-	PromptTokens             int                            `json:"prompt_tokens"`
-	CompletionTokens         int                            `json:"completion_tokens"`
-	TotalTokens              int                            `json:"total_tokens"`
-	PromptTokensDetails      *openaiPromptTokensDetails      `json:"prompt_tokens_details,omitempty"`
+	PromptTokens            int                            `json:"prompt_tokens"`
+	CompletionTokens        int                            `json:"completion_tokens"`
+	TotalTokens             int                            `json:"total_tokens"`
+	PromptTokensDetails     *openaiPromptTokensDetails     `json:"prompt_tokens_details,omitempty"`
 	CompletionTokensDetails *openaiCompletionTokensDetails `json:"completion_tokens_details,omitempty"`
 }
 

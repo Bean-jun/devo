@@ -15,7 +15,13 @@ func (t *ReadFileTool) Name() string {
 }
 
 func (t *ReadFileTool) Description() string {
-	return "Read the contents of a file at the given path"
+	return `Reads a file from the local filesystem. You can access any file directly by using this tool.
+
+Usage:
+- The file_path parameter must be an absolute path, not a relative path.
+- If the file does not exist, an error will be returned.
+- Reads the entire file content at once.
+- Use glob or list_files first if you're unsure of the file path.`
 }
 
 func (t *ReadFileTool) RiskLevel() RiskLevel {
@@ -28,7 +34,7 @@ func (t *ReadFileTool) ParamsSchema() map[string]interface{} {
 		"properties": map[string]interface{}{
 			"path": map[string]interface{}{
 				"type":        "string",
-				"description": "文件路径（相对于工作目录或绝对路径）",
+				"description": "File path relative to working directory or absolute path",
 			},
 		},
 		"required": []string{"path"},

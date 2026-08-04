@@ -43,6 +43,34 @@ async function copyContent() {
     }, 2000)
   }
 }
+
+const contentRef = ref<HTMLElement | null>(null)
+
+async function handleCodeBlockCopy(e: MouseEvent): Promise<void> {
+  const target = e.target as HTMLElement
+  const btn = target.closest('.code-block-copy') as HTMLButtonElement | null
+  if (!btn) return
+  const text = btn.getAttribute('data-code') || ''
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+  }
+  const orig = btn.textContent
+  btn.textContent = '已复制'
+  btn.classList.add('copied')
+  setTimeout(() => {
+    btn.textContent = orig
+    btn.classList.remove('copied')
+  }, 2000)
+}
 </script>
 
 <template>
@@ -87,8 +115,10 @@ async function copyContent() {
 
       <div
         v-if="message.role === 'assistant'"
+        ref="contentRef"
         class="bubble-content markdown-body"
         v-html="renderedContent"
+        @click="handleCodeBlockCopy"
       />
       <div v-else class="bubble-content">
         {{ message.content }}
@@ -215,53 +245,142 @@ async function copyContent() {
   margin-bottom: 0;
 }
 
-.markdown-body :deep(pre) {
-  position: relative;
-  margin: var(--space-md) 0;
-  background: var(--color-code-bg) !important;
-  border-radius: var(--radius-md);
-  overflow-x: auto;
+/* 标题 */
+.markdown-body :deep(h1) {
+  font-size: 1.3em;
+  font-weight: 600;
+  margin: var(--space-lg) 0 var(--space-md);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-border-light);
 }
 
-.markdown-body :deep(code) {
+.markdown-body :deep(h2) {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin: var(--space-lg) 0 var(--space-md);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.markdown-body :deep(h3) {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: var(--space-lg) 0 var(--space-sm);
+}
+
+.markdown-body :deep(h4) {
+  font-size: 1em;
+  font-weight: 600;
+  margin: var(--space-md) 0 var(--space-sm);
+}
+
+.markdown-body :deep(h5) {
+  font-size: 0.95em;
+  font-weight: 600;
+  margin: var(--space-md) 0 var(--space-sm);
+}
+
+.markdown-body :deep(h6) {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: var(--space-md) 0 var(--space-sm);
+}
+
+/* 代码块容器 */
+.markdown-body :deep(.code-block) {
+  margin: var(--space-md) 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-sm);
+}
+
+.markdown-body :deep(.code-block-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-md);
+  background: rgba(125, 125, 125, 0.08);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.markdown-body :deep(.code-block-lang) {
+  font-size: var(--font-size-xs);
   font-family: var(--font-mono);
-  font-size: 0.85em;
-  padding: 0.15em 0.35em;
-  border-radius: 3px;
-  background: var(--color-bg-tertiary);
+  color: var(--color-text-tertiary);
+  text-transform: lowercase;
+}
+
+.markdown-body :deep(.code-block-copy) {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast) ease;
+}
+
+.markdown-body :deep(.code-block-copy:hover) {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-bg-hover);
+}
+
+.markdown-body :deep(.code-block-copy.copied) {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.markdown-body :deep(pre) {
+  margin: 0;
+  background: var(--color-code-bg);
+  overflow-x: auto;
 }
 
 .markdown-body :deep(pre code) {
   display: block;
   padding: var(--space-md) var(--space-lg);
-  background: none !important;
+  background: none;
   color: #e0e0e0;
   line-height: 1.6;
-}
-
-/* 代码块头部：语言标签 */
-.markdown-body :deep(pre)::before {
-  content: attr(data-lang);
-  position: absolute;
-  top: 0;
-  right: 0;
-  padding: 2px 8px;
-  font-size: 10px;
   font-family: var(--font-mono);
-  color: var(--color-text-tertiary);
-  background: var(--color-bg-tertiary);
-  border-radius: 0 var(--radius-md) 0 var(--radius-sm);
-  z-index: 1;
+  font-size: 0.85em;
 }
 
+/* 行内代码 */
+.markdown-body :deep(code) {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+  background: rgba(125, 125, 125, 0.15);
+  color: inherit;
+}
+
+.markdown-body :deep(pre code) {
+  background: none;
+  padding: var(--space-md) var(--space-lg);
+  color: #e0e0e0;
+}
+
+/* 引用块 */
 .markdown-body :deep(blockquote) {
   margin: var(--space-md) 0;
   padding: var(--space-sm) var(--space-lg);
-  border-left: 3px solid var(--color-accent);
-  background: var(--color-bg-hover);
+  border-left: 4px solid var(--color-accent);
+  background: rgba(125, 125, 125, 0.08);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--color-text-secondary);
 }
 
+.markdown-body :deep(blockquote p:last-child) {
+  margin-bottom: 0;
+}
+
+/* 列表 */
 .markdown-body :deep(ul),
 .markdown-body :deep(ol) {
   padding-left: var(--space-xl);
@@ -272,9 +391,27 @@ async function copyContent() {
   margin: var(--space-sm) 0;
 }
 
+.markdown-body :deep(li::marker) {
+  color: var(--color-text-tertiary);
+}
+
+/* GFM 任务列表 */
+.markdown-body :deep(input[type="checkbox"]) {
+  margin-right: var(--space-sm);
+  accent-color: var(--color-accent);
+  vertical-align: middle;
+}
+
+/* 表格 */
+.markdown-body :deep(.table-wrap) {
+  overflow-x: auto;
+  margin: var(--space-md) 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
 .markdown-body :deep(table) {
   width: 100%;
-  margin: var(--space-md) 0;
   border-collapse: collapse;
   font-size: var(--font-size-sm);
 }
@@ -282,19 +419,39 @@ async function copyContent() {
 .markdown-body :deep(th),
 .markdown-body :deep(td) {
   padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--color-border);
   text-align: left;
 }
 
 .markdown-body :deep(th) {
-  background: var(--color-bg-tertiary);
+  background: rgba(125, 125, 125, 0.1);
   font-weight: 600;
+  border-bottom: 2px solid var(--color-border);
 }
 
+.markdown-body :deep(tr:nth-child(even)) td {
+  background: rgba(125, 125, 125, 0.05);
+}
+
+/* 链接 */
 .markdown-body :deep(a) {
   color: var(--color-accent);
+  text-decoration: none;
+  transition: opacity var(--transition-fast) ease;
 }
 
+.markdown-body :deep(a:hover) {
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
+/* 图片 */
+.markdown-body :deep(img) {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}
+
+/* 分割线 */
 .markdown-body :deep(hr) {
   margin: var(--space-lg) 0;
   border: none;

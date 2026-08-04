@@ -36,6 +36,7 @@ const globalToolCallLimit = ref<number | null>(null)
 const globalMaxContextTokens = ref<number | null>(null)
 const globalKeepRecent = ref<number | null>(null)
 const globalContextCompressRatio = ref<number | null>(null)
+const globalMaxTokens = ref<number | null>(null)
 
 interface ApprovelOp {
   key: string
@@ -160,6 +161,7 @@ async function fetchGlobalConfig() {
       globalMaxContextTokens.value = data.max_context_tokens ?? null
       globalKeepRecent.value = data.keep_recent ?? null
       globalContextCompressRatio.value = data.context_compress_ratio ?? null
+      globalMaxTokens.value = data.llm?.max_tokens ?? null
       globalApprovalPolicy.value = data.approval_policy || {}
     }
   } catch {
@@ -174,6 +176,9 @@ async function saveGlobalParams() {
     if (globalMaxContextTokens.value != null) body.max_context_tokens = globalMaxContextTokens.value
     if (globalKeepRecent.value != null) body.keep_recent = globalKeepRecent.value
     if (globalContextCompressRatio.value != null) body.context_compress_ratio = globalContextCompressRatio.value
+    if (globalMaxTokens.value != null) {
+      body.llm = { max_tokens: globalMaxTokens.value }
+    }
 
     await fetch(`${API_BASE}/global/config`, {
       method: 'PUT',
@@ -363,6 +368,16 @@ onMounted(async () => {
             max="1.0"
             step="0.1"
             placeholder="0.8"
+            class="setting-input"
+          />
+        </div>
+        <div class="setting-item">
+          <label>最大输出 Tokens</label>
+          <input
+            v-model.number="globalMaxTokens"
+            type="number"
+            min="1"
+            placeholder="（服务端默认值）"
             class="setting-input"
           />
         </div>

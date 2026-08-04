@@ -25,7 +25,17 @@ func (t *UseSkillTool) Name() string {
 }
 
 func (t *UseSkillTool) Description() string {
-	return "Load a skill to get detailed instructions, available scripts, references, and assets for a specific task domain. Call this when you need domain-specific guidance."
+	return `Execute a skill within the main conversation.
+
+Usage:
+- Invoke skills using this tool with the skill name only (no arguments).
+- When you invoke a skill, the skill's prompt will expand and provide detailed instructions.
+- Examples:
+    command: "pdf" - invoke the pdf skill
+    command: "xlsx" - invoke the xlsx skill
+- MANDATORY for creating skills - MUST be invoked IMMEDIATELY when user wants to create/add any skill.
+- Only use skills listed in <available_skills>.
+- Do not invoke a skill that is already running.`
 }
 
 func (t *UseSkillTool) RiskLevel() RiskLevel {

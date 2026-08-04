@@ -7,6 +7,7 @@ interface Shortcut {
   ctrl?: boolean
   shift?: boolean
   alt?: boolean
+  capture?: boolean
   handler: KeyHandler
 }
 
@@ -30,10 +31,10 @@ export function useKeyboard(shortcuts: Shortcut[]) {
   }
 
   onMounted(() => {
-    window.addEventListener('keydown', handler)
+    window.addEventListener('keydown', handler, { capture: shortcuts.some(s => s.capture) })
   })
 
   onUnmounted(() => {
-    window.removeEventListener('keydown', handler)
+    window.removeEventListener('keydown', handler, { capture: shortcuts.some(s => s.capture) })
   })
 }

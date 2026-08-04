@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -14,6 +15,7 @@ type LLMConfig struct {
 	ExtraHeaders    map[string]string `json:"extra_headers,omitempty"`
 	EnableReasoning bool              `json:"enable_reasoning,omitempty"`
 	ReasoningEffort string            `json:"reasoning_effort,omitempty"`
+	MaxTokens       int               `json:"max_tokens,omitempty"`
 }
 
 type Config struct {
@@ -113,6 +115,11 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("DEVO_LLM_REASONING_EFFORT"); v != "" {
 		cfg.LLM.ReasoningEffort = v
 	}
+	if v := os.Getenv("DEVO_LLM_MAX_TOKENS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.LLM.MaxTokens = n
+		}
+	}
 	if v := os.Getenv("DEVO_DB_PATH"); v != "" {
 		cfg.DBPath = v
 	}
@@ -147,6 +154,10 @@ func ApplyDefaults(cfg *Config) {
 	if cfg.LLM.EnableReasoning && cfg.LLM.ReasoningEffort == "" {
 		cfg.LLM.ReasoningEffort = DefaultReasoningEffort
 	}
+
+	if cfg.LLM.MaxTokens == 0 {
+		cfg.LLM.MaxTokens = DefaultMaxTokens
+	}
 }
 
 func Merge(global, project *Config) *Config {
@@ -180,6 +191,9 @@ func Merge(global, project *Config) *Config {
 	}
 	if project.LLM.ReasoningEffort != "" {
 		result.LLM.ReasoningEffort = project.LLM.ReasoningEffort
+	}
+	if project.LLM.MaxTokens > 0 {
+		result.LLM.MaxTokens = project.LLM.MaxTokens
 	}
 	if project.DBPath != "" {
 		result.DBPath = project.DBPath

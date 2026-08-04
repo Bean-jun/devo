@@ -16,6 +16,7 @@ import MobileCommandSheet from '@/components/mobile/MobileCommandSheet.vue'
 import MobilePanelDrawer from '@/components/mobile/MobilePanelDrawer.vue'
 import MobileWorkspacePicker from '@/components/mobile/MobileWorkspacePicker.vue'
 import MobileSessionPicker from '@/components/mobile/MobileSessionPicker.vue'
+import { useKeyboard } from '@/composables/useKeyboard'
 
 const router = useRouter()
 const sessionStore = useSessionStore()
@@ -81,6 +82,34 @@ function closeInfoDialog() {
   showInfoDialog.value = false
 }
 
+function closeTopOverlay(): boolean {
+  if (showInfoDialog.value) {
+    closeInfoDialog()
+    return true
+  }
+  if (showNewSessionDialog.value) {
+    cancelNewSession()
+    return true
+  }
+  if (showSessionPicker.value) {
+    closeSessionPicker()
+    return true
+  }
+  if (showWorkspacePicker.value) {
+    closeWorkspacePicker()
+    return true
+  }
+  if (showPanelDrawer.value) {
+    closePanelDrawer()
+    return true
+  }
+  if (showCommandSheet.value) {
+    closeCommandSheet()
+    return true
+  }
+  return false
+}
+
 function handleCommandSelect(cmd: Command) {
   closeCommandSheet()
 
@@ -89,6 +118,7 @@ function handleCommandSelect(cmd: Command) {
     case 'skills':
     case 'mcp':
     case 'memory':
+    case 'background':
     case 'dashboard':
     case 'settings': {
       const tabMap: Record<string, string> = {
@@ -96,10 +126,11 @@ function handleCommandSelect(cmd: Command) {
         skills: 'skills',
         mcp: 'mcp',
         memory: 'memory',
+        background: 'background',
         dashboard: 'dashboard',
         settings: 'settings',
       }
-      const tab = (tabMap[cmd.id] || 'files') as 'files' | 'skills' | 'mcp' | 'memory' | 'dashboard' | 'settings'
+      const tab = (tabMap[cmd.id] || 'files') as 'files' | 'skills' | 'mcp' | 'memory' | 'background' | 'dashboard' | 'settings'
       uiStore.setActiveRightTab(tab)
       openPanelDrawer()
       break
@@ -313,11 +344,23 @@ function handleWorkspaceSwitched(_path: string) {
 function handleNewSessionFromPicker() {
   handleNewSession()
 }
+
+useKeyboard([
+  {
+    key: 'Escape',
+    capture: true,
+    handler: (e: KeyboardEvent) => {
+      if (closeTopOverlay()) {
+        e.stopImmediatePropagation()
+      }
+    },
+  },
+])
 </script>
 
 <template>
   <div class="mobile-layout" data-test="mobile-layout">
-    <StatusBar />
+    <StatusBar v-if="sessionStore.currentSession" />
     <div class="mobile-chat">
       <ChatPanel :hide-input="true" />
     </div>

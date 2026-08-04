@@ -46,7 +46,14 @@ func (t *WriteFileTool) Name() string {
 }
 
 func (t *WriteFileTool) Description() string {
-	return "Create a new file or overwrite an existing file with the given content"
+	return `Writes a file to the local filesystem.
+
+Usage:
+- This tool will overwrite the existing file if there is one at the provided path.
+- If this is an existing file, you MUST use the ReadFile tool first to read the file's contents. This tool will fail if you did not read the file first.
+- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
+- NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+- Only use emojis if the user explicitly requests it. Avoid writing emojis to files unless asked.`
 }
 
 func (t *WriteFileTool) RiskLevel() RiskLevel {
@@ -59,11 +66,11 @@ func (t *WriteFileTool) ParamsSchema() map[string]interface{} {
 		"properties": map[string]interface{}{
 			"path": map[string]interface{}{
 				"type":        "string",
-				"description": "文件路径（相对于工作目录）",
+				"description": "File path relative to working directory",
 			},
 			"content": map[string]interface{}{
 				"type":        "string",
-				"description": "要写入的文件内容",
+				"description": "Content to write to the file",
 			},
 		},
 		"required": []string{"path", "content"},
@@ -155,24 +162,24 @@ func (t *EditFileTool) ParamsSchema() map[string]interface{} {
 		"properties": map[string]interface{}{
 			"path": map[string]interface{}{
 				"type":        "string",
-				"description": "目标文件路径（相对于工作目录）",
+				"description": "Target file path relative to working directory",
 			},
 			"mode": map[string]interface{}{
 				"type":        "string",
-				"description": "编辑模式：replace（查找替换）或 patch（unified diff 补丁）",
+				"description": "Edit mode: 'replace' (find and replace) or 'patch' (unified diff patch)",
 				"enum":        []string{"replace", "patch"},
 			},
 			"old_str": map[string]interface{}{
 				"type":        "string",
-				"description": "（mode=replace 时必填）要替换的原始文本，需在文件中唯一匹配",
+				"description": "(Required when mode=replace) The original text to replace, must be unique in the file",
 			},
 			"new_str": map[string]interface{}{
 				"type":        "string",
-				"description": "（mode=replace 时选填）替换后的新文本，默认为空字符串",
+				"description": "(Optional when mode=replace) The replacement text, defaults to empty string",
 			},
 			"patch": map[string]interface{}{
 				"type":        "string",
-				"description": "（mode=patch 时必填）unified diff 格式的补丁内容",
+				"description": "(Required when mode=patch) Unified diff patch content",
 			},
 		},
 		"required": []string{"path", "mode"},

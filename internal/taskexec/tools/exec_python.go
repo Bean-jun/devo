@@ -97,51 +97,22 @@ func (t *ExecPythonTool) Name() string {
 }
 
 func (t *ExecPythonTool) Description() string {
-	return `Execute Python code. This is the ONLY runtime tool - use it for shell commands,
-builds, tests, data processing, and starting services.
+	return `Execute Python code for shell commands, builds, tests, data processing, and services.
 
-Two modes:
-
-sync (default): Python runs to completion. Use for finite tasks.
-  Call shell commands via subprocess.run with explicit decoding:
-    subprocess.run(["go", "build", "./..."],
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
-  This Python runs in UTF-8 mode, but the external program you call may emit bytes in the
-  local codepage (e.g. a Windows exe) - encoding="utf-8" + errors="replace" makes decoding
-  failures visible instead of raising UnicodeDecodeError or producing mojibake.
-  If you pass env=, base it on os.environ.copy() so you don't strip inherited settings.
-  Any subprocess you spawn must either finish before this script exits, or be started with
-  start_new_session=True and its stdout/stderr redirected to DEVNULL or a file - NOT left
-  inheriting this process's pipes, or the tool call hangs until timeout.
-
-background: Python itself IS the long-running process. The tool returns immediately with the
-  PID; stdout/stderr stream to the frontend in real time (visible in the BG panel). The
-  process is a direct child of devo - killed automatically on devo exit.
-  Write code that blocks directly:
-    subprocess.run(["npm", "run", "dev"])        # Python blocks on the dev server
-    uvicorn.run(app, host="0.0.0.0", port=8000) # Python runs the server itself
-  CORRECT pattern (the only accepted one): call subprocess.run([...]) and let it block.
-  The runtime captures the PID automatically and streams the child's stdout/stderr to the
-  frontend for you. If you need the output persisted to a file as well, pass the file
-  handle explicitly - this is allowed and is the supported way to log a background server:
-    with open("server.log", "w") as log:
-        subprocess.run(["npm", "run", "dev"], stdout=log, stderr=subprocess.STDOUT)
-  Do NOT use subprocess.Popen in background mode - it is rejected by PreCheck and would
-  leave the server as an orphaned grandchild that stop_background_process cannot reach.
-  Python MUST block; if it exits, the background process is unregistered and any
-  grandchild is orphaned and unstoppable via stop_background_process.
-  To stop later: use stop_background_process with the returned PID, or list_background_processes
-  to discover active PIDs. To verify readiness: poll an HTTP endpoint in a SEPARATE sync
-  exec_python call - do not try to capture startup output from within the background call.
-
-Cross-platform note: on Windows, commands that resolve to .cmd/.bat scripts (npm, npx,
-  yarn, gradlew, activate) cannot be run directly via subprocess list args - wrap them
-  with cmd /c, e.g. subprocess.run(["cmd", "/c", "npm", "run", "dev"]). Real .exe
-  binaries (python, node, git, go) can be called directly.
-
-Never use os.system(). Always use subprocess with list arguments.
-
-Security: Python code is pre-checked for dangerous patterns (best-effort, not a sandbox).`
+Usage:
+- Two modes: sync (default) and background.
+- sync: Python runs to completion for finite tasks (builds, tests, package management).
+  Use subprocess.run() with list arguments: encoding="utf-8", errors="replace".
+  Set timeout_seconds appropriately (default 30s, increase for long builds).
+  Never use os.system().
+- background: Python blocks on a long-running process (dev server, watcher, proxy).
+  Use subprocess.run() to block directly — the runtime captures the PID and streams output.
+  Do NOT use subprocess.Popen (rejected by PreCheck).
+- On Windows, wrap .cmd/.bat scripts (npm, npx, yarn) with cmd /c:
+    subprocess.run(["cmd", "/c", "npm", "run", "dev"])
+  Real .exe binaries (python, node, git, go) can be called directly.
+- To verify a server is ready: poll its HTTP endpoint in a SEPARATE sync exec_python call.
+- To stop background processes: use stop_background_process / list_background_processes.`
 }
 
 func (t *ExecPythonTool) RiskLevel() RiskLevel {
@@ -154,16 +125,16 @@ func (t *ExecPythonTool) ParamsSchema() map[string]interface{} {
 		"properties": map[string]interface{}{
 			"code": map[string]interface{}{
 				"type":        "string",
-				"description": "Python 代码片段，通过 python -c 执行",
+				"description": "Python code to execute via python -c",
 			},
 			"mode": map[string]interface{}{
 				"type":        "string",
-				"description": "执行模式：sync（默认，等待任务完成）| background（启动长进程，立即返回 PID，输出实时流给前端）",
+				"description": "Execution mode: 'sync' (default, waits for completion) | 'background' (starts long-running process, returns PID immediately, streams output)",
 				"enum":        []string{"sync", "background"},
 			},
 			"timeout_seconds": map[string]interface{}{
 				"type":        "integer",
-				"description": "执行超时时间（秒），仅 sync 模式生效，默认 30",
+				"description": "Timeout in seconds for sync mode only. Defaults to 30.",
 			},
 		},
 		"required": []string{"code"},

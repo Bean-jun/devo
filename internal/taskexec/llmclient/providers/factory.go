@@ -21,11 +21,7 @@ func NewClient(cfg *config.GlobalConfig, registry *tools.Registry) llmclient.Cli
 	}
 
 	client := openai.New(openai.Config{
-		BaseURL:         cfg.LLM.BaseURL,
-		APIKey:          cfg.LLM.APIKey,
-		Model:           cfg.LLM.Model,
-		Headers:         cfg.LLM.ExtraHeaders,
-		ReasoningEffort: reasoningEffort,
+		LLMConfig: &cfg.LLM,
 	}, registry)
 
 	logging.Info(context.Background(), "using llm",

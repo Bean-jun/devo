@@ -18,7 +18,14 @@ func (t *ListFilesTool) Name() string {
 }
 
 func (t *ListFilesTool) Description() string {
-	return "List files and directories at the given path"
+	return `List files and directories in a given path.
+
+Usage:
+- The path parameter must be an absolute path, not a relative path.
+- You can optionally provide an array of glob patterns to ignore with the ignore parameter.
+- Use max_depth to control recursion depth (default 1, only lists direct children).
+- Use max_files to limit the number of entries returned (default 500).
+- Results are sorted by modification time (newest first) for quick project overview.`
 }
 
 func (t *ListFilesTool) RiskLevel() RiskLevel {
@@ -31,15 +38,15 @@ func (t *ListFilesTool) ParamsSchema() map[string]interface{} {
 		"properties": map[string]interface{}{
 			"path": map[string]interface{}{
 				"type":        "string",
-				"description": "目录路径（相对于工作目录或绝对路径），默认为工作目录根目录",
+				"description": "Directory path relative to working directory or absolute path, defaults to working directory root",
 			},
 			"max_depth": map[string]interface{}{
 				"type":        "integer",
-				"description": "最大遍历深度，默认 1",
+				"description": "Maximum recursion depth. Defaults to 1.",
 			},
 			"max_files": map[string]interface{}{
 				"type":        "integer",
-				"description": "最大返回文件数，默认 500",
+				"description": "Maximum number of files to return. Defaults to 500.",
 			},
 		},
 	}

@@ -19,7 +19,16 @@ func (t *SearchCodebaseTool) Name() string {
 }
 
 func (t *SearchCodebaseTool) Description() string {
-	return "Search for a pattern in files within the working directory"
+	return `A powerful search tool built on ripgrep.
+
+Usage:
+- ALWAYS use search_codebase for search tasks. NEVER invoke grep or rg as a shell command.
+- Supports full regex syntax (e.g., "log.*Error", "function\s+\w+")
+- Filter files with file_pattern parameter (e.g., "*.go", "*.py") or path parameter.
+  file_pattern uses filepath.Match semantics — simple glob only, no brace expansion.
+- Output modes: "content" shows matching lines, "files_with_matches" shows only file paths (default), "count" shows match counts
+- Use glob tool for open-ended file discovery before narrowing with search_codebase
+- Pattern syntax: Uses Go regexp (not grep) - literal braces need escaping (use interface\{\} to match interface{} in Go code)`
 }
 
 func (t *SearchCodebaseTool) RiskLevel() RiskLevel {
@@ -32,35 +41,35 @@ func (t *SearchCodebaseTool) ParamsSchema() map[string]interface{} {
 		"properties": map[string]interface{}{
 			"pattern": map[string]interface{}{
 				"type":        "string",
-				"description": "搜索的正则表达式模式",
+				"description": "Regex pattern to search for",
 			},
 			"path": map[string]interface{}{
 				"type":        "string",
-				"description": "搜索路径（相对于工作目录），默认为工作目录",
+				"description": "Search path relative to working directory, defaults to working directory",
 			},
 			"file_pattern": map[string]interface{}{
 				"type":        "string",
-				"description": "限制搜索的文件类型，如 '*.go'、'*.{ts,js}'，默认为所有文件",
+				"description": "File name pattern to filter results (e.g. '*.go', '*.py'), defaults to all files. Uses filepath.Match semantics.",
 			},
 			"output_mode": map[string]interface{}{
 				"type":        "string",
-				"description": "输出模式：'content'（显示匹配行）、'files_with_matches'（只显示文件名）、'count'（显示匹配数），默认 'content'",
+				"description": "Output mode: 'content' (show matching lines), 'files_with_matches' (show file paths only), 'count' (show match counts). Defaults to 'content'.",
 			},
 			"case_sensitive": map[string]interface{}{
 				"type":        "boolean",
-				"description": "是否区分大小写，默认 false（不区分）",
+				"description": "Whether the search is case-sensitive. Defaults to false (case-insensitive).",
 			},
 			"context_lines": map[string]interface{}{
 				"type":        "integer",
-				"description": "匹配行前后各显示 N 行上下文，默认 0",
+				"description": "Number of context lines to show before and after each match. Defaults to 0.",
 			},
 			"max_results": map[string]interface{}{
 				"type":        "integer",
-				"description": "最大匹配结果数，默认 50",
+				"description": "Maximum number of matching results. Defaults to 50.",
 			},
 			"head_limit": map[string]interface{}{
 				"type":        "integer",
-				"description": "限制输出总行数（含 context_lines），0 表示不限制",
+				"description": "Limit total output lines (including context_lines). 0 means no limit.",
 			},
 		},
 		"required": []string{"pattern"},

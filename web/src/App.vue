@@ -18,7 +18,6 @@ import { useThemeTransition } from '@/composables/useThemeTransition'
 import { useAudio } from '@/composables/useAudio'
 import { decideDoubleEsc } from '@/utils/doubleEsc'
 import { API_BASE } from '@/utils/constants'
-import VscodeLayout from '@/layouts/VscodeLayout.vue'
 import BrowserLayout from '@/layouts/BrowserLayout.vue'
 import MobileLayout from '@/layouts/MobileLayout.vue'
 
@@ -32,7 +31,7 @@ const memoryStore = useMemoryStore()
 const mcpStore = useMcpStore()
 const backgroundStore = useBackgroundStore()
 const reasoningStore = useReasoningStore()
-const { detectMode, isVscodeMode, isMobileMode } = usePlatform()
+const { detectMode, isMobileMode } = usePlatform()
 const { startTransition } = useThemeTransition()
 const { playCompletedSound } = useAudio()
 
@@ -513,7 +512,6 @@ useKeyboard([
 </script>
 
 <template>
-  <VscodeLayout v-if="isVscodeMode" />
-  <MobileLayout v-else-if="isMobileMode" />
+  <MobileLayout v-if="isMobileMode" />
   <BrowserLayout v-else />
 </template>

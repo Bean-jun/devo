@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"devo/internal/config"
 	"devo/internal/core/agentloop"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
@@ -26,6 +27,7 @@ type Handler struct {
 	projectDir    string
 	userConfigDir string
 	llmConfigured bool
+	cfg           *config.GlobalConfig
 }
 
 func NewHandler(store session.SessionStore, loop *agentloop.Loop, memoryManager *memory.Manager, version string) *Handler {
@@ -54,6 +56,10 @@ func (h *Handler) SetProjectDir(dir string) {
 
 func (h *Handler) SetLLMConfigured(configured bool) {
 	h.llmConfigured = configured
+}
+
+func (h *Handler) SetAppConfig(cfg *config.GlobalConfig) {
+	h.cfg = cfg
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {

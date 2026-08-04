@@ -18,10 +18,11 @@ func (t *ListBackgroundProcessesTool) Name() string { return "list_background_pr
 
 func (t *ListBackgroundProcessesTool) Description() string {
 	return `List background processes started in this session via exec_python(mode="background").
-Shows PID, the command used to start it, whether it's still alive, when it started, and its log
-file path (if any). Use this before starting a new background process on a port/service you may
-have already started earlier, and before guessing a PID to stop — don't rely on remembering PIDs
-from earlier in the conversation.`
+
+Usage:
+- Shows PID, command, alive status, start time, and log file path (if any).
+- Use this before starting a new background process on a port/service you may have already started earlier.
+- Use this before guessing a PID to stop — don't rely on remembering PIDs from earlier in the conversation.`
 }
 
 func (t *ListBackgroundProcessesTool) RiskLevel() RiskLevel { return RiskLevelLow }
@@ -71,11 +72,12 @@ func (t *StopBackgroundProcessTool) Name() string { return "stop_background_proc
 
 func (t *StopBackgroundProcessTool) Description() string {
 	return `Stop a background process previously started via exec_python(mode="background").
-Pass the pid printed as __DEVO_BG_PID__=<pid> when it was started. This sends a graceful
-termination signal first, waits briefly, then force-kills the entire process tree if it
-hasn't exited. Do NOT try to kill background processes yourself with os.killpg/taskkill from
-exec_python — use this tool instead, so PID-reuse safety and cross-platform kill behavior are
-handled correctly. If you don't remember the PID, call list_background_processes first.`
+
+Usage:
+- Pass the pid printed as __DEVO_BG_PID__=<pid> when the process was started.
+- Sends a graceful termination signal first, waits briefly, then force-kills the entire process tree.
+- Do NOT try to kill background processes yourself with os.killpg/taskkill from exec_python — use this tool instead.
+- If you don't remember the PID, call list_background_processes first.`
 }
 
 func (t *StopBackgroundProcessTool) RiskLevel() RiskLevel { return RiskLevelMedium }

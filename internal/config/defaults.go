@@ -7,6 +7,7 @@ const (
 	DefaultLLMModel            = "gpt-4o"
 	DefaultApprovalTimeoutSecs = 300
 	DefaultReasoningEffort     = "medium"
+	DefaultMaxTokens           = 128000
 )
 
 func DefaultApprovalPolicy() map[approval.OperationType]approval.PolicyLevel {

@@ -22,7 +22,13 @@ describe('MobileLayout', () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) })
   })
 
+  let lastWrapper: ReturnType<typeof mount> | null = null
+
   afterEach(() => {
+    if (lastWrapper) {
+      lastWrapper.unmount()
+      lastWrapper = null
+    }
     document.body.removeChild(container)
   })
 
@@ -35,7 +41,7 @@ describe('MobileLayout', () => {
   }
 
   function mountLayout() {
-    return mount(MobileLayout, {
+    const wrapper = mount(MobileLayout, {
       attachTo: container,
       global: {
         stubs: {
@@ -83,6 +89,8 @@ describe('MobileLayout', () => {
         },
       },
     })
+    lastWrapper = wrapper
+    return wrapper
   }
 
   it('should render mobile layout', () => {
@@ -177,5 +185,26 @@ describe('MobileLayout', () => {
     expect(title?.textContent).toBe('版本信息')
     expect(content).not.toBeNull()
     expect(content?.textContent).toContain('Devo')
+  })
+
+  it('should close command sheet on Escape and stop propagation', async () => {
+    createSession()
+    const wrapper = mountLayout()
+
+    const bubbleSpy = vi.fn()
+    window.addEventListener('keydown', bubbleSpy)
+
+    await wrapper.find('[data-test="mobile-command-btn"]').trigger('click')
+    expect(wrapper.find('[data-test="command-sheet"]').exists()).toBe(true)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+
+    await wrapper.vm.$nextTick()
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(wrapper.find('[data-test="command-sheet"]').exists()).toBe(false)
+    expect(bubbleSpy).not.toHaveBeenCalled()
+
+    window.removeEventListener('keydown', bubbleSpy)
   })
 })

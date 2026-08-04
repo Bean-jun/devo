@@ -189,6 +189,7 @@ func (a *App) initHandler() {
 	a.handler = rest.NewHandler(a.store, a.loop, a.memoryMgr, Version)
 	a.handler.SetSkillsManager(a.skillsMgr)
 	a.handler.SetLLMConfigured(a.cfg.LLM.APIKey != "")
+	a.handler.SetAppConfig(a.cfg)
 	a.handler.SetBgProcManager(a.bgProcManager)
 
 	wd, _ := os.Getwd()

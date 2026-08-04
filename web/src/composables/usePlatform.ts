@@ -1,12 +1,10 @@
 import { computed } from 'vue'
 import { useUiStore } from '@/stores/ui'
 
-export type LayoutMode = 'browser' | 'vscode' | 'mobile'
+export type LayoutMode = 'browser' | 'mobile'
 
 export function usePlatform() {
   const uiStore = useUiStore()
-
-  const isVscodeMode = computed(() => uiStore.layoutMode === 'vscode')
 
   const isBrowserMode = computed(() => uiStore.layoutMode === 'browser')
 
@@ -18,20 +16,13 @@ export function usePlatform() {
     const params = new URLSearchParams(window.location.search)
     const mode = params.get('mode')
 
-    if (mode === 'vscode') {
-      uiStore.setLayoutMode('vscode')
-      return
-    }
-    if (mode === 'mobile') {
-      uiStore.setLayoutMode('mobile')
-      return
-    }
     if (mode === 'browser') {
       uiStore.setLayoutMode('browser')
       return
     }
 
-    if (window.innerWidth < 768) {
+    // 'vscode' is treated as a mobile alias (VSCode extension uses ?mode=vscode)
+    if (mode === 'vscode' || mode === 'mobile' || window.innerWidth < 768) {
       uiStore.setLayoutMode('mobile')
       return
     }
@@ -40,7 +31,6 @@ export function usePlatform() {
   }
 
   return {
-    isVscodeMode,
     isBrowserMode,
     isMobileMode,
     layoutMode,
