@@ -38,12 +38,13 @@ const contextUsage = computed(() => {
   return formatTokenCount(tokens)
 })
 
-const sessionTokenUsage = computed(() => {
+const sessionTokens = computed(() => {
   const usage = sessionStore.currentSession?.tokenUsage
-  const input = usage?.input ?? 0
-  const output = usage?.output ?? 0
-  const total = input + output
-  return `${formatTokenCount(total)} (↑${formatTokenCount(input)} ↓${formatTokenCount(output)})`
+  return {
+    input: usage?.input ?? 0,
+    output: usage?.output ?? 0,
+    total: (usage?.input ?? 0) + (usage?.output ?? 0),
+  }
 })
 
 function focusTextarea(): void {
@@ -182,7 +183,7 @@ function openCommand() {
       <div class="footer-row">
         <span class="footer-item">Context <span class="context-warn">{{ contextUsage }}</span></span>
         <span class="footer-sep">·</span>
-        <span class="footer-item">Tokens {{ sessionTokenUsage }}</span>
+        <span class="footer-item">Tokens {{ formatTokenCount(sessionTokens.total) }} (<AppIcon name="arrow-up" :size="10" />{{ formatTokenCount(sessionTokens.input) }} <AppIcon name="arrow-down" :size="10" />{{ formatTokenCount(sessionTokens.output) }})</span>
       </div>
     </div>
   </div>

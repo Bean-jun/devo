@@ -45,6 +45,40 @@ import {
   PhSliders,
   PhDotsThree,
   PhLightbulb,
+  PhArrowUp,
+  PhArrowDown,
+  PhLockOpen,
+  PhPuzzlePiece,
+  PhTag,
+  PhFile,
+  PhFileText,
+  PhPalette,
+  PhArticle,
+  PhAtom,
+  PhCode,
+  PhTerminal,
+  PhImage,
+  PhLock,
+  PhGlobe,
+  PhDatabase,
+  PhArrowArcLeft,
+  PhArrowsClockwise,
+  PhRobot,
+  PhCoffee,
+  PhDog,
+  PhCpu,
+  PhVinylRecord,
+  PhFileArrowUp,
+  PhFileArrowDown,
+  PhCircleHalf,
+  PhFileCode,
+  PhFileCss,
+  PhFileJs,
+  PhFileTs,
+  PhFileVue,
+  PhFileRs,
+  PhFilePy,
+  PhCube,
 } from '@phosphor-icons/vue'
 
 const props = withDefaults(defineProps<{
@@ -101,6 +135,40 @@ const iconMap: Record<IconName, Component> = {
   sliders: PhSliders,
   'dots-three': PhDotsThree,
   lightbulb: PhLightbulb,
+  'arrow-up': PhArrowUp,
+  'arrow-down': PhArrowDown,
+  'lock-open': PhLockOpen,
+  'puzzle-piece': PhPuzzlePiece,
+  tag: PhTag,
+  file: PhFile,
+  'file-text': PhFileText,
+  palette: PhPalette,
+  article: PhArticle,
+  atom: PhAtom,
+  code: PhCode,
+  terminal: PhTerminal,
+  image: PhImage,
+  lock: PhLock,
+  globe: PhGlobe,
+  database: PhDatabase,
+  'arrow-arc-left': PhArrowArcLeft,
+  'arrows-clockwise': PhArrowsClockwise,
+  robot: PhRobot,
+  coffee: PhCoffee,
+  dog: PhDog,
+  cpu: PhCpu,
+  'vinyl-record': PhVinylRecord,
+  'file-arrow-up': PhFileArrowUp,
+  'file-arrow-down': PhFileArrowDown,
+  'circle-half': PhCircleHalf,
+  'file-code': PhFileCode,
+  'file-css': PhFileCss,
+  'file-js': PhFileJs,
+  'file-ts': PhFileTs,
+  'file-vue': PhFileVue,
+  'file-rs': PhFileRs,
+  'file-py': PhFilePy,
+  cube: PhCube,
 }
 
 export type IconName =
@@ -147,6 +215,40 @@ export type IconName =
   | 'sliders'
   | 'dots-three'
   | 'lightbulb'
+  | 'arrow-up'
+  | 'arrow-down'
+  | 'lock-open'
+  | 'puzzle-piece'
+  | 'tag'
+  | 'file'
+  | 'file-text'
+  | 'palette'
+  | 'article'
+  | 'atom'
+  | 'code'
+  | 'terminal'
+  | 'image'
+  | 'lock'
+  | 'globe'
+  | 'database'
+  | 'arrow-arc-left'
+  | 'arrows-clockwise'
+  | 'robot'
+  | 'coffee'
+  | 'dog'
+  | 'cpu'
+  | 'vinyl-record'
+  | 'file-arrow-up'
+  | 'file-arrow-down'
+  | 'circle-half'
+  | 'file-code'
+  | 'file-css'
+  | 'file-js'
+  | 'file-ts'
+  | 'file-vue'
+  | 'file-rs'
+  | 'file-py'
+  | 'cube'
 
 const resolvedIcon = computed(() => iconMap[props.name])
 

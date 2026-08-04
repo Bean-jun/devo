@@ -108,6 +108,7 @@ function onTouchMove(e: TouchEvent) {
               data-test="command-item"
               @click="selectCommand(cmd)"
             >
+              <AppIcon v-if="cmd.icon" :name="cmd.icon" :size="18" class="command-icon" />
               <span class="command-name">{{ cmd.name }}</span>
               <span v-if="cmd.placeholder" class="command-placeholder">{{ cmd.placeholder }}</span>
               <span class="command-desc">{{ cmd.description }}</span>
@@ -224,6 +225,11 @@ function onTouchMove(e: TouchEvent) {
   transition: background var(--transition-fast);
   min-height: 44px;
   -webkit-tap-highlight-color: transparent;
+}
+
+.command-icon {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
 }
 
 .command-item:active {

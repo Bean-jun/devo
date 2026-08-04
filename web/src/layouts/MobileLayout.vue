@@ -310,7 +310,7 @@ function handleStatus() {
 
   const lines = [
     `Context: ${contextTokens}`,
-    `Tokens: ${totalTokens} (↑${inputTokens} ↓${outputTokens})`,
+    `Tokens: ${totalTokens} (输入 ${inputTokens} / 输出 ${outputTokens})`,
     `工作区: ${dir}`,
   ]
   showInfo('状态信息', lines.join('\n'))

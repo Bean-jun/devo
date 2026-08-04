@@ -75,7 +75,7 @@ function onTouchMove(e: TouchEvent) {
               <span class="picker-item-name">{{ ws.name }}</span>
               <span class="picker-item-path">{{ ws.exists ? ws.path : '已移除' }}</span>
             </div>
-            <span v-if="activeWorkspace === ws.id" class="picker-check">●</span>
+            <AppIcon v-if="activeWorkspace === ws.id" name="circle" :size="10" weight="fill" class="picker-check" />
           </button>
           <div v-if="workspaces.length === 0" class="picker-empty">
             暂无工作区
@@ -190,7 +190,6 @@ function onTouchMove(e: TouchEvent) {
 
 .picker-check {
   color: var(--color-accent);
-  font-size: 12px;
   flex-shrink: 0;
 }
 

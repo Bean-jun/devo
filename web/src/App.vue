@@ -163,9 +163,11 @@ function connectSSE(sessionId: string) {
     uiStore.setActivity(data.content || data.token || '')
   })
 
-  onEvent('streaming_complete', (_data: any) => {
-    // streaming_complete arrives before message_complete
-    // Actual message finalization is handled in message_complete
+  onEvent('streaming_complete', (data: any) => {
+    const toolCalls = data.tool_calls
+    if (toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0) {
+      chatStore.commitStreamingSegment()
+    }
   })
 
   onEvent('token_usage', (data: any) => {
@@ -302,7 +304,7 @@ function connectSSE(sessionId: string) {
     const summary = data.summary || ''
     const policy = data.policy_level || ''
     if (policy !== 'yolo') {
-      chatStore.appendSystemMessage(`🔓 已自动批准 ${summary}（策略：${policy}）`)
+      chatStore.appendSystemMessage(`已自动批准 ${summary}（策略：${policy}）`)
     }
   })
 

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import type { IconName } from '@/components/common/AppIcon.vue'
 
 export interface Command {
   id: string
@@ -8,6 +9,7 @@ export interface Command {
   placeholder?: string
   group?: 'panel' | 'session' | 'workspace' | 'app'
   mobileLabel?: string
+  icon?: IconName
 }
 
 export const useCommandStore = defineStore('command', () => {

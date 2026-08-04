@@ -99,8 +99,25 @@ export const useChatStore = defineStore('chat', () => {
     isReasoningActive.value = false
   }
 
+  function commitStreamingSegment(): void {
+    if (streamingContent.value.trim() || streamingReasoning.value.trim()) {
+      const msg: Message = {
+        id: streamingMessageId.value ?? generateId(),
+        sessionId: '',
+        role: 'assistant',
+        content: streamingContent.value,
+        reasoning: streamingReasoning.value || undefined,
+        timestamp: new Date().toISOString(),
+      }
+      messages.value.push(msg)
+    }
+    streamingContent.value = ''
+    streamingReasoning.value = ''
+    streamingMessageId.value = generateId()
+  }
+
   function finishStreaming(tokenUsage?: { input: number; output: number }, reasoning?: string): void {
-    if (streamingContent.value || reasoning || streamingReasoning.value) {
+    if (streamingContent.value.trim() || reasoning || streamingReasoning.value.trim()) {
       const msg: Message = {
         id: streamingMessageId.value ?? generateId(),
         sessionId: '',
@@ -286,6 +303,7 @@ export const useChatStore = defineStore('chat', () => {
     appendStreamChunk,
     appendReasoningChunk,
     finishReasoning,
+    commitStreamingSegment,
     finishStreaming,
     updateToolCallStatus,
     updateToolProgress,

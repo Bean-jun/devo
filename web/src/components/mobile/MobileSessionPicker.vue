@@ -88,7 +88,7 @@ function onTouchMove(e: TouchEvent) {
           >
             <AppIcon name="chat-dots" :size="18" />
             <span class="picker-item-name">{{ sess.title }}</span>
-            <span v-if="currentSessionId === sess.id" class="picker-check">●</span>
+            <AppIcon v-if="currentSessionId === sess.id" name="circle" :size="10" weight="fill" class="picker-check" />
           </button>
           <div v-if="sessions.length === 0" class="picker-empty">
             暂无会话
@@ -208,7 +208,6 @@ function onTouchMove(e: TouchEvent) {
 
 .picker-check {
   color: var(--color-accent);
-  font-size: 12px;
   flex-shrink: 0;
 }
 

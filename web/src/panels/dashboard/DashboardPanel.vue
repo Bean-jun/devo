@@ -149,15 +149,26 @@ onMounted(() => { fetchAll() })
           </div>
 
           <div v-if="sessionSteps.length > 0" class="chart-section">
-            <div class="chart-label">步骤消耗</div>
+            <div class="chart-header">
+              <span class="chart-label">步骤消耗</span>
+              <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot legend-input" />输入</span>
+                <span class="legend-item"><span class="legend-dot legend-output" />输出</span>
+              </div>
+            </div>
             <div class="bar-chart">
               <div
-                v-for="s in sessionSteps"
+                v-for="(s, idx) in sessionSteps"
                 :key="s.step_seq"
                 class="bar-item"
-                :title="`步骤 ${s.step_seq}: 输入 ${formatTokens(s.input_tokens)} / 输出 ${formatTokens(s.output_tokens)}`"
+                :style="{ animationDelay: idx * 60 + 'ms' }"
               >
+                <span class="bar-label">步骤 {{ s.step_seq }}</span>
                 <div class="bar-track">
+                  <div class="bar-tooltip">
+                    <span class="tooltip-row"><span class="tooltip-dot ti-dot" />输入 {{ formatTokens(s.input_tokens) }}</span>
+                    <span class="tooltip-row"><span class="tooltip-dot to-dot" />输出 {{ formatTokens(s.output_tokens) }}</span>
+                  </div>
                   <div class="bar-fill" :style="{ width: stepBarWidth(s) + '%' }">
                     <div
                       class="bar-segment bar-input"
@@ -169,12 +180,8 @@ onMounted(() => { fetchAll() })
                     />
                   </div>
                 </div>
-                <span class="bar-label">{{ s.step_seq }}</span>
+                <span class="bar-value">{{ formatTokens(s.input_tokens + s.output_tokens) }}</span>
               </div>
-            </div>
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot legend-input" />输入</span>
-              <span class="legend-item"><span class="legend-dot legend-output" />输出</span>
             </div>
           </div>
         </template>
@@ -212,14 +219,26 @@ onMounted(() => { fetchAll() })
           </div>
 
           <div v-if="projectGroups.length > 0" class="chart-section">
+            <div class="chart-header">
+              <span class="chart-label">{{ groupBy === 'date' ? '每日消耗' : '会话消耗' }}</span>
+              <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot legend-input" />输入</span>
+                <span class="legend-item"><span class="legend-dot legend-output" />输出</span>
+              </div>
+            </div>
             <div class="bar-chart">
               <div
-                v-for="g in projectGroups"
+                v-for="(g, idx) in projectGroups"
                 :key="g.key"
                 class="bar-item"
-                :title="`${g.key}: 输入 ${formatTokens(g.input_tokens)} / 输出 ${formatTokens(g.output_tokens)}`"
+                :style="{ animationDelay: idx * 60 + 'ms' }"
               >
+                <span class="bar-label">{{ g.key }}</span>
                 <div class="bar-track">
+                  <div class="bar-tooltip">
+                    <span class="tooltip-row"><span class="tooltip-dot ti-dot" />输入 {{ formatTokens(g.input_tokens) }}</span>
+                    <span class="tooltip-row"><span class="tooltip-dot to-dot" />输出 {{ formatTokens(g.output_tokens) }}</span>
+                  </div>
                   <div class="bar-fill" :style="{ width: groupBarWidth(g) + '%' }">
                     <div
                       class="bar-segment bar-input"
@@ -231,13 +250,8 @@ onMounted(() => { fetchAll() })
                     />
                   </div>
                 </div>
-                <span class="bar-label">{{ g.key }}</span>
                 <span class="bar-value">{{ formatTokens(g.total_tokens) }}</span>
               </div>
-            </div>
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot legend-input" />输入</span>
-              <span class="legend-item"><span class="legend-dot legend-output" />输出</span>
             </div>
           </div>
 
@@ -283,22 +297,192 @@ onMounted(() => { fetchAll() })
 
 .card-empty { text-align: center; color: var(--color-text-tertiary); padding: 16px 0; font-size: 12px; }
 
-.chart-section { margin-top: 10px; }
-.chart-label { font-size: 11px; font-weight: 600; color: var(--color-text-tertiary); margin-bottom: 6px; }
+.chart-section { margin-top: 12px; }
 
-.bar-chart { display: flex; flex-direction: column; gap: 4px; }
-.bar-item { display: flex; align-items: center; gap: 6px; }
-.bar-track { flex: 1; height: 14px; background: var(--color-bg-tertiary); border-radius: 3px; overflow: hidden; }
-.bar-fill { height: 100%; display: flex; border-radius: 3px; transition: width 0.3s ease; min-width: 2px; }
-.bar-segment { height: 100%; }
-.bar-input { background: var(--color-accent); opacity: 0.85; }
-.bar-output { background: #34c759; opacity: 0.7; }
-.bar-label { font-size: 10px; color: var(--color-text-tertiary); min-width: 28px; text-align: right; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bar-value { font-size: 10px; color: var(--color-text-secondary); min-width: 40px; text-align: right; font-family: var(--font-mono); }
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
 
-.chart-legend { display: flex; gap: 12px; margin-top: 6px; }
-.legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--color-text-tertiary); }
-.legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
-.legend-input { background: var(--color-accent); opacity: 0.85; }
-.legend-output { background: #34c759; opacity: 0.7; }
+.chart-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: barSlideIn 0.4s ease both;
+}
+
+@keyframes barSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.bar-label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  min-width: 52px;
+  max-width: 80px;
+  text-align: right;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.bar-track {
+  flex: 1;
+  height: 22px;
+  background: var(--color-bg-tertiary);
+  border-radius: 6px;
+  overflow: visible;
+  position: relative;
+  cursor: pointer;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.bar-track:hover {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 2px var(--color-accent-light);
+  transform: translateY(-1px);
+}
+
+.bar-track:hover .bar-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-2px);
+}
+
+.bar-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+  z-index: 10;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ti-dot {
+  background: linear-gradient(135deg, var(--color-accent), #5ea3f0);
+}
+
+.to-dot {
+  background: linear-gradient(135deg, #34c759, #4cd964);
+}
+
+.bar-fill {
+  height: 100%;
+  display: flex;
+  border-radius: 6px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.bar-segment {
+  height: 100%;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bar-input {
+  background: linear-gradient(180deg, #3b8be8 0%, var(--color-accent) 100%);
+  border-radius: 6px 0 0 6px;
+}
+
+.bar-input:last-child {
+  border-radius: 6px;
+}
+
+.bar-output {
+  background: linear-gradient(180deg, #4cd964 0%, #34c759 100%);
+  border-radius: 0 6px 6px 0;
+}
+
+.bar-value {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  min-width: 44px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 14px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.legend-input {
+  background: linear-gradient(135deg, #3b8be8, var(--color-accent));
+}
+
+.legend-output {
+  background: linear-gradient(135deg, #4cd964, #34c759);
+}
 </style>

@@ -8,6 +8,7 @@ import type { Message } from '@/types/message'
 import MessageBubble from './MessageBubble.vue'
 import ToolCallCard from './ToolCallCard.vue'
 import ToolCallGroup from './ToolCallGroup.vue'
+import AppIcon from '@/components/common/AppIcon.vue'
 import ThinkingIndicator from './ThinkingIndicator.vue'
 import VirtualMessageItem from './VirtualMessageItem.vue'
 
@@ -21,7 +22,7 @@ const allMessages = computed(() => chatStore.messages)
 
 const visibleMessages = computed(() =>
   allMessages.value.filter((msg) => {
-    if (msg.role === 'assistant' && !msg.content) return false
+    if (msg.role === 'assistant' && !msg.content.trim()) return false
     return true
   })
 )
@@ -259,7 +260,7 @@ defineExpose({
       class="scroll-to-bottom"
       @click="scrollToBottom(true)"
     >
-      ↓ 回到底部
+      <AppIcon name="arrow-down" :size="14" /> 回到底部
     </button>
   </div>
 </template>

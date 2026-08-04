@@ -2,6 +2,7 @@
 import { watch, nextTick, ref } from 'vue'
 import { useCommandStore } from '@/stores/command'
 import { useCommand } from '@/composables/useCommand'
+import AppIcon from '@/components/common/AppIcon.vue'
 
 const commandStore = useCommandStore()
 const { openPalette } = useCommand()
@@ -89,7 +90,7 @@ function handleSelect(index: number) {
       </div>
 
       <div class="palette-footer">
-        <span>↑↓ 导航</span>
+        <span><AppIcon name="arrow-up" :size="12" /><AppIcon name="arrow-down" :size="12" /> 导航</span>
         <span>Enter 选择</span>
         <span>Esc 关闭</span>
       </div>

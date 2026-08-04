@@ -5,6 +5,7 @@ import { API_BASE } from '@/utils/constants'
 import { getLanguageFromExtension } from '@/utils/languageMap'
 import HighlightPreview from '@/components/editor/HighlightPreview.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
+import type { IconName } from '@/components/common/AppIcon.vue'
 
 const sessionStore = useSessionStore()
 
@@ -160,22 +161,22 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
-function getFileIcon(type: 'file' | 'dir', name: string): string {
-  if (type === 'dir') return '📁'
+function getFileIcon(type: 'file' | 'dir', name: string): IconName {
+  if (type === 'dir') return 'folder'
   const ext = name.split('.').pop()?.toLowerCase() || ''
-  const iconMap: Record<string, string> = {
-    ts: '🔷', tsx: '⚛️', js: '🟨', jsx: '⚛️', vue: '💚',
-    py: '🐍', go: '🔵', rs: '🦀', java: '☕', cs: '🟣',
-    css: '🎨', scss: '🎨', less: '🎨',
-    html: '🌐', htm: '🌐',
-    json: '📋', yaml: '📋', yml: '📋', toml: '📋',
-    md: '📝', txt: '📄', log: '📄',
-    gitignore: '⚙', dockerfile: '🐳',
-    png: '🖼', jpg: '🖼', jpeg: '🖼', gif: '🖼', svg: '🖼',
-    sh: '💻', bash: '💻', zsh: '💻',
-    lock: '🔒', config: '⚙',
+  const iconMap: Record<string, IconName> = {
+    ts: 'file-ts', tsx: 'atom', js: 'file-js', jsx: 'atom', vue: 'file-vue',
+    py: 'file-py', go: 'cpu', rs: 'file-rs', java: 'coffee', cs: 'cube',
+    css: 'file-css', scss: 'file-css', less: 'file-css',
+    html: 'globe', htm: 'globe',
+    json: 'article', yaml: 'article', yml: 'article', toml: 'article',
+    md: 'note', txt: 'file-text', log: 'file-text',
+    gitignore: 'gear', dockerfile: 'cube',
+    png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', svg: 'image',
+    sh: 'terminal', bash: 'terminal', zsh: 'terminal',
+    lock: 'lock', config: 'gear',
   }
-  return iconMap[ext] || '📄'
+  return iconMap[ext] || 'file'
 }
 
 function flattenTree(nodes: TreeNode[], depth: number): TreeNode[] {
@@ -340,7 +341,7 @@ onUnmounted(() => {
             :style="{ left: (8 + (d - 1) * 22 + 8) + 'px' }"
           ></span>
           <AppIcon :name="expandedPaths.has(node.path) ? 'caret-down' : 'caret-right'" :size="12" class="file-chevron" />
-          <span class="file-icon">{{ getFileIcon(node.type, node.name) }}</span>
+          <AppIcon :name="getFileIcon(node.type, node.name)" :size="16" class="file-icon" />
           <span class="file-name">{{ node.name }}</span>
           <AppIcon v-if="node.type === 'dir' && !node.loaded && expandedPaths.has(node.path)" name="hourglass" :size="12" class="file-loading-icon" />
           <span class="file-size" v-if="node.type === 'file'">{{ formatFileSize(node.size) }}</span>
@@ -402,7 +403,7 @@ onUnmounted(() => {
 .file-row.selected .file-chevron { color: rgba(255,255,255,0.8); }
 .tree-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--color-border); pointer-events: none; }
 .file-chevron { font-size: 9px; width: 12px; flex-shrink: 0; color: var(--color-text-tertiary); text-align: center; }
-.file-icon { font-size: 13px; flex-shrink: 0; width: 18px; text-align: center; }
+.file-icon { flex-shrink: 0; width: 16px; height: 16px; color: var(--color-text-tertiary); display: flex; align-items: center; justify-content: center; }
 .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .file-size { font-size: 10px; color: var(--color-text-tertiary); flex-shrink: 0; margin-left: auto; }
 .file-loading-icon { font-size: 10px; flex-shrink: 0; }
