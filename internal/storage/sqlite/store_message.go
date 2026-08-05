@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"devo/internal/core/session"
+	"time"
 )
 
 func (s *GormStore) AddMessage(sessionID string, msg session.Message) error {
@@ -61,4 +62,40 @@ func (s *GormStore) GetMessages(sessionID string, limit, offset int) ([]session.
 	}
 
 	return msgs, int(total), nil
+}
+
+type lastMessageRow struct {
+	SessionID string
+	Content   string
+	Role      string
+	CreatedAt time.Time
+}
+
+func (s *GormStore) GetLastMessages(sessionIDs []string) (map[string]session.LastMessageInfo, error) {
+	if len(sessionIDs) == 0 {
+		return map[string]session.LastMessageInfo{}, nil
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var rows []lastMessageRow
+	err := s.db.Model(&MessageModel{}).
+		Select("message_models.session_id, message_models.content, message_models.role, message_models.created_at").
+		Joins("INNER JOIN (SELECT session_id, MAX(seq) AS max_seq FROM message_models WHERE session_id IN ? AND role = 'user' GROUP BY session_id) sub ON message_models.session_id = sub.session_id AND message_models.seq = sub.max_seq", sessionIDs).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]session.LastMessageInfo, len(rows))
+	for _, row := range rows {
+		result[row.SessionID] = session.LastMessageInfo{
+			SessionID: row.SessionID,
+			Content:   row.Content,
+			Role:      row.Role,
+			CreatedAt: row.CreatedAt,
+		}
+	}
+	return result, nil
 }

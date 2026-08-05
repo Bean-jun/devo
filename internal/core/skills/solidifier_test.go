@@ -191,3 +191,7 @@ func (m *mockSessionStore) DeleteByWorkspace(path string) (int, error) {
 func (m *mockSessionStore) DeleteSession(id string) error {
 	return nil
 }
+
+func (m *mockSessionStore) GetLastMessages(sessionIDs []string) (map[string]session.LastMessageInfo, error) {
+	return nil, nil
+}

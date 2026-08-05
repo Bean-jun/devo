@@ -208,6 +208,8 @@ type listSessionsItem struct {
 	TokenUsage           session.TokenUsage `json:"token_usage"`
 	CurrentContextTokens int                `json:"current_context_tokens"`
 	TrustLevel           string             `json:"trust_level"`
+	LastMessageContent   string             `json:"last_message_content,omitempty"`
+	LastMessageTime      string             `json:"last_message_time,omitempty"`
 }
 
 type listSessionsResponse struct {
@@ -247,9 +249,15 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sessionIDs := make([]string, len(sessions))
+	for i, s := range sessions {
+		sessionIDs[i] = s.ID
+	}
+	lastMsgMap, _ := h.store.GetLastMessages(sessionIDs)
+
 	items := make([]listSessionsItem, len(sessions))
 	for i, s := range sessions {
-		items[i] = listSessionsItem{
+		item := listSessionsItem{
 			ID:                   s.ID,
 			Title:                s.Title,
 			ProjectPath:          s.WorkingDirectory,
@@ -261,6 +269,11 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 			CurrentContextTokens: s.CurrentContextTokens,
 			TrustLevel:           string(s.TrustLevel),
 		}
+		if lastMsg, ok := lastMsgMap[s.ID]; ok {
+			item.LastMessageContent = lastMsg.Content
+			item.LastMessageTime = lastMsg.CreatedAt.Format(time.RFC3339)
+		}
+		items[i] = item
 	}
 
 	writeJSON(w, http.StatusOK, listSessionsResponse{

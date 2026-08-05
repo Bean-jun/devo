@@ -128,8 +128,6 @@ func matchDoubleStar(pattern, path string) bool {
 			}
 			path = strings.Join(pathParts[len(prefixParts):], "/")
 		}
-	} else if prefix == "" {
-		path = path
 	}
 
 	if suffix == "" {

@@ -23,6 +23,17 @@ function formatTokenUsage(usage?: TokenUsage): string {
   return `${total} token`
 }
 
+function truncateText(text: string, maxLen: number): string {
+  if (!text) return ''
+  if (text.length <= maxLen) return text
+  return text.slice(0, maxLen) + '...'
+}
+
+function formatLastMessageTime(time?: string): string {
+  if (!time) return ''
+  return formatDateTime(time)
+}
+
 const isOpen = computed(() => uiStore.activeModal === 'session-picker')
 const filteredSessions = computed(() => {
   if (!searchQuery.value) return sessionStore.sessions
@@ -112,8 +123,13 @@ function handleKeydown(e: KeyboardEvent) {
         >
           <div class="item-left">
             <span class="item-name">{{ session.title }}</span>
+            <span v-if="session.lastMessageContent" class="item-last-msg">
+              {{ truncateText(session.lastMessageContent, 60) }}
+            </span>
             <span class="item-meta">
-              {{ session.messageCount }} 条消息 · {{ formatTokenUsage(session.tokenUsage) }} · {{ formatDateTime(session.createdAt) }}
+              {{ session.messageCount }} 条消息 · {{ formatTokenUsage(session.tokenUsage) }}
+              <span v-if="session.lastMessageTime"> · {{ formatLastMessageTime(session.lastMessageTime) }}</span>
+              <span v-else> · {{ formatDateTime(session.createdAt) }}</span>
             </span>
           </div>
           <div class="item-right">
@@ -251,6 +267,16 @@ function handleKeydown(e: KeyboardEvent) {
 .item-meta {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
+}
+
+.item-last-msg {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .item-status {

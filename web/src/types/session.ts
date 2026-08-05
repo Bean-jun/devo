@@ -34,6 +34,8 @@ export interface Session {
   keepRecent?: number
   maxContextTokens?: number
   currentContextTokens?: number
+  lastMessageContent?: string
+  lastMessageTime?: string
 }
 
 export interface CreateSessionRequest {

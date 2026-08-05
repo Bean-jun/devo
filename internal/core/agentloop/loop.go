@@ -185,7 +185,11 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 	if traceID == "" {
 		traceID = logging.GenerateTraceID()
 	}
-	ctx = logging.WithSessionID(ctx, sessionID)
+	logging.WithSessionID(ctx, sessionID)
+
+	loopCtx, loopCancel := context.WithCancel(context.Background())
+	loopCtx = logging.WithTraceID(loopCtx, traceID)
+	loopCtx = logging.WithSessionID(loopCtx, sessionID)
 
 	lc := &LoopContext{
 		SessionID: sessionID,
@@ -194,15 +198,15 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		CancelCh:  make(chan struct{}, 1),
 		PauseCh:   make(chan struct{}, 1),
 		ResumeCh:  make(chan struct{}, 1),
+		Ctx:       loopCtx,
+		CancelCtx: loopCancel,
 	}
 
 	l.activeLoops.Store(sessionID, lc)
 	go func() {
 		defer l.activeLoops.Delete(sessionID)
-		bgCtx := context.Background()
-		bgCtx = logging.WithTraceID(bgCtx, traceID)
-		bgCtx = logging.WithSessionID(bgCtx, sessionID)
-		l.stateMachine.Run(bgCtx, lc)
+		defer loopCancel()
+		l.stateMachine.Run(loopCtx, lc)
 
 		sess, err := l.store.Get(sessionID)
 		if err == nil && sess.State != session.StatePaused {

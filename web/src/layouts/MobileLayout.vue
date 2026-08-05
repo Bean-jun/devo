@@ -160,6 +160,9 @@ function handleCommandSelect(cmd: Command) {
     case 'cancel':
       handleCancelSession()
       break
+    case 'compact':
+      handleCompact()
+      break
     case 'help':
       uiStore.setActiveModal('help')
       break
@@ -274,6 +277,25 @@ async function handleCancelSession() {
     uiStore.showToast('info', '操作已取消')
   } catch (e: any) {
     uiStore.showToast('error', e.message || '取消失败')
+  }
+}
+
+async function handleCompact() {
+  const session = sessionStore.currentSession
+  if (!session) return
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${session.id}/compact`, { method: 'POST' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+    const compressedCount = data.compressed_count ?? 0
+    const tokensRemoved = data.tokens_removed ?? 0
+    if (compressedCount > 0) {
+      uiStore.showToast('success', `上下文已压缩，压缩了 ${compressedCount} 条消息，减少约 ${tokensRemoved} tokens`)
+    } else {
+      uiStore.showToast('info', '当前上下文无需压缩')
+    }
+  } catch (e: any) {
+    uiStore.showToast('error', e.message || '压缩失败')
   }
 }
 

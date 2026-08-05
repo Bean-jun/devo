@@ -408,6 +408,11 @@ func (c *Client) parseSSEStream(ctx context.Context, body io.Reader, callback ll
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		callback(llmclient.StreamEvent{Type: "error", Err: err})
+		return err
+	}
+
 	if finishReason != "" {
 		fullText := fullTextBuilder.String()
 		fullReasoning := fullReasoningBuilder.String()

@@ -467,9 +467,13 @@ func TestPauseChannelSignal(t *testing.T) {
 	sess.State = session.StateToolExecuting
 	store.Update(sess)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	lc := &LoopContext{
 		SessionID: "sess-1",
 		PauseCh:   make(chan struct{}, 1),
+		Ctx:       ctx,
+		CancelCtx: cancel,
 	}
 	loop.activeLoops.Store("sess-1", lc)
 	defer loop.activeLoops.Delete("sess-1")
@@ -494,9 +498,12 @@ func TestCancelChannelSignal(t *testing.T) {
 	sess.State = session.StateThinking
 	store.Update(sess)
 
+	ctx, cancel := context.WithCancel(context.Background())
 	lc := &LoopContext{
 		SessionID: "sess-1",
 		CancelCh:  make(chan struct{}, 1),
+		Ctx:       ctx,
+		CancelCtx: cancel,
 	}
 	loop.activeLoops.Store("sess-1", lc)
 	defer loop.activeLoops.Delete("sess-1")
@@ -521,9 +528,13 @@ func TestResumeChannelSignal(t *testing.T) {
 	sess.State = session.StatePaused
 	store.Update(sess)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	lc := &LoopContext{
 		SessionID: "sess-1",
 		ResumeCh:  make(chan struct{}, 1),
+		Ctx:       ctx,
+		CancelCtx: cancel,
 	}
 	loop.activeLoops.Store("sess-1", lc)
 	defer loop.activeLoops.Delete("sess-1")
@@ -586,9 +597,12 @@ func TestCancelChannelSignalKillsChildProcess(t *testing.T) {
 	sess.ChildPID = &pid
 	store.Update(sess)
 
+	ctx, cancel := context.WithCancel(context.Background())
 	lc := &LoopContext{
 		SessionID: "sess-1",
 		CancelCh:  make(chan struct{}, 1),
+		Ctx:       ctx,
+		CancelCtx: cancel,
 	}
 	loop.activeLoops.Store("sess-1", lc)
 	defer loop.activeLoops.Delete("sess-1")

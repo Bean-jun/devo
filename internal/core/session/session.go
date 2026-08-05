@@ -153,6 +153,13 @@ type FileModificationRecord struct {
 	CausedByMessageID string    `json:"caused_by_message_id"`
 }
 
+type LastMessageInfo struct {
+	SessionID string
+	Content   string
+	Role      string
+	CreatedAt time.Time
+}
+
 type SessionStore interface {
 	Create(s *Session) error
 	Get(id string) (*Session, error)
@@ -163,6 +170,7 @@ type SessionStore interface {
 	DeleteSession(id string) error
 	AddMessage(sessionID string, msg Message) error
 	GetMessages(sessionID string, limit, offset int) ([]Message, int, error)
+	GetLastMessages(sessionIDs []string) (map[string]LastMessageInfo, error)
 	GetEventBus(sessionID string) (*EventBus, error)
 	AddEvent(sessionID string, event Event) error
 	GetEvents(sessionID string, sinceID int64) ([]Event, error)

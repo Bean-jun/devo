@@ -630,3 +630,107 @@ func TestGetSession_IncludesConcurrencyFields(t *testing.T) {
 		t.Errorf("expected max_concurrent_subprocesses 3, got %d", result.MaxConcurrentSubprocesses)
 	}
 }
+
+func TestListSessions_IncludesLastMessage(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+
+	sess := &session.Session{
+		ID:               "sess-lastmsg-1",
+		Title:            "Session With Messages",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	}
+	store.Create(sess)
+
+	msgTime := time.Now().Add(-time.Hour)
+	store.AddMessage("sess-lastmsg-1", session.Message{
+		ID:        "msg-1",
+		Role:      session.RoleUser,
+		Content:   "Hello, write a function",
+		CreatedAt: msgTime,
+	})
+	store.AddMessage("sess-lastmsg-1", session.Message{
+		ID:        "msg-2",
+		Role:      session.RoleAssistant,
+		Content:   "function hello() { return 'Hello World'; }",
+		CreatedAt: msgTime.Add(time.Minute),
+	})
+	store.AddMessage("sess-lastmsg-1", session.Message{
+		ID:        "msg-3",
+		Role:      session.RoleUser,
+		Content:   "Now add error handling",
+		CreatedAt: msgTime.Add(2 * time.Minute),
+	})
+
+	resp, err := http.Get(server.URL + "/api/v1/sessions?status=all")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result listSessionsResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	found := false
+	for _, item := range result.Sessions {
+		if item.ID == "sess-lastmsg-1" {
+			found = true
+			expectedContent := "Now add error handling"
+			if item.LastMessageContent != expectedContent {
+				t.Errorf("expected last user message content %q, got %q", expectedContent, item.LastMessageContent)
+			}
+			if item.LastMessageTime == "" {
+				t.Error("expected non-empty last_message_time")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("session with messages not found in list response")
+	}
+}
+
+func TestListSessions_NoLastMessageForEmptySession(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+
+	store.Create(&session.Session{
+		ID:               "sess-empty-1",
+		Title:            "Empty Session",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+		CreatedAt:        time.Now(),
+		LastActiveAt:     time.Now(),
+	})
+
+	resp, err := http.Get(server.URL + "/api/v1/sessions?status=all")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result listSessionsResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	for _, item := range result.Sessions {
+		if item.ID == "sess-empty-1" {
+			if item.LastMessageContent != "" {
+				t.Errorf("expected empty last_message_content for session with no messages, got %q", item.LastMessageContent)
+			}
+			if item.LastMessageTime != "" {
+				t.Errorf("expected empty last_message_time for session with no messages, got %q", item.LastMessageTime)
+			}
+		}
+	}
+}

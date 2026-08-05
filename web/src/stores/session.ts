@@ -242,6 +242,8 @@ export const useSessionStore = defineStore('session', () => {
       keepRecent: data.keep_recent,
       maxContextTokens: data.max_context_tokens,
       currentContextTokens: data.current_context_tokens,
+      lastMessageContent: data.last_message_content,
+      lastMessageTime: data.last_message_time,
     }
   }
 

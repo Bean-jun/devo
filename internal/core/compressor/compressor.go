@@ -57,7 +57,15 @@ type CompressResult struct {
 	SummaryText     string
 }
 
+func (c *Compressor) ForceCompress(ctx context.Context, sessionID string, eventBus *session.EventBus, systemPromptTokens int) (*CompressResult, error) {
+	return c.compress(ctx, sessionID, eventBus, systemPromptTokens, true)
+}
+
 func (c *Compressor) Compress(ctx context.Context, sessionID string, eventBus *session.EventBus, systemPromptTokens int) (*CompressResult, error) {
+	return c.compress(ctx, sessionID, eventBus, systemPromptTokens, false)
+}
+
+func (c *Compressor) compress(ctx context.Context, sessionID string, eventBus *session.EventBus, systemPromptTokens int, force bool) (*CompressResult, error) {
 	msgs, _, err := c.store.GetMessages(sessionID, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("get messages: %w", err)
@@ -76,7 +84,7 @@ func (c *Compressor) Compress(ctx context.Context, sessionID string, eventBus *s
 	estimatedTokens := EstimateContextTokens(msgs, sess.CompressionState) + systemPromptTokens
 	compressThreshold := int(float64(maxContext) * 0.8)
 
-	if estimatedTokens <= compressThreshold {
+	if !force && estimatedTokens <= compressThreshold {
 		return nil, nil
 	}
 

@@ -1,6 +1,7 @@
 package agentloop
 
 import (
+	"context"
 	"strings"
 
 	"devo/internal/core/session"
@@ -38,4 +39,9 @@ type LoopContext struct {
 
 	// ReasoningBuilder 累计本轮 LLM 流式输出的思考过程
 	ReasoningBuilder strings.Builder
+
+	// Ctx 是可取消的 context，当 Cancel() 被调用时会被取消。
+	// 用于在 thinkingHandler 等长时间运行的 handler 中中断 LLM 流式请求。
+	Ctx       context.Context
+	CancelCtx context.CancelFunc
 }

@@ -53,4 +53,76 @@ describe('SessionPicker', () => {
 
     expect(wrapper.find('.picker-empty').text()).toContain('暂无')
   })
+
+  it('should display last message content when available', () => {
+    const uiStore = useUiStore()
+    const sessionStore = useSessionStore()
+
+    sessionStore.sessions = [
+      {
+        id: 's1',
+        title: 'Session 1',
+        state: 'idle',
+        messageCount: 5,
+        lastActiveAt: '2026-01-01T00:00:00Z',
+        lastMessageContent: 'function hello() { return "Hello World"; }',
+        lastMessageTime: '2026-01-02T12:00:00Z',
+      } as any,
+    ]
+
+    uiStore.setActiveModal('session-picker')
+
+    const wrapper = mount(SessionPicker)
+
+    const lastMsg = wrapper.find('.item-last-msg')
+    expect(lastMsg.exists()).toBe(true)
+    expect(lastMsg.text()).toContain('function hello()')
+  })
+
+  it('should truncate long last message content', () => {
+    const uiStore = useUiStore()
+    const sessionStore = useSessionStore()
+
+    const longContent = 'A'.repeat(100)
+    sessionStore.sessions = [
+      {
+        id: 's1',
+        title: 'Session 1',
+        state: 'idle',
+        messageCount: 5,
+        lastActiveAt: '2026-01-01T00:00:00Z',
+        lastMessageContent: longContent,
+        lastMessageTime: '2026-01-02T12:00:00Z',
+      } as any,
+    ]
+
+    uiStore.setActiveModal('session-picker')
+
+    const wrapper = mount(SessionPicker)
+
+    const lastMsg = wrapper.find('.item-last-msg')
+    expect(lastMsg.exists()).toBe(true)
+    expect(lastMsg.text().endsWith('...')).toBe(true)
+  })
+
+  it('should not show last message when content is empty', () => {
+    const uiStore = useUiStore()
+    const sessionStore = useSessionStore()
+
+    sessionStore.sessions = [
+      {
+        id: 's1',
+        title: 'Session 1',
+        state: 'idle',
+        messageCount: 5,
+        lastActiveAt: '2026-01-01T00:00:00Z',
+      } as any,
+    ]
+
+    uiStore.setActiveModal('session-picker')
+
+    const wrapper = mount(SessionPicker)
+
+    expect(wrapper.find('.item-last-msg').exists()).toBe(false)
+  })
 })

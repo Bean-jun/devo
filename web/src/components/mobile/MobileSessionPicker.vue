@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
 import { API_BASE } from '@/utils/constants'
+import { formatDateTime } from '@/utils/formatters'
 import AppIcon from '@/components/common/AppIcon.vue'
 
 const emit = defineEmits<{
@@ -17,6 +18,17 @@ const uiStore = useUiStore()
 
 const sessions = computed(() => sessionStore.sessions)
 const currentSessionId = computed(() => sessionStore.currentSession?.id)
+
+function truncateText(text: string, maxLen: number): string {
+  if (!text) return ''
+  if (text.length <= maxLen) return text
+  return text.slice(0, maxLen) + '...'
+}
+
+function formatLastMessageTime(time?: string): string {
+  if (!time) return ''
+  return formatDateTime(time)
+}
 
 async function selectSession(sessionId: string) {
   const ok = await sessionStore.switchSessionById(sessionId)
@@ -87,7 +99,16 @@ function onTouchMove(e: TouchEvent) {
             @click="selectSession(sess.id)"
           >
             <AppIcon name="chat-dots" :size="18" />
-            <span class="picker-item-name">{{ sess.title }}</span>
+            <div class="picker-item-content">
+              <span class="picker-item-name">{{ sess.title }}</span>
+              <span v-if="sess.lastMessageContent" class="picker-item-last-msg">
+                {{ truncateText(sess.lastMessageContent, 50) }}
+              </span>
+              <span class="picker-item-meta">
+                {{ sess.messageCount }} 条消息
+                <span v-if="sess.lastMessageTime"> · {{ formatLastMessageTime(sess.lastMessageTime) }}</span>
+              </span>
+            </div>
             <AppIcon v-if="currentSessionId === sess.id" name="circle" :size="10" weight="fill" class="picker-check" />
           </button>
           <div v-if="sessions.length === 0" class="picker-empty">
@@ -197,13 +218,33 @@ function onTouchMove(e: TouchEvent) {
 }
 
 .picker-item-name {
-  flex: 1;
   font-size: var(--font-size-base);
   color: var(--color-text-primary);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.picker-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.picker-item-last-msg {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-item-meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
 }
 
 .picker-check {

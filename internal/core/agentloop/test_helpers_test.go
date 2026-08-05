@@ -12,6 +12,7 @@ import (
 
 func newTestLoopContext(sessionID string, store session.SessionStore) *LoopContext {
 	eventBus, _ := store.GetEventBus(sessionID)
+	ctx, cancel := context.WithCancel(context.Background())
 	return &LoopContext{
 		SessionID:           sessionID,
 		EventBus:            eventBus,
@@ -19,6 +20,8 @@ func newTestLoopContext(sessionID string, store session.SessionStore) *LoopConte
 		PauseCh:             make(chan struct{}, 1),
 		ResumeCh:            make(chan struct{}, 1),
 		ExecutedToolCallIDs: make(map[string]bool),
+		Ctx:                 ctx,
+		CancelCtx:           cancel,
 	}
 }
 

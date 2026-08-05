@@ -92,6 +92,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sessions/{id}/pause", h.Pause)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/resume", h.Resume)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/rollback", h.Rollback)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/compact", h.Compact)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/complete", h.Complete)
 
 	mux.HandleFunc("GET /api/v1/sessions/{id}/background", h.ListBackgroundProcesses)

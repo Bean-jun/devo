@@ -427,3 +427,28 @@ func (s *InMemoryStore) DeleteFileModificationsAfter(sessionID string, afterTime
 	s.fileModifications[sessionID] = filtered
 	return nil
 }
+
+func (s *InMemoryStore) GetLastMessages(sessionIDs []string) (map[string]LastMessageInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make(map[string]LastMessageInfo, len(sessionIDs))
+	for _, sid := range sessionIDs {
+		sess, ok := s.sessions[sid]
+		if !ok || len(sess.Messages) == 0 {
+			continue
+		}
+		for i := len(sess.Messages) - 1; i >= 0; i-- {
+			if sess.Messages[i].Role == RoleUser {
+				result[sid] = LastMessageInfo{
+					SessionID: sid,
+					Content:   sess.Messages[i].Content,
+					Role:      string(sess.Messages[i].Role),
+					CreatedAt: sess.Messages[i].CreatedAt,
+				}
+				break
+			}
+		}
+	}
+	return result, nil
+}

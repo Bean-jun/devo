@@ -92,7 +92,7 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 	lc.ReasoningBuilder.Reset()
 
 	var streamErr error
-	err := l.llmClient.CompleteStream(ctx, lc.ActiveMsgs, lc.DynamicPrompt, func(evt llmclient.StreamEvent) {
+	err := l.llmClient.CompleteStream(lc.Ctx, lc.ActiveMsgs, lc.DynamicPrompt, func(evt llmclient.StreamEvent) {
 		switch evt.Type {
 		case "reasoning_token":
 			lc.ReasoningBuilder.WriteString(evt.Reasoning)
@@ -177,9 +177,15 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 		}
 	})
 	if err != nil {
+		if lc.Ctx.Err() != nil {
+			return LoopStateCancelled, nil
+		}
 		return LoopStateError, fmt.Errorf("llm complete: %w", err)
 	}
 	if streamErr != nil {
+		if lc.Ctx.Err() != nil {
+			return LoopStateCancelled, nil
+		}
 		return LoopStateError, fmt.Errorf("llm stream error: %w", streamErr)
 	}
 
@@ -243,12 +249,12 @@ func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopS
 
 	if len(lc.ExecutedToolCallIDs) == 0 {
 		assistantMsg := session.Message{
-			ID:         session.GenerateID("msg"),
-			Role:       session.RoleAssistant,
-			Content:    lc.LLMResult.Text,
-			Reasoning:  lc.LLMResult.Reasoning,
-			ToolCalls:  lc.LLMResult.ToolCalls,
-			CreatedAt:  time.Now(),
+			ID:        session.GenerateID("msg"),
+			Role:      session.RoleAssistant,
+			Content:   lc.LLMResult.Text,
+			Reasoning: lc.LLMResult.Reasoning,
+			ToolCalls: lc.LLMResult.ToolCalls,
+			CreatedAt: time.Now(),
 		}
 		if err := l.store.AddMessage(lc.SessionID, assistantMsg); err != nil {
 			return LoopStateError, fmt.Errorf("add assistant message with tool calls: %w", err)
@@ -294,11 +300,11 @@ func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopS
 
 func (l *Loop) textResponseHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
 	assistantMsg := session.Message{
-		ID:         session.GenerateID("msg"),
-		Role:       session.RoleAssistant,
-		Content:    lc.LLMResult.Text,
-		Reasoning:  lc.LLMResult.Reasoning,
-		CreatedAt:  time.Now(),
+		ID:        session.GenerateID("msg"),
+		Role:      session.RoleAssistant,
+		Content:   lc.LLMResult.Text,
+		Reasoning: lc.LLMResult.Reasoning,
+		CreatedAt: time.Now(),
 	}
 	if err := l.store.AddMessage(lc.SessionID, assistantMsg); err != nil {
 		return LoopStateError, fmt.Errorf("add assistant message: %w", err)

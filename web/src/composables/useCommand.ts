@@ -72,6 +72,14 @@ export function useCommand() {
       mobileLabel: '取消当前操作',
     },
     {
+      id: 'compact',
+      name: '/compact',
+      description: '压缩当前会话上下文',
+      group: 'session',
+      icon: 'chat',
+      mobileLabel: '压缩会话上下文',
+    },
+    {
       id: 'help',
       name: '/help',
       description: '显示帮助',

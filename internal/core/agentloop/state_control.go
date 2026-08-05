@@ -1,10 +1,13 @@
 package agentloop
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"devo/internal/core/compressor"
 	"devo/internal/core/session"
+	"devo/internal/core/tokenmeter"
 )
 
 func (l *Loop) Pause(sessionID string) error {
@@ -148,6 +151,7 @@ func (l *Loop) Cancel(sessionID string) error {
 	}
 
 	loopCtx := lc.(*LoopContext)
+	loopCtx.CancelCtx()
 	select {
 	case loopCtx.CancelCh <- struct{}{}:
 	default:
@@ -179,6 +183,7 @@ func (l *Loop) Complete(sessionID string) error {
 		lc, ok := l.activeLoops.Load(sessionID)
 		if ok {
 			loopCtx := lc.(*LoopContext)
+			loopCtx.CancelCtx()
 			select {
 			case loopCtx.CancelCh <- struct{}{}:
 			default:
@@ -245,6 +250,33 @@ func (l *Loop) Archive(sessionID string) error {
 	}
 
 	return nil
+}
+
+func (l *Loop) Compact(sessionID string) (*compressor.CompressResult, error) {
+	sess, err := l.store.Get(sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("get session: %w", err)
+	}
+
+	if sess.State != session.StateIdle {
+		return nil, fmt.Errorf("cannot compact: current state is %s", sess.State.ToSnakeCase())
+	}
+
+	eventBus, err := l.store.GetEventBus(sessionID)
+	if err != nil {
+		eventBus = nil
+	}
+
+	dynamicPrompt := l.promptAssembler.Assemble(sess)
+	systemPromptTokens := tokenmeter.EstimateTokens(dynamicPrompt)
+
+	ctx := context.Background()
+	result, err := l.compressor.ForceCompress(ctx, sessionID, eventBus, systemPromptTokens)
+	if err != nil {
+		return nil, fmt.Errorf("compress: %w", err)
+	}
+
+	return result, nil
 }
 
 func (l *Loop) UpdateConfig(sessionID string, toolCallLimit int) error {

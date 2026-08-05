@@ -193,6 +193,27 @@ async function handleExecuteCommand(text: string) {
       }
       break
     }
+    case 'compact': {
+      const sid = sessionStore.currentSession?.id
+      if (!sid) return
+      try {
+        const res = await fetch(`${API_BASE}/sessions/${sid}/compact`, { method: 'POST' })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw new Error(data.error || `HTTP ${res.status}`)
+        }
+        const compressedCount = data.compressed_count ?? 0
+        const tokensRemoved = data.tokens_removed ?? 0
+        if (compressedCount > 0) {
+          uiStore.showToast('success', `上下文已压缩，压缩了 ${compressedCount} 条消息，减少约 ${tokensRemoved} tokens`)
+        } else {
+          uiStore.showToast('info', '当前上下文无需压缩')
+        }
+      } catch (e: any) {
+        uiStore.showToast('error', e.message || '压缩失败')
+      }
+      break
+    }
     case 'help': {
       uiStore.setActiveModal('help')
       break
