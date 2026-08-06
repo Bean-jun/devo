@@ -36,15 +36,16 @@ type SessionModel struct {
 }
 
 type MessageModel struct {
-	ID            string `gorm:"primaryKey;size:64"`
-	SessionID     string `gorm:"size:64;index:idx_msg_session_id;not null"`
-	Role          string `gorm:"size:16"`
-	Content       string `gorm:"type:text"`
-	Reasoning     string `gorm:"type:text"`
-	ToolCallsJSON string `gorm:"type:text"`
-	ToolCallID    string `gorm:"size:64"`
-	Seq           int    `gorm:"index:idx_msg_seq"`
-	CreatedAt     time.Time
+	ID               string `gorm:"primaryKey;size:64"`
+	SessionID        string `gorm:"size:64;index:idx_msg_session_id;not null"`
+	Role             string `gorm:"size:16"`
+	Content          string `gorm:"type:text"`
+	ContentPartsJSON string `gorm:"type:text"`
+	Reasoning        string `gorm:"type:text"`
+	ToolCallsJSON    string `gorm:"type:text"`
+	ToolCallID       string `gorm:"size:64"`
+	Seq              int    `gorm:"index:idx_msg_seq"`
+	CreatedAt        time.Time
 }
 
 type EventModel struct {
@@ -159,6 +160,13 @@ func (m *MessageModel) ToDomain() session.Message {
 		}
 	}
 
+	if m.ContentPartsJSON != "" {
+		var contentParts []session.ContentPart
+		if err := json.Unmarshal([]byte(m.ContentPartsJSON), &contentParts); err == nil {
+			msg.ContentParts = contentParts
+		}
+	}
+
 	return msg
 }
 
@@ -178,6 +186,13 @@ func fromMessage(sessionID string, seq int, m session.Message) *MessageModel {
 		data, err := json.Marshal(m.ToolCalls)
 		if err == nil {
 			model.ToolCallsJSON = string(data)
+		}
+	}
+
+	if len(m.ContentParts) > 0 {
+		data, err := json.Marshal(m.ContentParts)
+		if err == nil {
+			model.ContentPartsJSON = string(data)
 		}
 	}
 

@@ -83,7 +83,7 @@ func TestAgentLoopWithApproval_Approve(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Create a new file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Create a new file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -207,7 +207,7 @@ func TestAgentLoopWithApproval_Reject(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Create a file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Create a file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -334,7 +334,7 @@ func TestAgentLoop_ReadOnlyToolsNoApproval(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Read the file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Read the file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -401,7 +401,7 @@ func TestApprovalRequiredEventFields(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	loop.ProcessMessage(context.Background(), "sess-1", "Create a file")
+	loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Create a file"})
 
 	evt, ok := waitForEvent(ch, "approval_required", 3*time.Second)
 	if !ok {
@@ -499,7 +499,7 @@ func TestAgentLoop_PolicySessionTrust_AutoApprove(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Create a file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Create a file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -565,7 +565,7 @@ func TestAgentLoop_PolicyAlwaysAsk_StillRequiresApproval(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Create a file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Create a file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -621,7 +621,7 @@ func TestApprovalTimeout_AutoReject(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Create a file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Create a file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -768,7 +768,7 @@ func TestApprovalRequest_WriteFileDiff(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Overwrite the file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Overwrite the file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -902,7 +902,7 @@ func TestApprovalRequest_EditFileDiff(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Edit the file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Edit the file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -1046,7 +1046,7 @@ func TestApprovalRequest_EditFileDiffFailureNoApproval(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Edit the file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Edit the file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -1169,7 +1169,7 @@ func TestApprovalRequest_ExecPythonContext(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Run a command"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Run a command"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 

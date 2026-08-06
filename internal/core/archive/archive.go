@@ -39,7 +39,7 @@ func (am *ArchiveManager) EnsureArchivePath(sess *session.Session) error {
 	return nil
 }
 
-func (am *ArchiveManager) AppendUserMessage(sessionID string, content string) error {
+func (am *ArchiveManager) AppendUserMessage(sessionID string, msg session.Message) error {
 	sess, err := am.store.Get(sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
@@ -53,7 +53,12 @@ func (am *ArchiveManager) AppendUserMessage(sessionID string, content string) er
 		return err
 	}
 
-	entry := fmt.Sprintf("\n### 用户\n%s\n", content)
+	var entry string
+	if len(msg.ContentParts) > 0 {
+		entry = fmt.Sprintf("\n### 用户\n[图片] %s\n", msg.Content)
+	} else {
+		entry = fmt.Sprintf("\n### 用户\n%s\n", msg.Content)
+	}
 	return am.appendToFile(archivePath, entry)
 }
 
@@ -223,7 +228,11 @@ func (am *ArchiveManager) renderArchive(sess *session.Session, msgs []session.Me
 		if msg.Role == session.RoleSystem {
 			b.WriteString(fmt.Sprintf("\n### 系统\n%s\n", msg.Content))
 		} else if msg.Role == session.RoleUser {
-			b.WriteString(fmt.Sprintf("\n### 用户\n%s\n", msg.Content))
+			if len(msg.ContentParts) > 0 {
+				b.WriteString(fmt.Sprintf("\n### 用户\n[图片] %s\n", msg.Content))
+			} else {
+				b.WriteString(fmt.Sprintf("\n### 用户\n%s\n", msg.Content))
+			}
 		} else if msg.Role == session.RoleAssistant {
 			if len(msg.ToolCalls) > 0 {
 				for _, tc := range msg.ToolCalls {

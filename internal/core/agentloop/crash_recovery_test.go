@@ -311,7 +311,7 @@ func TestRecoverCrashedSessions_CanContinueAfterRecovery(t *testing.T) {
 		t.Fatalf("expected Idle after recovery, got %q", sess.State)
 	}
 
-	err := loop.ProcessMessage(context.Background(), "sess-continue", "Hello after crash")
+	err := loop.ProcessMessage(context.Background(), "sess-continue", session.Message{Content: "Hello after crash"})
 	if err != nil {
 		t.Fatalf("ProcessMessage after recovery failed: %v", err)
 	}

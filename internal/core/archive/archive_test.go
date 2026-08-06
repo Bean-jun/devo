@@ -57,7 +57,7 @@ func TestAppendUserMessage(t *testing.T) {
 		t.Fatalf("create session: %v", err)
 	}
 
-	if err := am.AppendUserMessage(sess.ID, "Hello, World!"); err != nil {
+	if err := am.AppendUserMessage(sess.ID, session.Message{Content: "Hello, World!"}); err != nil {
 		t.Fatalf("append user message: %v", err)
 	}
 
@@ -271,7 +271,7 @@ func TestGetArchiveContent(t *testing.T) {
 		t.Fatalf("create session: %v", err)
 	}
 
-	if err := am.AppendUserMessage(sess.ID, "test content"); err != nil {
+	if err := am.AppendUserMessage(sess.ID, session.Message{Content: "test content"}); err != nil {
 		t.Fatalf("append message: %v", err)
 	}
 
@@ -347,7 +347,7 @@ func TestSyncArchiveOverwrite(t *testing.T) {
 		store.AddMessage(sess.ID, msg)
 	}
 
-	if err := am.AppendUserMessage(sess.ID, "Manually added junk"); err != nil {
+	if err := am.AppendUserMessage(sess.ID, session.Message{Content: "Manually added junk"}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 
@@ -522,7 +522,7 @@ func TestAppendNonBlocking(t *testing.T) {
 	}
 	defer os.Remove(dirPath)
 
-	err := am.AppendUserMessage(sess.ID, "test")
+	err := am.AppendUserMessage(sess.ID, session.Message{Content: "test"})
 	if err == nil {
 		t.Error("expected error when archive directory path is a file, but got nil")
 	}

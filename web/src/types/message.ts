@@ -9,10 +9,12 @@ export interface Message {
   timestamp: string
   tokenUsage?: TokenUsage
   toolCall?: ToolCall
+  images?: string[]
 }
 
 export interface SendMessageRequest {
   content: string
+  images?: string[]
 }
 
 export interface SendMessageResponse {

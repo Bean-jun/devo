@@ -21,7 +21,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  send: [text: string]
+  send: [text: string, images?: string[]]
   stop: []
   clear: []
   openCommand: []
@@ -50,9 +50,39 @@ let isPatchingDOM = false
 const inputHistory: string[] = []
 let historyIndex = -1
 
+const uploadedImages = ref<string[]>([])
+
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const lightboxImage = ref<string | null>(null)
+
+function triggerFileInput(): void {
+  fileInputRef.value?.click()
+}
+
+function handleFileInputChange(e: Event): void {
+  const input = e.target as HTMLInputElement
+  const files = input.files
+  if (!files) return
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    if (file.type.startsWith('image/')) {
+      readImageAsBase64(file)
+    }
+  }
+  input.value = ''
+}
+
+function openLightbox(src: string): void {
+  lightboxImage.value = src
+}
+
+function closeLightbox(): void {
+  lightboxImage.value = null
+}
+
 const charCount = computed(() => totalLength())
 const tokenEstimate = computed(() => estimateTokens(serialize()))
-const canSend = computed(() => !isEmpty() && !props.isDisabled)
+const canSend = computed(() => (!isEmpty() || uploadedImages.value.length > 0) && !props.isDisabled)
 const showPlaceholder = computed(() => isEmpty())
 
 const contextUsage = computed(() => {
@@ -136,6 +166,22 @@ function handleInput(): void {
 
 function handlePaste(e: ClipboardEvent): void {
   if (isComposing.value) return
+
+  const items = e.clipboardData?.items
+  if (items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item.type.startsWith('image/')) {
+        e.preventDefault()
+        const file = item.getAsFile()
+        if (file) {
+          readImageAsBase64(file)
+        }
+        return
+      }
+    }
+  }
+
   const pasted = e.clipboardData?.getData('text') || ''
   if (!pasted) return
 
@@ -264,10 +310,12 @@ function send(): void {
   if (text.startsWith('/')) {
     emit('executeCommand', text)
   } else {
-    emit('send', text)
+    const images = uploadedImages.value.length > 0 ? [...uploadedImages.value] : undefined
+    emit('send', text, images)
   }
   reset()
   pasteMap.value.clear()
+  uploadedImages.value = []
   renderEditor()
 }
 
@@ -276,6 +324,35 @@ function autoResize(): void {
   if (!el) return
   el.style.height = 'auto'
   el.style.height = Math.min(el.scrollHeight, 200) + 'px'
+}
+
+function readImageAsBase64(file: File): void {
+  const reader = new FileReader()
+  reader.onload = () => {
+    const dataUrl = reader.result as string
+    uploadedImages.value.push(dataUrl)
+  }
+  reader.readAsDataURL(file)
+}
+
+function removeImage(index: number): void {
+  uploadedImages.value.splice(index, 1)
+}
+
+function handleImageDrop(e: DragEvent): void {
+  e.preventDefault()
+  const files = e.dataTransfer?.files
+  if (!files) return
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    if (file.type.startsWith('image/')) {
+      readImageAsBase64(file)
+    }
+  }
+}
+
+function handleDragOver(e: DragEvent): void {
+  e.preventDefault()
 }
 </script>
 
@@ -290,6 +367,15 @@ function autoResize(): void {
       >
         <span class="command-btn-text">/</span>
       </button>
+
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept="image/*"
+        multiple
+        class="file-input-hidden"
+        @change="handleFileInputChange"
+      />
 
       <div class="input-wrapper">
         <div
@@ -306,10 +392,20 @@ function autoResize(): void {
           @paste="handlePaste"
           @compositionstart="handleCompositionStart"
           @compositionend="handleCompositionEnd"
+          @dragover="handleDragOver"
+          @drop="handleImageDrop"
         />
 
         <div class="input-actions">
           <span class="input-info">
+            <button
+              class="image-upload-btn"
+              aria-label="上传图片"
+              title="上传图片"
+              @click="triggerFileInput"
+            >
+              <AppIcon name="image" :size="14" />
+            </button>
             <span v-if="charCount > 0" class="char-count" data-test="char-count">
               {{ charCount }} / {{ MAX_MESSAGE_LENGTH }}
               <span class="token-estimate">~{{ tokenEstimate }} tokens</span>
@@ -337,6 +433,13 @@ function autoResize(): void {
             发送
           </button>
         </div>
+
+        <div v-if="uploadedImages.length > 0" class="image-previews">
+          <div v-for="(img, idx) in uploadedImages" :key="idx" class="image-preview-item">
+            <img :src="img" alt="preview" class="image-preview-thumb" @click="openLightbox(img)" />
+            <button class="image-remove-btn" @click="removeImage(idx)" aria-label="移除图片">&times;</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="input-footer">
@@ -345,6 +448,13 @@ function autoResize(): void {
       <span class="footer-item">Tokens {{ formatTokenCount(sessionTokens.total) }} (<AppIcon name="arrow-up" :size="10" />{{ formatTokenCount(sessionTokens.input) }} <AppIcon name="arrow-down" :size="10" />{{ formatTokenCount(sessionTokens.output) }})</span>
       <span v-if="workingDir" class="footer-item footer-dir">{{ workingDir }}</span>
     </div>
+
+    <Teleport to="body">
+      <div v-if="lightboxImage" class="image-lightbox" @click="closeLightbox">
+        <img :src="lightboxImage" alt="enlarged" class="lightbox-image" @click.stop />
+        <button class="lightbox-close" @click="closeLightbox" aria-label="关闭">&times;</button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -554,5 +664,122 @@ function autoResize(): void {
 
 .stop-icon {
   font-size: 10px;
+}
+
+.image-previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.image-preview-item {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.image-preview-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.image-remove-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+.image-upload-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-right: var(--space-sm);
+  transition: all var(--transition-fast);
+}
+
+.image-upload-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+.image-lightbox {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lightbox-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  cursor: default;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--transition-fast);
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 </style>

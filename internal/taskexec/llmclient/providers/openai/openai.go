@@ -485,6 +485,17 @@ type openaiMessage struct {
 	ToolCallID string           `json:"tool_call_id,omitempty"`
 }
 
+type openaiContentPart struct {
+	Type     string          `json:"type"`
+	Text     string          `json:"text,omitempty"`
+	ImageURL *openaiImageURL `json:"image_url,omitempty"`
+}
+
+type openaiImageURL struct {
+	URL    string `json:"url"`
+	Detail string `json:"detail,omitempty"`
+}
+
 type openaiToolCall struct {
 	ID       string             `json:"id"`
 	Type     string             `json:"type"`

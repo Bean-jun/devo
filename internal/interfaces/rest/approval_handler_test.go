@@ -275,7 +275,7 @@ func TestApprove_ApproveDecision(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	loop.ProcessMessage(context.Background(), "sess-test-1", "Write test_approve.txt")
+	loop.ProcessMessage(context.Background(), "sess-test-1", session.Message{Content: "Write test_approve.txt"})
 
 	var approvalID string
 	timeout := time.After(2 * time.Second)
@@ -339,7 +339,7 @@ func TestApprove_RejectDecision(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	loop.ProcessMessage(context.Background(), "sess-test-1", "Write test_approve.txt")
+	loop.ProcessMessage(context.Background(), "sess-test-1", session.Message{Content: "Write test_approve.txt"})
 
 	var approvalID string
 	timeout := time.After(2 * time.Second)
@@ -428,7 +428,7 @@ func TestApprove_TimeoutReturns409(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	loop.ProcessMessage(context.Background(), "sess-test-1", "Write test_approve.txt")
+	loop.ProcessMessage(context.Background(), "sess-test-1", session.Message{Content: "Write test_approve.txt"})
 
 	var approvalID string
 	timeout := time.After(2 * time.Second)

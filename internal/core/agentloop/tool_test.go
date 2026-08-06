@@ -82,7 +82,7 @@ func TestAgentLoopWithToolCalling(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Read the file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Read the file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -196,7 +196,7 @@ func TestAgentLoopWithMultipleToolCalls(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Explore the project"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Explore the project"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -247,7 +247,7 @@ func TestAgentLoopWithoutToolExecutor(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Read the file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Read the file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -339,7 +339,7 @@ func TestToolCallLimitReached(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Do many operations"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Do many operations"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -405,7 +405,7 @@ func TestContinuationAfterToolLimit(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Do operations"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Do operations"}); err != nil {
 		t.Fatalf("first message: %v", err)
 	}
 
@@ -428,7 +428,7 @@ func TestContinuationAfterToolLimit(t *testing.T) {
 	msgsBeforeContinue, _, _ := store.GetMessages("sess-1", 0, 0)
 	msgCountBefore := len(msgsBeforeContinue)
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "继续"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "继续"}); err != nil {
 		t.Fatalf("continuation message: %v", err)
 	}
 
@@ -536,7 +536,7 @@ func TestToolCallCountResetsOnNewLoop(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Do one thing"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Do one thing"}); err != nil {
 		t.Fatalf("first message: %v", err)
 	}
 
@@ -554,7 +554,7 @@ func TestToolCallCountResetsOnNewLoop(t *testing.T) {
 	sess, _ = store.Get("sess-1")
 	t.Logf("After first loop: tool_call_count=%d, termination_reason=%s", sess.ToolCallCount, sess.LastLoopTerminationReason)
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "继续"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "继续"}); err != nil {
 		t.Fatalf("continuation: %v", err)
 	}
 
@@ -585,7 +585,7 @@ func TestContinuationWithNewTask(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "First task"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "First task"}); err != nil {
 		t.Fatalf("first message: %v", err)
 	}
 
@@ -603,7 +603,7 @@ func TestContinuationWithNewTask(t *testing.T) {
 	msgsBeforeContinue, _, _ := store.GetMessages("sess-1", 0, 0)
 	msgCountBefore := len(msgsBeforeContinue)
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Do a completely different task now"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Do a completely different task now"}); err != nil {
 		t.Fatalf("new task message: %v", err)
 	}
 

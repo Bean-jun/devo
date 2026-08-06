@@ -11,7 +11,8 @@ import (
 )
 
 type postMessageRequest struct {
-	Content string `json:"content"`
+	Content string   `json:"content"`
+	Images  []string `json:"images,omitempty"`
 }
 
 func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
@@ -23,12 +24,32 @@ func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Content == "" {
+	if req.Content == "" && len(req.Images) == 0 {
 		writeError(w, http.StatusBadRequest, "content is required")
 		return
 	}
 
-	if err := h.loop.ProcessMessage(r.Context(), id, req.Content); err != nil {
+	msg := session.Message{
+		Content: req.Content,
+	}
+
+	if len(req.Images) > 0 {
+		msg.ContentParts = make([]session.ContentPart, 0, len(req.Images)+1)
+		for _, img := range req.Images {
+			msg.ContentParts = append(msg.ContentParts, session.ContentPart{
+				Type: "image_url",
+				URL:  img,
+			})
+		}
+		if req.Content != "" {
+			msg.ContentParts = append(msg.ContentParts, session.ContentPart{
+				Type: "text",
+				Text: req.Content,
+			})
+		}
+	}
+
+	if err := h.loop.ProcessMessage(r.Context(), id, msg); err != nil {
 		if errors.Is(err, session.ErrSessionNotFound) {
 			writeError(w, http.StatusNotFound, "session not found")
 			return
@@ -49,12 +70,13 @@ func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 type messageItem struct {
-	ID         string             `json:"id"`
-	Role       string             `json:"role"`
-	Content    string             `json:"content"`
-	CreatedAt  string             `json:"created_at"`
-	ToolCalls  []session.ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string             `json:"tool_call_id,omitempty"`
+	ID           string                `json:"id"`
+	Role         string                `json:"role"`
+	Content      string                `json:"content"`
+	ContentParts []session.ContentPart `json:"content_parts,omitempty"`
+	CreatedAt    string                `json:"created_at"`
+	ToolCalls    []session.ToolCall    `json:"tool_calls,omitempty"`
+	ToolCallID   string                `json:"tool_call_id,omitempty"`
 }
 
 type getMessagesResponse struct {
@@ -101,12 +123,13 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	items := make([]messageItem, len(msgs))
 	for i, m := range msgs {
 		items[i] = messageItem{
-			ID:         m.ID,
-			Role:       string(m.Role),
-			Content:    m.Content,
-			CreatedAt:  m.CreatedAt.Format(time.RFC3339),
-			ToolCalls:  m.ToolCalls,
-			ToolCallID: m.ToolCallID,
+			ID:           m.ID,
+			Role:         string(m.Role),
+			Content:      m.Content,
+			ContentParts: m.ContentParts,
+			CreatedAt:    m.CreatedAt.Format(time.RFC3339),
+			ToolCalls:    m.ToolCalls,
+			ToolCallID:   m.ToolCallID,
 		}
 	}
 

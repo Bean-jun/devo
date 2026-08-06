@@ -35,16 +35,20 @@ const isDisabled = computed(() =>
 
 const isProcessing = computed(() => sessionStore.isProcessing)
 
-async function handleSend(text: string) {
+async function handleSend(text: string, images?: string[]) {
   if (!sessionStore.currentSession) return
   uiStore.clearErrorToasts()
-  chatStore.appendUserMessage(text)
+  chatStore.appendUserMessage(text, images)
 
   try {
+    const body: { content: string; images?: string[] } = { content: text }
+    if (images && images.length > 0) {
+      body.images = images
+    }
     const res = await fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: text }),
+      body: JSON.stringify(body),
     })
 
     if (!res.ok) {

@@ -71,7 +71,7 @@ func TestProcessMessageReturnsImmediately(t *testing.T) {
 	createTestSession(store, "sess-1")
 
 	start := time.Now()
-	err := loop.ProcessMessage(context.Background(), "sess-1", "Hello, world!")
+	err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello, world!"})
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -91,7 +91,7 @@ func TestProcessMessagePublishesEvents(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Hello, world!"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello, world!"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -119,7 +119,7 @@ func TestProcessMessagePublishesEvents(t *testing.T) {
 func TestProcessMessageSessionNotFound(t *testing.T) {
 	loop, _ := setupTestLoop()
 
-	err := loop.ProcessMessage(context.Background(), "nonexistent", "Hello")
+	err := loop.ProcessMessage(context.Background(), "nonexistent", session.Message{Content: "Hello"})
 	if err == nil {
 		t.Fatal("expected error for nonexistent session")
 	}
@@ -133,7 +133,7 @@ func TestMultiTurnConversation(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "First message"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "First message"}); err != nil {
 		t.Fatalf("first message: %v", err)
 	}
 
@@ -146,7 +146,7 @@ func TestMultiTurnConversation(t *testing.T) {
 		t.Fatalf("first round did not finish: %v", err)
 	}
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "Second message"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Second message"}); err != nil {
 		t.Fatalf("second message: %v", err)
 	}
 
@@ -188,7 +188,7 @@ func TestStateTransitions(t *testing.T) {
 		t.Errorf("initial state should be Idle, got %q", sess.State)
 	}
 
-	loop.ProcessMessage(context.Background(), "sess-1", "Hello")
+	loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello"})
 
 	_, ok := waitForEvent(ch, "session_state_change", 2*time.Second)
 	if !ok {
@@ -229,7 +229,7 @@ func TestProcessMessageConflictDuringProcessing(t *testing.T) {
 	slowClient := &slowLLMClient{}
 	loop := New(store, slowClient)
 
-	if err := loop.ProcessMessage(context.Background(), "sess-1", "First"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "First"}); err != nil {
 		t.Fatalf("first message: %v", err)
 	}
 
@@ -240,7 +240,7 @@ func TestProcessMessageConflictDuringProcessing(t *testing.T) {
 		t.Errorf("expected state Thinking after first message starts processing")
 	}
 
-	err := loop.ProcessMessage(context.Background(), "sess-1", "Second")
+	err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Second"})
 	if err == nil {
 		t.Fatal("expected error when session is Thinking")
 	}
@@ -268,7 +268,7 @@ func TestStateRevertsOnLLMError(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	loop.ProcessMessage(context.Background(), "sess-1", "Hello")
+	loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello"})
 
 	_, ok := waitForEvent(ch, "loop.thinking_started", 2*time.Second)
 	if !ok {
@@ -291,7 +291,7 @@ func TestEventTypesOrder(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	loop.ProcessMessage(context.Background(), "sess-1", "Hello")
+	loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello"})
 
 	expectedOrder := []string{"loop.thinking_started", "token_usage", "loop.thinking_complete", "loop.loop_completed"}
 	received := make([]string, 0, 4)
@@ -407,7 +407,7 @@ func TestConcurrentSessionProcessing(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			sessionID := fmt.Sprintf("sess-concurrent-%d", idx)
-			err := loop.ProcessMessage(context.Background(), sessionID, fmt.Sprintf("Message %d", idx))
+			err := loop.ProcessMessage(context.Background(), sessionID, session.Message{Content: fmt.Sprintf("Message %d", idx)})
 			if err != nil {
 				errs <- fmt.Errorf("session %d: %w", idx, err)
 			}
@@ -449,7 +449,7 @@ func TestConcurrentSessionStateIsolation(t *testing.T) {
 	slowClient := &slowLLMClient{}
 	loop := New(store, slowClient)
 
-	if err := loop.ProcessMessage(context.Background(), "sess-a", "Message A"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-a", session.Message{Content: "Message A"}); err != nil {
 		t.Fatalf("session A: %v", err)
 	}
 	time.Sleep(20 * time.Millisecond)
@@ -464,7 +464,7 @@ func TestConcurrentSessionStateIsolation(t *testing.T) {
 		t.Errorf("session B should remain Idle, got %q", sessB.State)
 	}
 
-	if err := loop.ProcessMessage(context.Background(), "sess-b", "Message B"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-b", session.Message{Content: "Message B"}); err != nil {
 		t.Fatalf("session B: %v", err)
 	}
 }

@@ -45,6 +45,15 @@ async function copyContent() {
 }
 
 const contentRef = ref<HTMLElement | null>(null)
+const lightboxImage = ref<string | null>(null)
+
+function openLightbox(src: string): void {
+  lightboxImage.value = src
+}
+
+function closeLightbox(): void {
+  lightboxImage.value = null
+}
 
 async function handleCodeBlockCopy(e: MouseEvent): Promise<void> {
   const target = e.target as HTMLElement
@@ -121,9 +130,26 @@ async function handleCodeBlockCopy(e: MouseEvent): Promise<void> {
         @click="handleCodeBlockCopy"
       />
       <div v-else class="bubble-content">
+        <div v-if="message.images && message.images.length > 0" class="message-images">
+          <img
+            v-for="(img, idx) in message.images"
+            :key="idx"
+            :src="img"
+            alt="uploaded image"
+            class="message-image"
+            @click="openLightbox(img)"
+          />
+        </div>
         {{ message.content }}
       </div>
     </div>
+
+    <Teleport to="body">
+      <div v-if="lightboxImage" class="image-lightbox" @click="closeLightbox">
+        <img :src="lightboxImage" alt="enlarged" class="lightbox-image" @click.stop />
+        <button class="lightbox-close" @click="closeLightbox" aria-label="关闭">&times;</button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -509,5 +535,72 @@ async function handleCodeBlockCopy(e: MouseEvent): Promise<void> {
   border: none;
   max-height: 400px;
   overflow-y: auto;
+}
+
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.message-image {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.message-image:hover {
+  transform: scale(1.02);
+}
+
+.image-lightbox {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lightbox-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  cursor: default;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--transition-fast);
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 </style>

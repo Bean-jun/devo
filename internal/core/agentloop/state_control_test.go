@@ -16,7 +16,7 @@ func TestProcessMessageNotIdle(t *testing.T) {
 	sess.State = session.StateThinking
 	store.Update(sess)
 
-	err := loop.ProcessMessage(context.Background(), "sess-1", "Hello")
+	err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello"})
 	if err == nil {
 		t.Fatal("expected error when session is not idle")
 	}
@@ -29,7 +29,7 @@ func TestProcessMessageArchivedRejected(t *testing.T) {
 	sess.State = session.StateArchived
 	store.Update(sess)
 
-	err := loop.ProcessMessage(context.Background(), "sess-1", "Hello")
+	err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello"})
 	if err == nil {
 		t.Fatal("expected error when posting to archived session")
 	}
@@ -42,7 +42,7 @@ func TestProcessMessagePausedAutoResume(t *testing.T) {
 	sess.State = session.StatePaused
 	store.Update(sess)
 
-	err := loop.ProcessMessage(context.Background(), "sess-1", "Hello from paused")
+	err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello from paused"})
 	if err != nil {
 		t.Fatalf("expected no error (auto-resume), got: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestProcessMessageFromThinking(t *testing.T) {
 	sess.State = session.StateThinking
 	store.Update(sess)
 
-	err := loop.ProcessMessage(context.Background(), "sess-1", "Hello")
+	err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello"})
 	if err == nil {
 		t.Fatal("expected error when processing is already running")
 	}
@@ -73,7 +73,7 @@ func TestProcessMessageFromAwaitingApproval(t *testing.T) {
 	sess.State = session.StateAwaitingApproval
 	store.Update(sess)
 
-	err := loop.ProcessMessage(context.Background(), "sess-1", "Hello")
+	err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello"})
 	if err == nil {
 		t.Fatal("expected error when session is awaiting approval")
 	}
@@ -652,7 +652,7 @@ func TestFullStateFlowIdleToArchived(t *testing.T) {
 		t.Fatalf("expected Archived, got %q", sess.State)
 	}
 
-	err := loop.ProcessMessage(context.Background(), "sess-1", "Hello")
+	err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "Hello"})
 	if err == nil {
 		t.Fatal("expected error when posting to archived session")
 	}

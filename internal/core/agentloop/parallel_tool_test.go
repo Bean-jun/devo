@@ -80,7 +80,7 @@ func TestParallelToolExecution_Basic(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-parallel", "Do parallel tasks"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-parallel", session.Message{Content: "Do parallel tasks"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -148,7 +148,7 @@ func TestParallelToolExecution_SerialFallback(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-serial", "Do tasks"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-serial", session.Message{Content: "Do tasks"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -224,7 +224,7 @@ func TestParallelToolExecution_WithApproval(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-approval-parallel", "Write a file"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-approval-parallel", session.Message{Content: "Write a file"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -273,7 +273,7 @@ func TestParallelToolExecution_ToolCallLimit(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-parallel-limit", "Do tasks"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-parallel-limit", session.Message{Content: "Do tasks"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -316,7 +316,7 @@ func TestParallelToolExecution_FileChange(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-file-change", "Do tasks"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-file-change", session.Message{Content: "Do tasks"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -341,7 +341,7 @@ func TestParallelToolExecution_SingleTool(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-single-parallel", "Do tasks"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-single-parallel", session.Message{Content: "Do tasks"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 

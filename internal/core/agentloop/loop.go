@@ -98,7 +98,7 @@ func (l *Loop) EstimateInitialContextTokens(sess *session.Session) int {
 	return tokens
 }
 
-func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) error {
+func (l *Loop) ProcessMessage(ctx context.Context, sessionID string, msg session.Message) error {
 	sess, err := l.store.Get(sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
@@ -157,10 +157,14 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 	}
 
 	userMsg := session.Message{
-		ID:        session.GenerateID("msg"),
-		Role:      session.RoleUser,
-		Content:   content,
-		CreatedAt: time.Now(),
+		ID:           msg.ID,
+		Role:         session.RoleUser,
+		Content:      msg.Content,
+		ContentParts: msg.ContentParts,
+		CreatedAt:    time.Now(),
+	}
+	if userMsg.ID == "" {
+		userMsg.ID = session.GenerateID("msg")
 	}
 	if err := l.store.AddMessage(sessionID, userMsg); err != nil {
 		sess.State = session.StateIdle
@@ -168,7 +172,7 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID, content string) er
 		return fmt.Errorf("add user message: %w", err)
 	}
 
-	l.archiveManager.AppendUserMessage(sessionID, content)
+	l.archiveManager.AppendUserMessage(sessionID, msg)
 
 	eventBus, err := l.store.GetEventBus(sessionID)
 	if err != nil {

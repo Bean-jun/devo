@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"devo/internal/core/session"
 )
 
 func TestTokenUsageEventPublished(t *testing.T) {
@@ -14,7 +16,7 @@ func TestTokenUsageEventPublished(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-token-1", "Hello, world!"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-token-1", session.Message{Content: "Hello, world!"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -56,7 +58,7 @@ func TestMessageCompleteHasTotalStepTokens(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-token-2", "Hello!"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-token-2", session.Message{Content: "Hello!"}); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -83,7 +85,7 @@ func TestSessionTokenUsageAccumulates(t *testing.T) {
 	loop, store := setupTestLoop()
 	createTestSession(store, "sess-token-3")
 
-	if err := loop.ProcessMessage(context.Background(), "sess-token-3", "Hello!"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-token-3", session.Message{Content: "Hello!"}); err != nil {
 		t.Fatalf("first message: %v", err)
 	}
 
@@ -104,7 +106,7 @@ func TestSessionTokenUsageAccumulates(t *testing.T) {
 
 	firstUsage := sess.TokenUsage
 
-	if err := loop.ProcessMessage(context.Background(), "sess-token-3", "Second message"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-token-3", session.Message{Content: "Second message"}); err != nil {
 		t.Fatalf("second message: %v", err)
 	}
 
@@ -123,7 +125,7 @@ func TestTokenUsageStepsStored(t *testing.T) {
 	loop, store := setupTestLoop()
 	createTestSession(store, "sess-token-4")
 
-	if err := loop.ProcessMessage(context.Background(), "sess-token-4", "Hello!"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-token-4", session.Message{Content: "Hello!"}); err != nil {
 		t.Fatalf("message: %v", err)
 	}
 
@@ -157,7 +159,7 @@ func TestTokenUsageMonotonicallyIncreasing(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	if err := loop.ProcessMessage(context.Background(), "sess-token-5", "Hello!"); err != nil {
+	if err := loop.ProcessMessage(context.Background(), "sess-token-5", session.Message{Content: "Hello!"}); err != nil {
 		t.Fatalf("message: %v", err)
 	}
 

@@ -25,12 +25,13 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.push(message)
   }
 
-  function appendUserMessage(content: string): Message {
+  function appendUserMessage(content: string, images?: string[]): Message {
     const msg: Message = {
       id: generateId(),
       sessionId: '',
       role: 'user',
       content,
+      images,
       timestamp: new Date().toISOString(),
     }
     messages.value.push(msg)
@@ -252,13 +253,20 @@ export const useChatStore = defineStore('chat', () => {
 
       // 构建最终消息列表
       messages.value = list.map((m: any) => {
-        const baseMsg = {
+        const baseMsg: Message = {
           id: m.id || generateId(),
           sessionId,
           role: m.role || 'user',
           content: m.content || '',
           reasoning: m.reasoning || undefined,
           timestamp: m.created_at || new Date().toISOString(),
+        }
+
+        if (m.content_parts && Array.isArray(m.content_parts)) {
+          const imageParts = m.content_parts.filter((cp: any) => cp.type === 'image_url' && cp.url)
+          if (imageParts.length > 0) {
+            baseMsg.images = imageParts.map((cp: any) => cp.url)
+          }
         }
 
         if (m.role === 'tool' && m.tool_call_id && toolCallMap.has(m.tool_call_id)) {

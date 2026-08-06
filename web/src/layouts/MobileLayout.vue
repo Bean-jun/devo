@@ -183,15 +183,19 @@ function handleCommandSelect(cmd: Command) {
   }
 }
 
-function handleSend(text: string) {
+function handleSend(text: string, images?: string[]) {
   if (!sessionStore.currentSession) return
   uiStore.clearErrorToasts()
-  chatStore.appendUserMessage(text)
+  chatStore.appendUserMessage(text, images)
 
+  const body: { content: string; images?: string[] } = { content: text }
+  if (images && images.length > 0) {
+    body.images = images
+  }
   fetch(`${API_BASE}/sessions/${sessionStore.currentSession.id}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content: text }),
+    body: JSON.stringify(body),
   }).catch((err) => {
     uiStore.showToast('error', `发送失败: ${(err as Error).message}`)
   })

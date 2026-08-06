@@ -18,7 +18,7 @@ func TestIntegration_FullConversation(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	err := loop.ProcessMessage(context.Background(), "sess-full", "Hello, world!")
+	err := loop.ProcessMessage(context.Background(), "sess-full", session.Message{Content: "Hello, world!"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestIntegration_ToolCallLoop(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	err := loop.ProcessMessage(context.Background(), "sess-tool-loop", "list files")
+	err := loop.ProcessMessage(context.Background(), "sess-tool-loop", session.Message{Content: "list files"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestIntegration_ApprovalRequired(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	err := loop.ProcessMessage(context.Background(), "sess-approval", "Write a new file")
+	err := loop.ProcessMessage(context.Background(), "sess-approval", session.Message{Content: "Write a new file"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestIntegration_EventSequence(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	err := loop.ProcessMessage(context.Background(), "sess-seq", "Hello")
+	err := loop.ProcessMessage(context.Background(), "sess-seq", session.Message{Content: "Hello"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestIntegration_StateTransitions(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	err := loop.ProcessMessage(context.Background(), "sess-transitions", "Hello")
+	err := loop.ProcessMessage(context.Background(), "sess-transitions", session.Message{Content: "Hello"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestIntegration_PauseResumeMidLoop(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	err := loop.ProcessMessage(context.Background(), "sess-pause-resume", "Hello")
+	err := loop.ProcessMessage(context.Background(), "sess-pause-resume", session.Message{Content: "Hello"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -255,7 +255,7 @@ func TestIntegration_CancelMidLoop(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	err := loop.ProcessMessage(context.Background(), "sess-cancel", "Hello")
+	err := loop.ProcessMessage(context.Background(), "sess-cancel", session.Message{Content: "Hello"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -301,7 +301,7 @@ func TestIntegration_ToolCallLimit(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	err := loop.ProcessMessage(context.Background(), "sess-tool-limit", "list files")
+	err := loop.ProcessMessage(context.Background(), "sess-tool-limit", session.Message{Content: "list files"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestIntegration_ErrorRecovery(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	err := loop.ProcessMessage(context.Background(), "sess-error-recovery", "Hello")
+	err := loop.ProcessMessage(context.Background(), "sess-error-recovery", session.Message{Content: "Hello"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}

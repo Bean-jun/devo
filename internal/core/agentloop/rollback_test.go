@@ -289,7 +289,7 @@ func TestRollbackCanContinueConversation(t *testing.T) {
 		t.Fatalf("rollback failed: %v", err)
 	}
 
-	err = loop.ProcessMessage(nil, "sess-1", "New message after rollback")
+	err = loop.ProcessMessage(nil, "sess-1", session.Message{Content: "New message after rollback"})
 	if err != nil {
 		t.Fatalf("expected to be able to continue conversation after rollback, got: %v", err)
 	}
