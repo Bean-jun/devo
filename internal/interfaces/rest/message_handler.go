@@ -3,11 +3,13 @@ package rest
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"devo/internal/core/session"
+	"devo/internal/taskexec/imageproc"
 )
 
 type postMessageRequest struct {
@@ -34,6 +36,18 @@ func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.Images) > 0 {
+		compressed := make([]string, 0, len(req.Images))
+		for _, img := range req.Images {
+			result, err := imageproc.Compress(img, nil)
+			if err != nil {
+				log.Printf("image compress warning: %v", err)
+				compressed = append(compressed, img)
+				continue
+			}
+			compressed = append(compressed, result.DataURL)
+		}
+		req.Images = compressed
+
 		msg.ContentParts = make([]session.ContentPart, 0, len(req.Images)+1)
 		for _, img := range req.Images {
 			msg.ContentParts = append(msg.ContentParts, session.ContentPart{
