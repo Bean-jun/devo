@@ -257,14 +257,6 @@ func (am *ArchiveManager) renderArchive(sess *session.Session, msgs []session.Me
 		}
 	}
 
-	if sess.CompressionState != nil && len(sess.CompressionState.Summaries) > 0 {
-		b.WriteString("\n---\n\n## 上下文压缩摘要\n\n")
-		for i, summary := range sess.CompressionState.Summaries {
-			b.WriteString(fmt.Sprintf("### 压缩 #%d (%s)\n", i+1, summary.CreatedAt.Format(time.RFC3339)))
-			b.WriteString(fmt.Sprintf("%s\n\n", summary.SummaryText))
-		}
-	}
-
 	return b.String()
 }
 

@@ -262,58 +262,6 @@ func TestSyncArchive(t *testing.T) {
 	}
 }
 
-func TestSyncArchiveWithCompression(t *testing.T) {
-	store := session.NewInMemoryStore()
-	am := NewArchiveManager(store, concurrency.NewPathLockManager())
-
-	sess := newTestSession(t)
-	sess.CompressionCount = 2
-	sess.CompressionState = &session.CompressionState{
-		CompressedRanges: []session.CompressedRange{
-			{StartMessageID: "msg-1", EndMessageID: "msg-3"},
-		},
-		Summaries: []session.CompressionSummary{
-			{SummaryText: "First compression summary here.", CreatedAt: time.Now()},
-			{SummaryText: "Second compression summary here.", CreatedAt: time.Now()},
-		},
-	}
-	if err := store.Create(sess); err != nil {
-		t.Fatalf("create session: %v", err)
-	}
-
-	msgs := []session.Message{
-		{ID: "msg-1", Role: session.RoleUser, Content: "Hello", CreatedAt: time.Now()},
-		{ID: "msg-2", Role: session.RoleAssistant, Content: "Hi", CreatedAt: time.Now()},
-	}
-	for _, msg := range msgs {
-		store.AddMessage(sess.ID, msg)
-	}
-
-	_, err := am.SyncArchive(sess.ID)
-	if err != nil {
-		t.Fatalf("sync archive: %v", err)
-	}
-
-	content, err := os.ReadFile(am.ArchivePath(sess))
-	if err != nil {
-		t.Fatalf("read archive: %v", err)
-	}
-
-	text := string(content)
-	if !strings.Contains(text, "## 上下文压缩摘要") {
-		t.Error("archive missing compression summary appendix")
-	}
-	if !strings.Contains(text, "First compression summary here.") {
-		t.Error("archive missing first compression summary")
-	}
-	if !strings.Contains(text, "Second compression summary here.") {
-		t.Error("archive missing second compression summary")
-	}
-	if !strings.Contains(text, "压缩次数") {
-		t.Error("archive missing compression count")
-	}
-}
-
 func TestGetArchiveContent(t *testing.T) {
 	store := session.NewInMemoryStore()
 	am := NewArchiveManager(store, concurrency.NewPathLockManager())

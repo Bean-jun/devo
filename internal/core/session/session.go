@@ -76,22 +76,6 @@ type TokenUsage struct {
 	Total  int `json:"total"`
 }
 
-type CompressedRange struct {
-	StartMessageID string `json:"start_message_id"`
-	EndMessageID   string `json:"end_message_id"`
-}
-
-type CompressionSummary struct {
-	SummaryText string          `json:"summary_text"`
-	CoversRange CompressedRange `json:"covers_range"`
-	CreatedAt   time.Time       `json:"created_at"`
-}
-
-type CompressionState struct {
-	CompressedRanges []CompressedRange    `json:"compressed_ranges"`
-	Summaries        []CompressionSummary `json:"summaries"`
-}
-
 type Session struct {
 	ID                        string                `json:"id"`
 	Title                     string                `json:"title"`
@@ -114,9 +98,7 @@ type Session struct {
 	MessageCount              int                   `json:"message_count"`
 	LastLoopTerminationReason LoopTerminationReason `json:"last_loop_termination_reason,omitempty"`
 	TokenUsage                TokenUsage            `json:"token_usage"`
-	CompressionState          *CompressionState     `json:"compression_state,omitempty"`
 	CompressionCount          int                   `json:"compression_count"`
-	CompressThreshold         int                   `json:"compress_threshold"`
 	KeepRecent                int                   `json:"keep_recent"`
 	MaxContextTokens          int                   `json:"max_context_tokens"`
 	MaxConcurrentToolCalls    int                   `json:"max_concurrent_tool_calls"`
@@ -183,6 +165,7 @@ type SessionStore interface {
 	Close() error
 
 	DeleteMessagesAfter(sessionID string, messageID string) (int, error)
+	DeleteMessages(sessionID string, messageIDs []string) (int, error)
 	GetMessageByID(sessionID string, messageID string) (*Message, error)
 	RecordFileModification(record FileModificationRecord) error
 	GetFileModifications(sessionID string) ([]FileModificationRecord, error)

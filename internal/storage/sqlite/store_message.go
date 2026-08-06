@@ -3,6 +3,8 @@ package sqlite
 import (
 	"devo/internal/core/session"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 func (s *GormStore) AddMessage(sessionID string, msg session.Message) error {
@@ -98,4 +100,26 @@ func (s *GormStore) GetLastMessages(sessionIDs []string) (map[string]session.Las
 		}
 	}
 	return result, nil
+}
+
+func (s *GormStore) DeleteMessages(sessionID string, messageIDs []string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(messageIDs) == 0 {
+		return 0, nil
+	}
+
+	result := s.db.Where("session_id = ? AND id IN ?", sessionID, messageIDs).Delete(&MessageModel{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	deleted := int(result.RowsAffected)
+	if deleted > 0 {
+		s.db.Model(&SessionModel{}).Where("id = ?", sessionID).
+			Update("message_count", gorm.Expr("message_count - ?", deleted))
+	}
+
+	return deleted, nil
 }

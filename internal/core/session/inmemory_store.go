@@ -349,6 +349,35 @@ func (s *InMemoryStore) GetMessageByID(sessionID string, messageID string) (*Mes
 	return nil, ErrMessageNotFound
 }
 
+func (s *InMemoryStore) DeleteMessages(sessionID string, messageIDs []string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return 0, ErrSessionNotFound
+	}
+
+	deleteSet := make(map[string]bool, len(messageIDs))
+	for _, id := range messageIDs {
+		deleteSet[id] = true
+	}
+
+	var kept []Message
+	deleted := 0
+	for _, msg := range sess.Messages {
+		if deleteSet[msg.ID] {
+			deleted++
+		} else {
+			kept = append(kept, msg)
+		}
+	}
+
+	sess.Messages = kept
+	sess.MessageCount = len(kept)
+	return deleted, nil
+}
+
 func (s *InMemoryStore) DeleteMessagesAfter(sessionID string, messageID string) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

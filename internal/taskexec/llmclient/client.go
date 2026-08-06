@@ -22,7 +22,7 @@ type StreamEvent struct {
 	Token         string                 `json:"token,omitempty"`
 	Reasoning     string                 `json:"reasoning,omitempty"`
 	FullText      string                 `json:"full_text,omitempty"`
-	FullReasoning string                `json:"full_reasoning,omitempty"`
+	FullReasoning string                 `json:"full_reasoning,omitempty"`
 	ToolCalls     []session.ToolCall     `json:"tool_calls,omitempty"`
 	FinishReason  string                 `json:"finish_reason,omitempty"`
 	TokenUsage    *tokenmeter.TokenUsage `json:"token_usage,omitempty"`

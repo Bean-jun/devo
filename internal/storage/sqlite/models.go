@@ -27,9 +27,7 @@ type SessionModel struct {
 	TokenUsageInput           int    `gorm:"default:0"`
 	TokenUsageOutput          int    `gorm:"default:0"`
 	TokenUsageTotal           int    `gorm:"default:0"`
-	CompressionStateJSON      string `gorm:"type:text"`
 	CompressionCount          int    `gorm:"default:0"`
-	CompressThreshold         int    `gorm:"default:0"`
 	KeepRecent                int    `gorm:"default:0"`
 	MaxContextTokens          int    `gorm:"default:0"`
 	CurrentContextTokens      int    `gorm:"default:0"`
@@ -80,7 +78,6 @@ func (m *SessionModel) ToDomain() *session.Session {
 			Total:  m.TokenUsageTotal,
 		},
 		CompressionCount:     m.CompressionCount,
-		CompressThreshold:    m.CompressThreshold,
 		KeepRecent:           m.KeepRecent,
 		MaxContextTokens:     m.MaxContextTokens,
 		CurrentContextTokens: m.CurrentContextTokens,
@@ -91,13 +88,6 @@ func (m *SessionModel) ToDomain() *session.Session {
 		var policy map[string]string
 		if err := json.Unmarshal([]byte(m.ApprovalPolicyJSON), &policy); err == nil {
 			sess.ApprovalPolicy = policy
-		}
-	}
-
-	if m.CompressionStateJSON != "" {
-		var state session.CompressionState
-		if err := json.Unmarshal([]byte(m.CompressionStateJSON), &state); err == nil {
-			sess.CompressionState = &state
 		}
 	}
 
@@ -129,7 +119,6 @@ func fromDomain(s *session.Session) *SessionModel {
 		TokenUsageOutput:          s.TokenUsage.Output,
 		TokenUsageTotal:           s.TokenUsage.Total,
 		CompressionCount:          s.CompressionCount,
-		CompressThreshold:         s.CompressThreshold,
 		KeepRecent:                s.KeepRecent,
 		MaxContextTokens:          s.MaxContextTokens,
 		CurrentContextTokens:      s.CurrentContextTokens,
@@ -140,13 +129,6 @@ func fromDomain(s *session.Session) *SessionModel {
 		data, err := json.Marshal(s.ApprovalPolicy)
 		if err == nil {
 			model.ApprovalPolicyJSON = string(data)
-		}
-	}
-
-	if s.CompressionState != nil {
-		data, err := json.Marshal(s.CompressionState)
-		if err == nil {
-			model.CompressionStateJSON = string(data)
 		}
 	}
 

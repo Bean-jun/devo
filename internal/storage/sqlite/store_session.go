@@ -63,7 +63,7 @@ func (s *GormStore) Update(sess *session.Session) error {
 		"token_usage_output":           sess.TokenUsage.Output,
 		"token_usage_total":            sess.TokenUsage.Total,
 		"compression_count":            sess.CompressionCount,
-		"compress_threshold":           sess.CompressThreshold,
+		"max_context_tokens":           sess.MaxContextTokens,
 		"keep_recent":                  sess.KeepRecent,
 		"current_context_tokens":       sess.CurrentContextTokens,
 		"system_prompt_override":       sess.SystemPromptOverride,
@@ -72,13 +72,6 @@ func (s *GormStore) Update(sess *session.Session) error {
 	if sess.ApprovalPolicy != nil {
 		data, _ := json.Marshal(sess.ApprovalPolicy)
 		updates["approval_policy_json"] = string(data)
-	}
-
-	if sess.CompressionState != nil {
-		data, _ := json.Marshal(sess.CompressionState)
-		updates["compression_state_json"] = string(data)
-	} else {
-		updates["compression_state_json"] = ""
 	}
 
 	if sess.ActiveSkills != nil {

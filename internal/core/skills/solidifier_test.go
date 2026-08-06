@@ -160,6 +160,10 @@ func (m *mockSessionStore) Close() error {
 	return nil
 }
 
+func (m *mockSessionStore) DeleteMessages(sessionID string, messageIDs []string) (int, error) {
+	return 0, nil
+}
+
 func (m *mockSessionStore) DeleteMessagesAfter(sessionID string, messageID string) (int, error) {
 	return 0, nil
 }

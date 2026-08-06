@@ -12,27 +12,41 @@ import (
 )
 
 const (
-	ProgressiveBatchSize = 10 // 渐进式压缩：每次最多压缩 10 条消息
-	summarySystemPrompt  = `You are a specialized conversation summarizer for developer-AI coding sessions. Your task is to compress conversation history into a structured summary.
+	summarySystemPrompt = `You are a specialized conversation summarizer for developer-AI coding sessions. Your task is to compress conversation history into a structured summary using the exact section format below.
 
-Requirements:
-1. Preserve critical information:
-   - All technical decisions and their rationale (why option A over option B)
-   - File paths, function names, class names, and variable names
-   - Specific code changes and their purpose
-   - Error messages and their resolutions
-   - Unfinished tasks and pending action items
+Output must follow this structure exactly:
 
-2. Output format:
-   - Use concise bullet points, avoid verbose narration
-   - Group information chronologically or by topic
-   - Keep code identifiers, file names, and error messages in their original form
+## Project State
+- Current task/feature being worked on, overall progress
+- What is working and what is not
+- Pending TODOs and next steps
 
-3. Compression principles:
-   - Remove repetitive discussions and redundant back-and-forth
-   - Merge multiple interactions on the same topic
-   - Discard outdated information that has been superseded by later actions
-   - Keep the summary under 20% of the original length
+## Key Decisions
+- Technical decisions made and their rationale (why option A over option B)
+- Architecture choices, design patterns selected
+- Any trade-offs discussed and accepted
+
+## File Changes
+- Files created, modified, or deleted
+- Key code changes and their purpose
+- Keep file paths, function names, class names, and variable names in original form
+
+## Errors and Fixes
+- Error messages encountered and their root causes
+- Solutions applied and their effectiveness
+- Any workarounds still in place
+
+## Important Context
+- Configuration values, environment details, dependency versions
+- User preferences or constraints explicitly stated
+- Any other information essential for continuing the work
+
+Compression rules:
+- Remove repetitive discussions and redundant back-and-forth
+- Merge multiple interactions on the same topic into single entries
+- Discard outdated information that has been superseded by later actions
+- Keep the total summary under 20% of the original length
+- If a section has no relevant content, write "None" under it
 
 Output only the compressed summary, nothing else.`
 
@@ -81,7 +95,7 @@ func (c *Compressor) compress(ctx context.Context, sessionID string, eventBus *s
 		maxContext = 128000
 	}
 
-	estimatedTokens := EstimateContextTokens(msgs, sess.CompressionState) + systemPromptTokens
+	estimatedTokens := EstimateContextTokens(msgs) + systemPromptTokens
 	compressThreshold := int(float64(maxContext) * 0.8)
 
 	if !force && estimatedTokens <= compressThreshold {
@@ -93,18 +107,24 @@ func (c *Compressor) compress(ctx context.Context, sessionID string, eventBus *s
 		keepRecent = 30
 	}
 
-	compressible, toCompress := selectMessagesToCompress(msgs, keepRecent)
+	remaining, toCompress := selectMessagesToCompress(msgs, keepRecent)
 	if len(toCompress) == 0 {
 		return nil, nil
-	}
-
-	if len(toCompress) > ProgressiveBatchSize {
-		toCompress = toCompress[:ProgressiveBatchSize]
 	}
 
 	summaryText, err := c.generateSummary(ctx, toCompress)
 	if err != nil {
 		return nil, fmt.Errorf("generate summary: %w", err)
+	}
+
+	compressedIDs := make([]string, len(toCompress))
+	for i, msg := range toCompress {
+		compressedIDs[i] = msg.ID
+	}
+
+	deletedCount, err := c.store.DeleteMessages(sessionID, compressedIDs)
+	if err != nil {
+		return nil, fmt.Errorf("delete compressed messages: %w", err)
 	}
 
 	summaryMsg := session.Message{
@@ -117,41 +137,24 @@ func (c *Compressor) compress(ctx context.Context, sessionID string, eventBus *s
 		return nil, fmt.Errorf("add summary message: %w", err)
 	}
 
-	compressedRange := session.CompressedRange{
-		StartMessageID: toCompress[0].ID,
-		EndMessageID:   toCompress[len(toCompress)-1].ID,
-	}
-
-	compressionSummary := session.CompressionSummary{
-		SummaryText: summaryText,
-		CoversRange: compressedRange,
-		CreatedAt:   time.Now(),
-	}
-
-	if sess.CompressionState == nil {
-		sess.CompressionState = &session.CompressionState{}
-	}
-	sess.CompressionState.CompressedRanges = append(sess.CompressionState.CompressedRanges, compressedRange)
-	sess.CompressionState.Summaries = append(sess.CompressionState.Summaries, compressionSummary)
 	sess.CompressionCount++
-
 	if err := c.store.Update(sess); err != nil {
-		return nil, fmt.Errorf("update session compression state: %w", err)
+		return nil, fmt.Errorf("update session compression count: %w", err)
 	}
 
 	tokensRemoved := estimateTokens(toCompress)
 
 	if eventBus != nil {
 		eventBus.Publish("context_compressed", map[string]any{
-			"compressed_count": len(toCompress),
+			"compressed_count": deletedCount,
 			"tokens_removed":   tokensRemoved,
 		})
 	}
 
-	_ = compressible
+	_ = remaining
 
 	return &CompressResult{
-		CompressedCount: len(toCompress),
+		CompressedCount: deletedCount,
 		TokensRemoved:   tokensRemoved,
 		SummaryText:     summaryText,
 	}, nil
@@ -163,57 +166,42 @@ func selectMessagesToCompress(msgs []session.Message, keepRecent int) (remaining
 	}
 
 	splitIdx := len(msgs) - keepRecent
-	if splitIdx < 0 {
-		splitIdx = 0
-	}
 
-	// Collect tool_call_ids from tool messages in the compressible area.
-	// These tool results must be preserved, so their owning assistant
-	// messages must also be preserved to form valid API request pairs.
-	toolCallIDsInCompressible := make(map[string]bool)
-	for _, msg := range msgs[:splitIdx] {
-		if msg.Role == session.RoleTool && msg.ToolCallID != "" {
-			toolCallIDsInCompressible[msg.ToolCallID] = true
+	for {
+		needIDs := make(map[string]bool)
+		for i := splitIdx; i < len(msgs); i++ {
+			if msgs[i].Role == session.RoleTool && msgs[i].ToolCallID != "" {
+				needIDs[msgs[i].ToolCallID] = true
+			}
 		}
-	}
 
-	// Also collect tool_call_ids from the recent area, because an assistant
-	// in the compressible area may own a tool call whose result is in the
-	// recent area. If we compress the assistant, the tool result becomes
-	// orphaned and the API call will fail with a 400 error.
-	toolCallIDsInRecent := make(map[string]bool)
-	for _, msg := range msgs[splitIdx:] {
-		if msg.Role == session.RoleTool && msg.ToolCallID != "" {
-			toolCallIDsInRecent[msg.ToolCallID] = true
+		if len(needIDs) == 0 {
+			break
 		}
-	}
 
-	for _, msg := range msgs[:splitIdx] {
-		if msg.Role == session.RoleSystem {
-			remaining = append(remaining, msg)
-		} else if msg.Role == session.RoleTool {
-			remaining = append(remaining, msg)
-		} else if msg.Role == session.RoleAssistant && len(msg.ToolCalls) > 0 {
-			// Preserve assistant if any of its tool calls have results in
-			// either the compressible area or the recent area.
-			preserve := false
-			for _, tc := range msg.ToolCalls {
-				if toolCallIDsInCompressible[tc.ID] || toolCallIDsInRecent[tc.ID] {
-					preserve = true
-					break
+		found := false
+		for i := splitIdx - 1; i >= 0; i-- {
+			if msgs[i].Role == session.RoleAssistant {
+				for _, tc := range msgs[i].ToolCalls {
+					if needIDs[tc.ID] {
+						splitIdx = i
+						found = true
+						break
+					}
 				}
 			}
-			if preserve {
-				remaining = append(remaining, msg)
-			} else {
-				toCompress = append(toCompress, msg)
+			if found {
+				break
 			}
-		} else {
-			toCompress = append(toCompress, msg)
+		}
+
+		if !found {
+			break
 		}
 	}
 
-	remaining = append(remaining, msgs[splitIdx:]...)
+	toCompress = msgs[:splitIdx]
+	remaining = msgs[splitIdx:]
 
 	return remaining, toCompress
 }
@@ -225,7 +213,27 @@ func (c *Compressor) generateSummary(ctx context.Context, msgs []session.Message
 
 	summaryPrompt := summaryUserPrefix
 	for _, msg := range msgs {
-		summaryPrompt += fmt.Sprintf("\n[%s]: %s", msg.Role, msg.Content)
+		switch msg.Role {
+		case session.RoleUser:
+			summaryPrompt += fmt.Sprintf("\n[user]: %s", msg.Content)
+		case session.RoleAssistant:
+			if msg.Reasoning != "" {
+				summaryPrompt += fmt.Sprintf("\n[assistant thinking]: %s", msg.Reasoning)
+			}
+			if len(msg.ToolCalls) > 0 {
+				for _, tc := range msg.ToolCalls {
+					paramsJSON, _ := json.Marshal(tc.Params)
+					summaryPrompt += fmt.Sprintf("\n[assistant → tool_call %s]: %s", tc.ToolName, string(paramsJSON))
+				}
+			}
+			if msg.Content != "" {
+				summaryPrompt += fmt.Sprintf("\n[assistant]: %s", msg.Content)
+			}
+		case session.RoleTool:
+			summaryPrompt += fmt.Sprintf("\n[tool_result %s]: %s", msg.ToolCallID, msg.Content)
+		case session.RoleSystem:
+			summaryPrompt += fmt.Sprintf("\n[system]: %s", msg.Content)
+		}
 	}
 
 	summaryReq := []session.Message{
@@ -262,39 +270,6 @@ func estimateTokens(msgs []session.Message) int {
 	return total
 }
 
-func EstimateContextTokens(msgs []session.Message, compressionState *session.CompressionState) int {
-	activeMsgs := FilterActiveMessages(msgs, compressionState)
-	return estimateTokens(activeMsgs)
-}
-
-func FilterActiveMessages(msgs []session.Message, compressionState *session.CompressionState) []session.Message {
-	if compressionState == nil || len(compressionState.CompressedRanges) == 0 {
-		return msgs
-	}
-
-	compressedIDs := make(map[string]bool)
-	for _, r := range compressionState.CompressedRanges {
-		inRange := false
-		for _, msg := range msgs {
-			if msg.ID == r.StartMessageID {
-				inRange = true
-			}
-			if inRange {
-				compressedIDs[msg.ID] = true
-			}
-			if msg.ID == r.EndMessageID {
-				inRange = false
-			}
-		}
-	}
-
-	var filtered []session.Message
-	for _, msg := range msgs {
-		if compressedIDs[msg.ID] {
-			continue
-		}
-		filtered = append(filtered, msg)
-	}
-
-	return filtered
+func EstimateContextTokens(msgs []session.Message) int {
+	return estimateTokens(msgs)
 }

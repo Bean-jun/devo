@@ -53,9 +53,8 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 	if err != nil {
 		return LoopStateError, fmt.Errorf("get session after compress: %w", err)
 	}
-	activeMsgs := compressor.FilterActiveMessages(msgs, sess.CompressionState)
 
-	currentContextTokens := compressor.EstimateContextTokens(msgs, sess.CompressionState) + systemPromptTokens
+	currentContextTokens := compressor.EstimateContextTokens(msgs) + systemPromptTokens
 	if l.toolExecutor != nil {
 		currentContextTokens += tools.EstimateToolTokens(l.toolExecutor.ListTools())
 	}
@@ -66,7 +65,7 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 		}
 	}
 
-	lc.ActiveMsgs = activeMsgs
+	lc.ActiveMsgs = msgs
 	lc.DynamicPrompt = dynamicPrompt
 
 	lc.EventBus.Publish("loop.preparing_done", nil)

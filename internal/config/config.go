@@ -19,17 +19,16 @@ type LLMConfig struct {
 }
 
 type Config struct {
-	LLM                  LLMConfig         `json:"llm,omitempty"`
-	DBPath               string            `json:"db_path,omitempty"`
-	LogPath              string            `json:"log_path,omitempty"`
-	LogLevel             string            `json:"log_level,omitempty"`
-	ApprovalPolicy       map[string]string `json:"approval_policy,omitempty"`
-	Skills               []string          `json:"skills,omitempty"`
-	MCP                  []string          `json:"mcp,omitempty"`
-	ToolCallLimit        int               `json:"tool_call_limit,omitempty"`
-	MaxContextTokens     int               `json:"max_context_tokens,omitempty"`
-	KeepRecent           int               `json:"keep_recent,omitempty"`
-	ContextCompressRatio float64           `json:"context_compress_ratio,omitempty"`
+	LLM              LLMConfig         `json:"llm,omitempty"`
+	DBPath           string            `json:"db_path,omitempty"`
+	LogPath          string            `json:"log_path,omitempty"`
+	LogLevel         string            `json:"log_level,omitempty"`
+	ApprovalPolicy   map[string]string `json:"approval_policy,omitempty"`
+	Skills           []string          `json:"skills,omitempty"`
+	MCP              []string          `json:"mcp,omitempty"`
+	ToolCallLimit    int               `json:"tool_call_limit,omitempty"`
+	MaxContextTokens int               `json:"max_context_tokens,omitempty"`
+	KeepRecent       int               `json:"keep_recent,omitempty"`
 }
 
 type GlobalConfig = Config
@@ -221,9 +220,6 @@ func Merge(global, project *Config) *Config {
 	}
 	if project.KeepRecent > 0 {
 		result.KeepRecent = project.KeepRecent
-	}
-	if project.ContextCompressRatio > 0 {
-		result.ContextCompressRatio = project.ContextCompressRatio
 	}
 
 	return result

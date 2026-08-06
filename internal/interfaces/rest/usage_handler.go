@@ -28,7 +28,7 @@ func (h *Handler) GetSessionUsage(w http.ResponseWriter, r *http.Request) {
 		"total_input_tokens":  sess.TokenUsage.Input,
 		"total_output_tokens": sess.TokenUsage.Output,
 		"total_tokens":        sess.TokenUsage.Total,
-		"compression_count":   0,
+		"compression_count":   sess.CompressionCount,
 	}
 
 	steps, err := h.store.GetUsageSteps(sessionID)

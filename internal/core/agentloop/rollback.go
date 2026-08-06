@@ -102,7 +102,6 @@ func (l *Loop) Rollback(sessionID string, targetMessageID string) (*RollbackResu
 	sess.State = session.StateIdle
 	sess.CancelRequested = false
 	sess.PauseRequested = false
-	sess.CompressionState = nil
 	sess.LastActiveAt = rollbackTime
 	if err := l.store.Update(sess); err != nil {
 		return nil, fmt.Errorf("update session state: %w", err)

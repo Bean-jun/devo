@@ -21,7 +21,6 @@ interface ProjectConfig {
   tool_call_limit?: number
   max_context_tokens?: number
   keep_recent?: number
-  context_compress_ratio?: number
 }
 
 const config = ref<ProjectConfig>({ skills: [], mcp: [] })
@@ -30,12 +29,10 @@ const configLoading = ref(false)
 const toolCallLimit = ref<number | null>(null)
 const maxContextTokens = ref<number | null>(null)
 const keepRecent = ref<number | null>(null)
-const contextCompressRatio = ref<number | null>(null)
 
 const globalToolCallLimit = ref<number | null>(null)
 const globalMaxContextTokens = ref<number | null>(null)
 const globalKeepRecent = ref<number | null>(null)
-const globalContextCompressRatio = ref<number | null>(null)
 const globalMaxTokens = ref<number | null>(null)
 
 interface ApprovelOp {
@@ -120,7 +117,6 @@ async function fetchConfig() {
       toolCallLimit.value = data.tool_call_limit ?? null
       maxContextTokens.value = data.max_context_tokens ?? null
       keepRecent.value = data.keep_recent ?? null
-      contextCompressRatio.value = data.context_compress_ratio ?? null
     }
   } catch {
     // ignore
@@ -139,7 +135,6 @@ async function saveProjectParams() {
     if (toolCallLimit.value != null) body.tool_call_limit = toolCallLimit.value
     if (maxContextTokens.value != null) body.max_context_tokens = maxContextTokens.value
     if (keepRecent.value != null) body.keep_recent = keepRecent.value
-    if (contextCompressRatio.value != null) body.context_compress_ratio = contextCompressRatio.value
 
     await fetch(`${API_BASE}/project/config`, {
       method: 'PUT',
@@ -160,7 +155,6 @@ async function fetchGlobalConfig() {
       globalToolCallLimit.value = data.tool_call_limit ?? null
       globalMaxContextTokens.value = data.max_context_tokens ?? null
       globalKeepRecent.value = data.keep_recent ?? null
-      globalContextCompressRatio.value = data.context_compress_ratio ?? null
       globalMaxTokens.value = data.llm?.max_tokens ?? null
       globalApprovalPolicy.value = data.approval_policy || {}
     }
@@ -175,7 +169,6 @@ async function saveGlobalParams() {
     if (globalToolCallLimit.value != null) body.tool_call_limit = globalToolCallLimit.value
     if (globalMaxContextTokens.value != null) body.max_context_tokens = globalMaxContextTokens.value
     if (globalKeepRecent.value != null) body.keep_recent = globalKeepRecent.value
-    if (globalContextCompressRatio.value != null) body.context_compress_ratio = globalContextCompressRatio.value
     if (globalMaxTokens.value != null) {
       body.llm = { max_tokens: globalMaxTokens.value }
     }
@@ -251,18 +244,6 @@ onMounted(async () => {
             type="number"
             min="1"
             placeholder="30"
-            class="setting-input"
-          />
-        </div>
-        <div class="setting-item">
-          <label>上下文压缩比例</label>
-          <input
-            v-model.number="contextCompressRatio"
-            type="number"
-            min="0.1"
-            max="1.0"
-            step="0.1"
-            placeholder="0.8"
             class="setting-input"
           />
         </div>
@@ -356,18 +337,6 @@ onMounted(async () => {
             type="number"
             min="1"
             placeholder="30"
-            class="setting-input"
-          />
-        </div>
-        <div class="setting-item">
-          <label>上下文压缩比例</label>
-          <input
-            v-model.number="globalContextCompressRatio"
-            type="number"
-            min="0.1"
-            max="1.0"
-            step="0.1"
-            placeholder="0.8"
             class="setting-input"
           />
         </div>

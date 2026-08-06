@@ -116,11 +116,11 @@ func TestSyncArchive_RendersReasoning(t *testing.T) {
 	msgs := []session.Message{
 		{ID: "msg-1", Role: session.RoleUser, Content: "explain Go interfaces", CreatedAt: time.Now()},
 		{
-			ID:         "msg-2",
-			Role:       session.RoleAssistant,
-			Content:    "An interface in Go is a type that specifies a method set...",
-			Reasoning:  "用户问 Go 接口，我应该从基本定义、隐式实现、应用场景三个角度回答。",
-			CreatedAt:  time.Now(),
+			ID:        "msg-2",
+			Role:      session.RoleAssistant,
+			Content:   "An interface in Go is a type that specifies a method set...",
+			Reasoning: "用户问 Go 接口，我应该从基本定义、隐式实现、应用场景三个角度回答。",
+			CreatedAt: time.Now(),
 		},
 	}
 

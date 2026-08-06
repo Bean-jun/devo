@@ -110,11 +110,11 @@ func TestMessageReasoning_PersistenceAcrossRestart(t *testing.T) {
 		})
 
 		store.AddMessage("sess-persist-r", session.Message{
-			ID:         "msg-1",
-			Role:       session.RoleAssistant,
-			Content:    "answer",
-			Reasoning:  "thinking before answer",
-			CreatedAt:  time.Now(),
+			ID:        "msg-1",
+			Role:      session.RoleAssistant,
+			Content:   "answer",
+			Reasoning: "thinking before answer",
+			CreatedAt: time.Now(),
 		})
 	}()
 

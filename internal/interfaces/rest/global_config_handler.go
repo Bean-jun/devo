@@ -17,25 +17,23 @@ type llmConfigResponse struct {
 }
 
 type getGlobalConfigResponse struct {
-	LLM                  llmConfigResponse `json:"llm,omitempty"`
-	ApprovalPolicy       map[string]string `json:"approval_policy,omitempty"`
-	Skills               []string          `json:"skills,omitempty"`
-	MCP                  []string          `json:"mcp,omitempty"`
-	ToolCallLimit        int               `json:"tool_call_limit,omitempty"`
-	MaxContextTokens     int               `json:"max_context_tokens,omitempty"`
-	KeepRecent           int               `json:"keep_recent,omitempty"`
-	ContextCompressRatio float64           `json:"context_compress_ratio,omitempty"`
+	LLM              llmConfigResponse `json:"llm,omitempty"`
+	ApprovalPolicy   map[string]string `json:"approval_policy,omitempty"`
+	Skills           []string          `json:"skills,omitempty"`
+	MCP              []string          `json:"mcp,omitempty"`
+	ToolCallLimit    int               `json:"tool_call_limit,omitempty"`
+	MaxContextTokens int               `json:"max_context_tokens,omitempty"`
+	KeepRecent       int               `json:"keep_recent,omitempty"`
 }
 
 type setGlobalConfigRequest struct {
-	LLM                  *config.LLMConfig `json:"llm,omitempty"`
-	ApprovalPolicy       map[string]string `json:"approval_policy,omitempty"`
-	Skills               []string          `json:"skills,omitempty"`
-	MCP                  []string          `json:"mcp,omitempty"`
-	ToolCallLimit        *int              `json:"tool_call_limit,omitempty"`
-	MaxContextTokens     *int              `json:"max_context_tokens,omitempty"`
-	KeepRecent           *int              `json:"keep_recent,omitempty"`
-	ContextCompressRatio *float64          `json:"context_compress_ratio,omitempty"`
+	LLM              *config.LLMConfig `json:"llm,omitempty"`
+	ApprovalPolicy   map[string]string `json:"approval_policy,omitempty"`
+	Skills           []string          `json:"skills,omitempty"`
+	MCP              []string          `json:"mcp,omitempty"`
+	ToolCallLimit    *int              `json:"tool_call_limit,omitempty"`
+	MaxContextTokens *int              `json:"max_context_tokens,omitempty"`
+	KeepRecent       *int              `json:"keep_recent,omitempty"`
 }
 
 func (h *Handler) GetGlobalConfig(w http.ResponseWriter, r *http.Request) {
@@ -52,13 +50,12 @@ func (h *Handler) GetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 			ReasoningEffort: cfg.LLM.ReasoningEffort,
 			MaxTokens:       cfg.LLM.MaxTokens,
 		},
-		ApprovalPolicy:       cfg.ApprovalPolicy,
-		Skills:               cfg.Skills,
-		MCP:                  cfg.MCP,
-		ToolCallLimit:        cfg.ToolCallLimit,
-		MaxContextTokens:     cfg.MaxContextTokens,
-		KeepRecent:           cfg.KeepRecent,
-		ContextCompressRatio: cfg.ContextCompressRatio,
+		ApprovalPolicy:   cfg.ApprovalPolicy,
+		Skills:           cfg.Skills,
+		MCP:              cfg.MCP,
+		ToolCallLimit:    cfg.ToolCallLimit,
+		MaxContextTokens: cfg.MaxContextTokens,
+		KeepRecent:       cfg.KeepRecent,
 	})
 }
 
@@ -116,9 +113,6 @@ func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 	if req.KeepRecent != nil {
 		h.cfg.KeepRecent = *req.KeepRecent
 	}
-	if req.ContextCompressRatio != nil {
-		h.cfg.ContextCompressRatio = *req.ContextCompressRatio
-	}
 
 	if err := config.SaveGlobalConfig(h.cfg); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save global config: "+err.Error())
@@ -135,13 +129,12 @@ func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 			ReasoningEffort: h.cfg.LLM.ReasoningEffort,
 			MaxTokens:       h.cfg.LLM.MaxTokens,
 		},
-		ApprovalPolicy:       h.cfg.ApprovalPolicy,
-		Skills:               h.cfg.Skills,
-		MCP:                  h.cfg.MCP,
-		ToolCallLimit:        h.cfg.ToolCallLimit,
-		MaxContextTokens:     h.cfg.MaxContextTokens,
-		KeepRecent:           h.cfg.KeepRecent,
-		ContextCompressRatio: h.cfg.ContextCompressRatio,
+		ApprovalPolicy:   h.cfg.ApprovalPolicy,
+		Skills:           h.cfg.Skills,
+		MCP:              h.cfg.MCP,
+		ToolCallLimit:    h.cfg.ToolCallLimit,
+		MaxContextTokens: h.cfg.MaxContextTokens,
+		KeepRecent:       h.cfg.KeepRecent,
 	})
 }
 

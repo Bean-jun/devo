@@ -106,13 +106,6 @@ func SaveProjectConfig(projectDir string, cfg *Config) error {
 		}
 		existing["keep_recent"] = keepRecentData
 	}
-	if cfg.ContextCompressRatio > 0 {
-		compressRatioData, err := json.Marshal(cfg.ContextCompressRatio)
-		if err != nil {
-			return fmt.Errorf("marshal context_compress_ratio: %w", err)
-		}
-		existing["context_compress_ratio"] = compressRatioData
-	}
 
 	data, err := json.MarshalIndent(existing, "", "  ")
 	if err != nil {
@@ -216,13 +209,6 @@ func SaveGlobalConfig(cfg *Config) error {
 			return fmt.Errorf("marshal keep_recent: %w", err)
 		}
 		existing["keep_recent"] = keepRecentData
-	}
-	if cfg.ContextCompressRatio > 0 {
-		compressRatioData, err := json.Marshal(cfg.ContextCompressRatio)
-		if err != nil {
-			return fmt.Errorf("marshal context_compress_ratio: %w", err)
-		}
-		existing["context_compress_ratio"] = compressRatioData
 	}
 
 	data, err := json.MarshalIndent(existing, "", "  ")

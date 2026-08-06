@@ -92,9 +92,8 @@ func TestSelectMessagesToCompress(t *testing.T) {
 		{ID: "m3", Role: session.RoleSystem, Content: "system 1"},
 		{ID: "m4", Role: session.RoleUser, Content: "user 2"},
 		{ID: "m5", Role: session.RoleAssistant, Content: "assistant 2"},
-		{ID: "m6", Role: session.RoleTool, Content: "tool result"},
-		{ID: "m7", Role: session.RoleUser, Content: "user recent"},
-		{ID: "m8", Role: session.RoleAssistant, Content: "assistant recent"},
+		{ID: "m6", Role: session.RoleUser, Content: "user recent"},
+		{ID: "m7", Role: session.RoleAssistant, Content: "assistant recent"},
 	}
 
 	remaining, toCompress := selectMessagesToCompress(msgs, 2)
@@ -103,15 +102,13 @@ func TestSelectMessagesToCompress(t *testing.T) {
 		t.Fatal("expected some messages to compress")
 	}
 
-	for _, msg := range toCompress {
-		if msg.Role == session.RoleSystem || msg.Role == session.RoleTool {
-			t.Errorf("system/tool messages should not be compressed, got role %q", msg.Role)
-		}
+	if len(toCompress) != 5 {
+		t.Errorf("expected 5 messages to compress, got %d", len(toCompress))
 	}
 
 	recentFound := false
 	for _, msg := range remaining {
-		if msg.ID == "m7" || msg.ID == "m8" {
+		if msg.ID == "m6" || msg.ID == "m7" {
 			recentFound = true
 		}
 	}
@@ -119,14 +116,8 @@ func TestSelectMessagesToCompress(t *testing.T) {
 		t.Error("recent messages should be in remaining")
 	}
 
-	systemFound := false
-	for _, msg := range remaining {
-		if msg.ID == "m3" {
-			systemFound = true
-		}
-	}
-	if !systemFound {
-		t.Error("system messages should be preserved in remaining")
+	if len(remaining) != 2 {
+		t.Errorf("expected 2 messages remaining, got %d", len(remaining))
 	}
 }
 
@@ -139,11 +130,11 @@ func TestSelectMessagesToCompressAllSystem(t *testing.T) {
 
 	remaining, toCompress := selectMessagesToCompress(msgs, 1)
 
-	if len(toCompress) != 0 {
-		t.Errorf("expected no messages to compress when all are system, got %d", len(toCompress))
+	if len(toCompress) != 2 {
+		t.Errorf("expected 2 messages to compress, got %d", len(toCompress))
 	}
-	if len(remaining) != 3 {
-		t.Errorf("expected all messages remaining, got %d", len(remaining))
+	if len(remaining) != 1 {
+		t.Errorf("expected 1 message remaining, got %d", len(remaining))
 	}
 }
 
@@ -160,6 +151,91 @@ func TestSelectMessagesToCompressKeepAll(t *testing.T) {
 	}
 	if len(remaining) != 2 {
 		t.Errorf("expected all messages remaining, got %d", len(remaining))
+	}
+}
+
+func TestSelectMessagesToCompressToolPairAlignment(t *testing.T) {
+	tc := func(id string) session.ToolCall {
+		return session.ToolCall{ID: id, ToolName: "test", Params: map[string]interface{}{}}
+	}
+
+	msgs := []session.Message{
+		{ID: "m1", Role: session.RoleUser, Content: "write a file"},
+		{ID: "m2", Role: session.RoleAssistant, Content: "ok", ToolCalls: []session.ToolCall{tc("tc1")}},
+		{ID: "m3", Role: session.RoleTool, Content: "file written", ToolCallID: "tc1"},
+		{ID: "m4", Role: session.RoleAssistant, Content: "done!"},
+		{ID: "m5", Role: session.RoleUser, Content: "now read it"},
+		{ID: "m6", Role: session.RoleAssistant, Content: "ok", ToolCalls: []session.ToolCall{tc("tc2")}},
+		{ID: "m7", Role: session.RoleTool, Content: "content here", ToolCallID: "tc2"},
+		{ID: "m8", Role: session.RoleAssistant, Content: "here you go"},
+	}
+
+	remaining, _ := selectMessagesToCompress(msgs, 2)
+
+	if len(remaining) == 0 {
+		t.Fatal("expected some messages to remain")
+	}
+
+	remainingIDs := make(map[string]bool)
+	for _, msg := range remaining {
+		remainingIDs[msg.ID] = true
+	}
+
+	if !remainingIDs["m7"] {
+		t.Error("m7 (tool result) should be in remaining")
+	}
+	if !remainingIDs["m8"] {
+		t.Error("m8 (assistant final) should be in remaining")
+	}
+
+	if !remainingIDs["m6"] {
+		t.Error("m6 (tool call for tc2) should be in remaining because m7 references tc2")
+	}
+
+	if remainingIDs["m3"] {
+		t.Error("m3 (tool result for tc1) should NOT be in remaining, it's part of the previous turn")
+	}
+}
+
+func TestSelectMessagesToCompressToolPairAlignmentMultiLevel(t *testing.T) {
+	tc := func(id string) session.ToolCall {
+		return session.ToolCall{ID: id, ToolName: "test", Params: map[string]interface{}{}}
+	}
+
+	msgs := []session.Message{
+		{ID: "m1", Role: session.RoleUser, Content: "do task"},
+		{ID: "m2", Role: session.RoleAssistant, Content: "step 1", ToolCalls: []session.ToolCall{tc("tc1")}},
+		{ID: "m3", Role: session.RoleTool, Content: "result 1", ToolCallID: "tc1"},
+		{ID: "m4", Role: session.RoleAssistant, Content: "step 2", ToolCalls: []session.ToolCall{tc("tc2")}},
+		{ID: "m5", Role: session.RoleTool, Content: "result 2", ToolCallID: "tc2"},
+		{ID: "m6", Role: session.RoleAssistant, Content: "all done!"},
+	}
+
+	remaining, _ := selectMessagesToCompress(msgs, 1)
+
+	if len(remaining) == 0 {
+		t.Fatal("expected some messages to remain")
+	}
+
+	remainingIDs := make(map[string]bool)
+	for _, msg := range remaining {
+		remainingIDs[msg.ID] = true
+	}
+
+	if !remainingIDs["m6"] {
+		t.Error("m6 should be in remaining")
+	}
+
+	if !remainingIDs["m5"] {
+		t.Error("m5 (tool result for tc2) should be in remaining because m6 follows it and m4 references tc2")
+	}
+
+	if !remainingIDs["m4"] {
+		t.Error("m4 (tool call for tc2) should be in remaining because m5 references tc2")
+	}
+
+	if remainingIDs["m3"] {
+		t.Error("m3 should NOT be in remaining, tc1 is not referenced by remaining")
 	}
 }
 
@@ -224,15 +300,6 @@ func TestCompressUpdatesSessionState(t *testing.T) {
 	if sess.CompressionCount != 1 {
 		t.Errorf("expected compression_count=1, got %d", sess.CompressionCount)
 	}
-	if sess.CompressionState == nil {
-		t.Fatal("expected non-nil compression state")
-	}
-	if len(sess.CompressionState.CompressedRanges) != 1 {
-		t.Errorf("expected 1 compressed range, got %d", len(sess.CompressionState.CompressedRanges))
-	}
-	if len(sess.CompressionState.Summaries) != 1 {
-		t.Errorf("expected 1 summary, got %d", len(sess.CompressionState.Summaries))
-	}
 }
 
 func TestCompressEmitsSSEEvent(t *testing.T) {
@@ -270,68 +337,6 @@ func TestCompressEmitsSSEEvent(t *testing.T) {
 	}
 }
 
-func TestFilterActiveMessages(t *testing.T) {
-	msgs := []session.Message{
-		{ID: "m1", Role: session.RoleUser, Content: "compressed user message"},
-		{ID: "m2", Role: session.RoleAssistant, Content: "compressed assistant message"},
-		{ID: "m3", Role: session.RoleSystem, Content: "system message"},
-		{ID: "m4", Role: session.RoleUser, Content: "active user message 1"},
-		{ID: "m5", Role: session.RoleAssistant, Content: "active assistant message 1"},
-		{ID: "m6", Role: session.RoleUser, Content: "active user message 2"},
-	}
-
-	compressionState := &session.CompressionState{
-		CompressedRanges: []session.CompressedRange{
-			{StartMessageID: "m1", EndMessageID: "m2"},
-		},
-	}
-
-	filtered := FilterActiveMessages(msgs, compressionState)
-
-	if len(filtered) != 4 {
-		t.Errorf("expected 4 messages after filtering, got %d", len(filtered))
-	}
-
-	for _, msg := range filtered {
-		if msg.ID == "m1" || msg.ID == "m2" {
-			t.Errorf("compressed message %s should not be in active messages", msg.ID)
-		}
-	}
-
-	if filtered[0].ID != "m3" {
-		t.Errorf("expected m3 (system) to be first, got %s", filtered[0].ID)
-	}
-}
-
-func TestFilterActiveMessagesNilState(t *testing.T) {
-	msgs := []session.Message{
-		{ID: "m1", Role: session.RoleUser, Content: "message 1"},
-		{ID: "m2", Role: session.RoleAssistant, Content: "message 2"},
-	}
-
-	filtered := FilterActiveMessages(msgs, nil)
-
-	if len(filtered) != 2 {
-		t.Errorf("expected all messages when no compression state, got %d", len(filtered))
-	}
-}
-
-func TestFilterActiveMessagesEmptyRanges(t *testing.T) {
-	msgs := []session.Message{
-		{ID: "m1", Role: session.RoleUser, Content: "message 1"},
-	}
-
-	compressionState := &session.CompressionState{
-		CompressedRanges: []session.CompressedRange{},
-	}
-
-	filtered := FilterActiveMessages(msgs, compressionState)
-
-	if len(filtered) != 1 {
-		t.Errorf("expected all messages when empty ranges, got %d", len(filtered))
-	}
-}
-
 func TestCompressMultipleRounds(t *testing.T) {
 	comp, store := setupTestCompressor()
 	createTestSession(store, "sess-1", 3, 1)
@@ -360,9 +365,6 @@ func TestCompressMultipleRounds(t *testing.T) {
 	sess, _ := store.Get("sess-1")
 	if sess.CompressionCount != 2 {
 		t.Errorf("expected compression_count=2, got %d", sess.CompressionCount)
-	}
-	if len(sess.CompressionState.CompressedRanges) != 2 {
-		t.Errorf("expected 2 compressed ranges, got %d", len(sess.CompressionState.CompressedRanges))
 	}
 }
 
@@ -482,5 +484,17 @@ func TestCompressNilEventBus(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatal("expected compression result even with nil event bus")
+	}
+}
+
+func TestEstimateContextTokens(t *testing.T) {
+	msgs := []session.Message{
+		{ID: "m1", Role: session.RoleUser, Content: "Hello, this is a test message with some content"},
+		{ID: "m2", Role: session.RoleAssistant, Content: "This is a response with more content to estimate tokens"},
+	}
+
+	tokens := EstimateContextTokens(msgs)
+	if tokens <= 0 {
+		t.Errorf("expected positive token count from EstimateContextTokens, got %d", tokens)
 	}
 }

@@ -250,36 +250,6 @@ func TestRollbackStateResetToIdle(t *testing.T) {
 	}
 }
 
-func TestRollbackClearsCompressionState(t *testing.T) {
-	loop, store := setupTestLoop()
-	sess := createTestSession(store, "sess-1")
-
-	sess.CompressionState = &session.CompressionState{
-		CompressedRanges: []session.CompressedRange{
-			{StartMessageID: "msg-1", EndMessageID: "msg-2"},
-		},
-		Summaries: []session.CompressionSummary{
-			{SummaryText: "test summary", CreatedAt: time.Now()},
-		},
-	}
-	sess.CompressionCount = 1
-	store.Update(sess)
-
-	store.AddMessage("sess-1", session.Message{
-		ID: "msg-1", Role: session.RoleUser, Content: "Hello", CreatedAt: time.Now(),
-	})
-
-	_, err := loop.Rollback("sess-1", "msg-1")
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-
-	sess, _ = store.Get("sess-1")
-	if sess.CompressionState != nil {
-		t.Error("expected CompressionState to be nil after rollback")
-	}
-}
-
 func TestRollbackArchivedSessionRejected(t *testing.T) {
 	loop, store := setupTestLoop()
 	sess := createTestSession(store, "sess-1")
