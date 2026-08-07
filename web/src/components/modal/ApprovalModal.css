@@ -1,0 +1,202 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-overlay);
+  animation: fadeIn var(--transition-fast) ease;
+}
+
+.approval-modal {
+  width: 600px;
+  max-height: 80vh;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  animation: modalIn var(--transition-base) ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.modal-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+.risk-badge {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
+
+.approval-info {
+  margin-bottom: var(--space-lg);
+}
+
+.info-row {
+  margin-bottom: var(--space-md);
+}
+
+.info-label {
+  display: block;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
+  font-size: var(--font-size-base);
+}
+
+.info-value code {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  background: var(--color-bg-tertiary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.file-path {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+}
+
+.command-preview {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  background: var(--color-code-bg);
+  color: #e0e0e0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.diff-section,
+.params-section {
+  margin-bottom: var(--space-lg);
+}
+
+.diff-preview {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--color-bg-secondary);
+  padding: 0;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.diff-preview code {
+  display: block;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.diff-summary {
+  font-weight: 400;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: none;
+  margin-left: var(--space-sm);
+}
+
+.diff-preview :deep(.diff-add) {
+  background: rgba(0, 200, 0, 0.1);
+  color: #2ecc71;
+  display: block;
+}
+
+.diff-preview :deep(.diff-remove) {
+  background: rgba(255, 0, 0, 0.1);
+  color: #e74c3c;
+  display: block;
+}
+
+.diff-preview :deep(.diff-hunk) {
+  color: var(--color-accent);
+  font-weight: 600;
+  display: block;
+}
+
+.diff-preview :deep(.diff-truncated) {
+  display: block;
+  padding: var(--space-sm) var(--space-md);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  text-align: center;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.params-preview {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--color-bg-secondary);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.btn-approve,
+.btn-reject {
+  padding: var(--space-sm) var(--space-xl);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.btn-approve {
+  background: var(--color-success);
+  color: white;
+}
+
+.btn-approve:hover {
+  background: #2db84d;
+}
+
+.btn-reject {
+  background: var(--color-error);
+  color: white;
+}
+
+.btn-reject:hover {
+  background: #e0352b;
+}

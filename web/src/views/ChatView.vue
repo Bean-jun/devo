@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import ChatPanel from '@/components/chat/ChatPanel.vue'
+import { useChatView } from './ChatViewController'
+
+const { ChatPanel } = useChatView()
 </script>
 
 <template>

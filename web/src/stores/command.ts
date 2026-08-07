@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { IconName } from '@/components/common/AppIcon.vue'
+import type { IconName } from '@/components/common/AppIconController'
 
 export interface Command {
   id: string

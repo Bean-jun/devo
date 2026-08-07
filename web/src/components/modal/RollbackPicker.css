@@ -1,0 +1,181 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-overlay);
+  animation: fadeIn var(--transition-fast) ease;
+}
+
+.rollback-picker {
+  width: 500px;
+  max-height: 70vh;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  animation: modalIn var(--transition-base) ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.picker-header {
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.picker-header h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+.picker-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.timeline {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
+
+.timeline-empty {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+.timeline-item {
+  display: flex;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.timeline-item:hover {
+  opacity: 0.8;
+}
+
+.timeline-item.selected .marker-dot {
+  background: var(--color-accent);
+  transform: scale(1.5);
+  box-shadow: 0 0 0 4px var(--color-accent-light);
+}
+
+.timeline-item.after-selected {
+  opacity: 0.3;
+  text-decoration: line-through;
+}
+
+.timeline-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.marker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-border);
+  border: 2px solid var(--color-bg-primary);
+  transition: all var(--transition-fast);
+}
+
+.marker-line {
+  width: 2px;
+  flex: 1;
+  background: var(--color-border-light);
+  min-height: 24px;
+}
+
+.timeline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.timeline-role {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.timeline-time {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.timeline-preview {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-footer {
+  padding: var(--space-lg);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.rollback-warning {
+  font-size: var(--font-size-xs);
+  color: var(--color-error);
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm);
+  background: var(--color-error-light);
+  border-radius: var(--radius-sm);
+}
+
+.picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+}
+
+.btn-cancel,
+.btn-confirm {
+  padding: var(--space-sm) var(--space-xl);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.btn-cancel {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.btn-cancel:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.btn-confirm {
+  background: var(--color-error);
+  color: white;
+}
+
+.btn-confirm:hover:not(:disabled) {
+  background: #e0352b;
+}
+
+.btn-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

@@ -1,0 +1,109 @@
+.command-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  justify-content: center;
+  padding-top: 15vh;
+  background: var(--color-overlay);
+  animation: fadeIn var(--transition-fast) ease;
+}
+
+.command-palette {
+  width: 520px;
+  max-height: 400px;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  animation: modalIn var(--transition-base) ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.palette-input-wrapper {
+  display: flex;
+  align-items: center;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.palette-prefix {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-right: var(--space-sm);
+}
+
+.palette-input {
+  flex: 1;
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.palette-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.palette-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-xs) 0;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-lg);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.palette-item:hover,
+.palette-item.selected {
+  background: var(--color-accent-light);
+}
+
+.palette-item-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.palette-item-name {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.palette-item-placeholder {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.palette-item-desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.palette-empty {
+  padding: var(--space-xl);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.palette-footer {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-lg);
+  border-top: 1px solid var(--color-border-light);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}

@@ -1,0 +1,323 @@
+.input-area {
+  flex-shrink: 0;
+  padding: var(--space-md) var(--space-lg);
+  padding-bottom: var(--space-sm);
+  background: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.input-footer {
+  max-width: 800px;
+  margin: var(--space-sm) auto 0;
+  padding: 0 var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  user-select: none;
+}
+
+.footer-item {
+  opacity: 0.85;
+}
+
+.footer-sep {
+  opacity: 0.4;
+}
+
+.footer-dir {
+  margin-left: auto;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-warn {
+  color: #ff9500 !important;
+}
+
+.input-row {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-sm);
+}
+
+.command-btn {
+  flex-shrink: 0;
+  width: 36px;
+  min-height: 36px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.command-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+.command-btn:active {
+  transform: scale(0.95);
+}
+
+.command-btn-text {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.input-wrapper {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm) var(--space-md);
+  transition: border-color var(--transition-fast);
+}
+
+.input-wrapper:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-light);
+}
+
+.input-field {
+  width: 100%;
+  min-height: 24px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.input-field.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+}
+
+.input-field.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.paste-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  margin: 0 2px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  user-select: none;
+  vertical-align: baseline;
+  cursor: default;
+}
+
+.input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.input-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.char-count {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.token-estimate {
+  margin-left: var(--space-sm);
+  color: var(--color-text-tertiary);
+  opacity: 0.7;
+}
+
+.btn-send,
+.btn-stop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.btn-send {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+.btn-send:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.btn-send:disabled {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-tertiary);
+}
+
+.btn-stop {
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+}
+
+.btn-stop:hover {
+  background: #e0352b;
+}
+
+.stop-icon {
+  font-size: 10px;
+}
+
+.image-previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.image-preview-item {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.image-preview-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.image-remove-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+.image-upload-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-right: var(--space-sm);
+  transition: all var(--transition-fast);
+}
+
+.image-upload-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+.image-lightbox {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lightbox-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  cursor: default;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--transition-fast);
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

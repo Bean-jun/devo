@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { useUiStore } from '@/stores/ui'
-import ToastItem from './ToastItem.vue'
+import { useToastContainer } from './ToastContainerController'
 
-const uiStore = useUiStore()
+const { uiStore, ToastItem } = useToastContainer()
 </script>
 
 <template>
@@ -18,15 +17,5 @@ const uiStore = useUiStore()
   </Teleport>
 </template>
 
-<style scoped>
-.toast-container {
-  position: fixed;
-  top: calc(var(--statusbar-height) + var(--space-sm));
-  right: var(--space-lg);
-  z-index: 10000;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  pointer-events: none;
-}
+<style scoped src="./ToastContainer.css">
 </style>

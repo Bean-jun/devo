@@ -1,195 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useUiStore } from '@/stores/ui'
-import { useSkillsStore } from '@/stores/skills'
-import { useMcpStore } from '@/stores/mcp'
-import { useSessionStore } from '@/stores/session'
-import { API_BASE } from '@/utils/constants'
 import AppIcon from '@/components/common/AppIcon.vue'
+import { useSettingsPanel } from './SettingsPanelController'
 
-const uiStore = useUiStore()
-const skillsStore = useSkillsStore()
-const mcpStore = useMcpStore()
-const sessionStore = useSessionStore()
-
-type SubTab = 'project' | 'global'
-const activeTab = ref<SubTab>('project')
-
-interface ProjectConfig {
-  skills: string[]
-  mcp: string[]
-  tool_call_limit?: number
-  max_context_tokens?: number
-  keep_recent?: number
-}
-
-const config = ref<ProjectConfig>({ skills: [], mcp: [] })
-const configLoading = ref(false)
-
-const toolCallLimit = ref<number | null>(null)
-const maxContextTokens = ref<number | null>(null)
-const keepRecent = ref<number | null>(null)
-
-const globalToolCallLimit = ref<number | null>(null)
-const globalMaxContextTokens = ref<number | null>(null)
-const globalKeepRecent = ref<number | null>(null)
-const globalMaxTokens = ref<number | null>(null)
-
-interface ApprovelOp {
-  key: string
-  label: string
-  icon: 'note' | 'pencil' | 'lightning' | 'brain' | 'wrench'
-  risk: 'high' | 'low'
-  defaultLevel: string
-}
-
-const APPROVAL_OPERATIONS: ApprovelOp[] = [
-  { key: 'file_write_new', label: '新建文件', icon: 'note', risk: 'high', defaultLevel: 'always_ask' },
-  { key: 'file_write_overwrite', label: '覆盖文件', icon: 'note', risk: 'high', defaultLevel: 'always_ask' },
-  { key: 'file_edit', label: '编辑文件', icon: 'pencil', risk: 'high', defaultLevel: 'always_ask' },
-  { key: 'exec_python', label: '执行Python', icon: 'lightning', risk: 'high', defaultLevel: 'always_ask' },
-  { key: 'memory_update', label: '更新记忆', icon: 'brain', risk: 'low', defaultLevel: 'auto_approve' },
-  { key: 'solidify_skill', label: '固化技能', icon: 'wrench', risk: 'low', defaultLevel: 'auto_approve' },
-]
-
-const APPROVAL_LEVELS: { key: string; label: string; short: string }[] = [
-  { key: 'always_ask', label: '始终询问', short: '询问' },
-  { key: 'session_trust', label: '本次会话信任', short: '会话' },
-  { key: 'full_trust', label: '永久信任', short: '信任' },
-  { key: 'auto_approve', label: '自动批准', short: '自动' },
-]
-
-const RISK_LABELS: Record<string, string> = {
-  high: '高风险',
-  low: '低风险',
-}
-
-const projectApprovalPolicy = ref<Record<string, string>>({})
-const globalApprovalPolicy = ref<Record<string, string>>({})
-
-function getProjectPolicyLevel(key: string): string {
-  return projectApprovalPolicy.value[key] ?? ''
-}
-
-function getGlobalPolicyLevel(key: string): string {
-  return globalApprovalPolicy.value[key] ?? ''
-}
-
-function isDefaultPolicy(policy: Record<string, string>, key: string): boolean {
-  const op = APPROVAL_OPERATIONS.find(o => o.key === key)
-  return !policy[key] || policy[key] === (op?.defaultLevel ?? '')
-}
-
-async function handleProjectApprovalChange(key: string, level: string) {
-  if (getProjectPolicyLevel(key) === level) return
-  const prev = { ...projectApprovalPolicy.value }
-  try {
-    projectApprovalPolicy.value = { ...projectApprovalPolicy.value, [key]: level }
-    await sessionStore.setProjectApprovalPolicy(projectApprovalPolicy.value)
-    uiStore.showToast('success', '项目审批策略已更新')
-  } catch {
-    projectApprovalPolicy.value = prev
-    uiStore.showToast('error', '保存失败')
-  }
-}
-
-async function handleGlobalApprovalChange(key: string, level: string) {
-  if (getGlobalPolicyLevel(key) === level) return
-  const prev = { ...globalApprovalPolicy.value }
-  try {
-    globalApprovalPolicy.value = { ...globalApprovalPolicy.value, [key]: level }
-    await sessionStore.setGlobalApprovalPolicy(globalApprovalPolicy.value)
-    uiStore.showToast('success', '全局审批策略已更新')
-  } catch {
-    globalApprovalPolicy.value = prev
-    uiStore.showToast('error', '保存失败')
-  }
-}
-
-async function fetchConfig() {
-  configLoading.value = true
-  try {
-    const res = await fetch(`${API_BASE}/project/config`)
-    if (res.ok) {
-      const data = await res.json()
-      config.value = { skills: data.skills || [], mcp: data.mcp || [] }
-      projectApprovalPolicy.value = data.approval_policy || {}
-      toolCallLimit.value = data.tool_call_limit ?? null
-      maxContextTokens.value = data.max_context_tokens ?? null
-      keepRecent.value = data.keep_recent ?? null
-    }
-  } catch {
-    // ignore
-  } finally {
-    configLoading.value = false
-  }
-}
-
-async function saveProjectParams() {
-  try {
-    const body: Record<string, unknown> = {
-      skills: config.value.skills,
-      mcp: config.value.mcp,
-      approval_policy: projectApprovalPolicy.value,
-    }
-    if (toolCallLimit.value != null) body.tool_call_limit = toolCallLimit.value
-    if (maxContextTokens.value != null) body.max_context_tokens = maxContextTokens.value
-    if (keepRecent.value != null) body.keep_recent = keepRecent.value
-
-    await fetch(`${API_BASE}/project/config`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    uiStore.showToast('success', '项目设置已保存')
-  } catch {
-    uiStore.showToast('error', '保存失败')
-  }
-}
-
-async function fetchGlobalConfig() {
-  try {
-    const res = await fetch(`${API_BASE}/global/config`)
-    if (res.ok) {
-      const data = await res.json()
-      globalToolCallLimit.value = data.tool_call_limit ?? null
-      globalMaxContextTokens.value = data.max_context_tokens ?? null
-      globalKeepRecent.value = data.keep_recent ?? null
-      globalMaxTokens.value = data.llm?.max_tokens ?? null
-      globalApprovalPolicy.value = data.approval_policy || {}
-    }
-  } catch {
-    // ignore
-  }
-}
-
-async function saveGlobalParams() {
-  try {
-    const body: Record<string, unknown> = {}
-    if (globalToolCallLimit.value != null) body.tool_call_limit = globalToolCallLimit.value
-    if (globalMaxContextTokens.value != null) body.max_context_tokens = globalMaxContextTokens.value
-    if (globalKeepRecent.value != null) body.keep_recent = globalKeepRecent.value
-    if (globalMaxTokens.value != null) {
-      body.llm = { max_tokens: globalMaxTokens.value }
-    }
-
-    await fetch(`${API_BASE}/global/config`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    uiStore.showToast('success', '全局设置已保存')
-  } catch {
-    uiStore.showToast('error', '保存失败')
-  }
-}
-
-onMounted(async () => {
-  await fetchConfig()
-  await fetchGlobalConfig()
-  await skillsStore.fetchSkills()
-  await mcpStore.fetchServers()
-})
+const {
+  activeTab,
+  config,
+  configLoading,
+  uiStore,
+  skillsStore,
+  mcpStore,
+  toolCallLimit,
+  maxContextTokens,
+  keepRecent,
+  globalToolCallLimit,
+  globalMaxContextTokens,
+  globalKeepRecent,
+  globalMaxTokens,
+  APPROVAL_OPERATIONS,
+  APPROVAL_LEVELS,
+  RISK_LABELS,
+  projectApprovalPolicy,
+  globalApprovalPolicy,
+  getProjectPolicyLevel,
+  getGlobalPolicyLevel,
+  isDefaultPolicy,
+  handleProjectApprovalChange,
+  handleGlobalApprovalChange,
+  saveProjectParams,
+  saveGlobalParams,
+} = useSettingsPanel()
 </script>
 
 <template>
@@ -393,168 +232,5 @@ onMounted(async () => {
   </div>
 </template>
 
-<style scoped>
-.settings-panel { display: flex; flex-direction: column; height: 100%; }
-.settings-tabs { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--color-border); }
-.subtab-btn { padding: 5px 14px; border: 1px solid var(--color-border); border-radius: 4px; background: transparent; color: var(--color-text-secondary); cursor: pointer; font-size: 12px; }
-.subtab-btn.active { background: var(--color-accent); border-color: var(--color-accent); color: white; }
-.settings-content { flex: 1; overflow-y: auto; padding: 12px; }
-.setting-section { margin-bottom: 16px; }
-.section-title { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-.setting-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--color-border); }
-.setting-item label { font-size: 13px; color: var(--color-text-primary); }
-.setting-value { font-size: 12px; color: var(--color-text-secondary); font-family: var(--font-mono); }
-.setting-hint { font-size: 12px; color: var(--color-text-tertiary); padding: 8px 0; }
-.config-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0; }
-.config-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: var(--color-bg-tertiary); color: var(--color-text-tertiary); border: 1px solid var(--color-border); }
-.config-tag.active { background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.3); color: var(--color-accent); }
-
-.approval-table {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.approval-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: var(--color-bg-secondary);
-  transition: background 0.15s;
-}
-
-.approval-row:hover {
-  background: var(--color-bg-tertiary);
-}
-
-.approval-row.risk-high {
-  border-left: 3px solid rgba(239, 68, 68, 0.5);
-}
-
-.approval-row.risk-low {
-  border-left: 3px solid rgba(34, 197, 94, 0.5);
-}
-
-.approval-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.approval-icon {
-  font-size: 14px;
-}
-
-.approval-label {
-  font-size: 13px;
-  color: var(--color-text-primary);
-  font-weight: 500;
-}
-
-.risk-badge {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-}
-
-.risk-badge.risk-high {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-}
-
-.risk-badge.risk-low {
-  background: rgba(34, 197, 94, 0.12);
-  color: #22c55e;
-}
-
-.approval-default {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-tertiary);
-  font-weight: 500;
-}
-
-.approval-pills {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.pill-btn {
-  font-size: 11px;
-  padding: 4px 10px;
-  border: 1px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
-  outline: none;
-  font-weight: 500;
-}
-
-.pill-btn:first-child {
-  border-radius: 6px 0 0 6px;
-}
-
-.pill-btn:last-child {
-  border-radius: 0 6px 6px 0;
-}
-
-.pill-btn:not(:first-child):not(:last-child) {
-  border-radius: 0;
-}
-
-.pill-btn:hover:not(.active) {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
-  border-color: var(--color-text-tertiary);
-}
-
-.pill-btn.active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: #fff;
-  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.3);
-}
-
-.setting-input {
-  width: 120px;
-  padding: 4px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-bg-primary);
-  color: var(--color-text-primary);
-  font-size: 12px;
-  font-family: var(--font-mono);
-  text-align: right;
-}
-
-.setting-input:focus {
-  outline: none;
-  border-color: var(--color-accent);
-}
-
-.save-btn {
-  margin-top: 8px;
-  padding: 6px 16px;
-  border: none;
-  border-radius: 4px;
-  background: var(--color-accent);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.save-btn:hover {
-  opacity: 0.9;
-}
+<style scoped src="./SettingsPanel.css">
 </style>

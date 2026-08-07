@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import ToastContainer from './ToastContainer.vue'
-import CommandPalette from '@/components/command/CommandPalette.vue'
-import ApprovalModal from '@/components/modal/ApprovalModal.vue'
-import SessionPicker from '@/components/modal/SessionPicker.vue'
-import RollbackPicker from '@/components/modal/RollbackPicker.vue'
-import HelpPanel from '@/components/modal/HelpPanel.vue'
-import ConfigWarningDialog from '@/components/modal/ConfigWarningDialog.vue'
+import { useGlobalModals } from './GlobalModalsController'
+
+const {
+  ToastContainer,
+  CommandPalette,
+  ApprovalModal,
+  SessionPicker,
+  RollbackPicker,
+  HelpPanel,
+  ConfigWarningDialog,
+} = useGlobalModals()
 </script>
 
 <template>
