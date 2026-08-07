@@ -191,13 +191,32 @@ func convertMessages(messages []session.Message, systemPrompt string) []openaiMe
 			ToolCallID: msg.ToolCallID,
 		}
 
-		switch {
-		case msg.Content != "":
-			om.Content = msg.Content
-		case msg.Role == session.RoleTool:
-			om.Content = "(无输出)"
-		default:
-			om.Content = nil
+		if len(msg.ContentParts) > 0 {
+			parts := make([]openaiContentPart, 0, len(msg.ContentParts))
+			for _, cp := range msg.ContentParts {
+				switch cp.Type {
+				case "image_url":
+					parts = append(parts, openaiContentPart{
+						Type:     "image_url",
+						ImageURL: &openaiImageURL{URL: cp.URL},
+					})
+				case "text":
+					parts = append(parts, openaiContentPart{
+						Type: "text",
+						Text: cp.Text,
+					})
+				}
+			}
+			om.Content = parts
+		} else {
+			switch {
+			case msg.Content != "":
+				om.Content = msg.Content
+			case msg.Role == session.RoleTool:
+				om.Content = "(无输出)"
+			default:
+				om.Content = nil
+			}
 		}
 
 		if len(msg.ToolCalls) > 0 {

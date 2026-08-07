@@ -1,11 +1,12 @@
 {
   "name": "devo-desktop",
-  "version": "0.1.0-67cb404-dirty",
+  "version": "0.1.0",
   "author": {
     "name": "Devo AI Coding Agent",
     "email": "1342104001@qq.com"
   },
   "description": "Devo AI Coding Agent - Desktop Application",
+  "homepage": "https://github.com/Bean-jun/devo",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -29,7 +30,10 @@
       "category": "public.app-category.developer-tools"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "resources/icon.png",
       "category": "Development"
     },
