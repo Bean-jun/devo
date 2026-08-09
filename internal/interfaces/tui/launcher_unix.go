@@ -3,11 +3,9 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func programOptions() []tea.ProgramOption {
-	return []tea.ProgramOption{
-		tea.WithAltScreen(),
-	}
+	return nil
 }

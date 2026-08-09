@@ -1,190 +1,201 @@
 package components
 
 import (
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"image/color"
+
+	"charm.land/lipgloss/v2"
 )
 
-func init() {
-	lipgloss.SetColorProfile(termenv.TrueColor)
+type Theme struct {
+	Name          string
+	IsDark        bool
+	BgPrimary     color.Color
+	TextPrimary   color.Color
+	TextSecondary color.Color
+	TextTertiary  color.Color
+	Accent        color.Color
+	Success       color.Color
+	Warning       color.Color
+	Error         color.Color
+	Border        color.Color
+}
+
+var Dark = Theme{
+	Name:          "dark",
+	IsDark:        true,
+	BgPrimary:     lipgloss.Color("#0d1117"),
+	TextPrimary:   lipgloss.Color("#e6edf3"),
+	TextSecondary: lipgloss.Color("#8b949e"),
+	TextTertiary:  lipgloss.Color("#6e7681"),
+	Accent:        lipgloss.Color("#58a6ff"),
+	Success:       lipgloss.Color("#3fb950"),
+	Warning:       lipgloss.Color("#d29922"),
+	Error:         lipgloss.Color("#f85149"),
+	Border:        lipgloss.Color("#30363d"),
+}
+
+var Light = Theme{
+	Name:          "light",
+	IsDark:        false,
+	BgPrimary:     lipgloss.Color("#ffffff"),
+	TextPrimary:   lipgloss.Color("#1f2328"),
+	TextSecondary: lipgloss.Color("#656d76"),
+	TextTertiary:  lipgloss.Color("#8b949e"),
+	Accent:        lipgloss.Color("#0969da"),
+	Success:       lipgloss.Color("#1a7f37"),
+	Warning:       lipgloss.Color("#9a6700"),
+	Error:         lipgloss.Color("#cf222e"),
+	Border:        lipgloss.Color("#d0d7de"),
+}
+
+var CurrentTheme = Dark
+
+func ToggleTheme() {
+	if CurrentTheme.Name == "dark" {
+		CurrentTheme = Light
+	} else {
+		CurrentTheme = Dark
+	}
+}
+
+func ColorAccent() color.Color  { return CurrentTheme.Accent }
+func ColorSuccess() color.Color { return CurrentTheme.Success }
+func ColorWarning() color.Color { return CurrentTheme.Warning }
+func ColorError() color.Color   { return CurrentTheme.Error }
+func ColorMuted() color.Color   { return CurrentTheme.TextSecondary }
+func ColorBorder() color.Color  { return CurrentTheme.Border }
+func ColorText() color.Color    { return CurrentTheme.TextPrimary }
+func ColorBg() color.Color      { return CurrentTheme.BgPrimary }
+
+func DimBgColor() color.Color {
+	if CurrentTheme.IsDark {
+		return lipgloss.Color("#090d13")
+	}
+	return lipgloss.Color("#e8e8ed")
 }
 
 var (
-	ColorPrimary = lipgloss.Color("#A78BFA")
-	ColorSuccess = lipgloss.Color("#34D399")
-	ColorWarning = lipgloss.Color("#FBBF24")
-	ColorDanger  = lipgloss.Color("#F87171")
-	ColorInfo    = lipgloss.Color("#60A5FA")
-	ColorMuted   = lipgloss.Color("#CBD5E1")
-	ColorBg      = lipgloss.Color("#334155")
-	ColorSurface = lipgloss.Color("#475569")
-	ColorBorder  = lipgloss.Color("#64748B")
-	ColorText    = lipgloss.Color("#F8FAFC")
-	ColorWhite   = lipgloss.Color("#FFFFFF")
-)
-
-var StateColors = map[string]lipgloss.Color{
-	"idle":              ColorSuccess,
-	"thinking":          ColorInfo,
-	"tool_executing":    ColorPrimary,
-	"processing":        ColorInfo,
-	"awaiting_approval": ColorWarning,
-	"paused":            ColorMuted,
-	"cancelled":         ColorDanger,
-	"completed":         ColorSuccess,
-	"archived":          ColorMuted,
-}
-
-var (
-	StatusBarStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), false, false, true, false).
-			BorderForeground(ColorBorder).
-			Background(ColorSurface).
-			Foreground(ColorWhite).
+	StatusBarBg = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.TextPrimary).
 			Padding(0, 1)
+	}
 
-	UserPrefixStyle = lipgloss.NewStyle().
-			Foreground(ColorWarning).
-			Bold(true)
-
-	AssistantPrefixStyle = lipgloss.NewStyle().
-				Foreground(ColorInfo).
-				Bold(true)
-
-	SystemNoticeStyle = lipgloss.NewStyle().
-				Foreground(ColorMuted).
-				Italic(true).
-				Padding(0, 1).
-				Margin(0, 0, 1, 0)
-
-	ToolCardStyle = lipgloss.NewStyle().
-			Padding(0, 0, 0, 2).
-			Margin(0, 0, 1, 0)
-
-	ToolCardExecutingStyle = lipgloss.NewStyle().
-				Padding(0, 0, 0, 2).
-				Margin(0, 0, 0, 0)
-
-	ToolCardSuccess = lipgloss.NewStyle().
-			Padding(0, 0, 0, 2).
-			Margin(0, 0, 0, 0)
-
-	ToolCardError = lipgloss.NewStyle().
-			Padding(0, 0, 0, 2).
-			Margin(0, 0, 0, 0)
-
-	ToolCardFoldedStyle = lipgloss.NewStyle().
-				Padding(0, 0, 0, 2).
-				Margin(0, 0, 0, 2)
-
-	ToolCardGroupBorder = lipgloss.NewStyle().
-				Padding(0, 0, 0, 1)
-
-	ToolCardSeparator = lipgloss.NewStyle().
-				Foreground(ColorBorder)
-
-	ModalOverlayStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("#000000CC"))
-
-	ModalBoxStyle = lipgloss.NewStyle().
+	InputBoxStyle = func() lipgloss.Style {
+		return lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorWarning).
-			Padding(2, 3).
-			Background(ColorSurface)
-
-	SidebarStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), false, true, false, false).
-			BorderForeground(ColorBorder).
-			Padding(0, 1).
-			Width(30)
-
-	SidebarItemStyle = lipgloss.NewStyle().
-				Padding(0, 1).
-				Width(27)
-
-	SidebarActiveStyle = lipgloss.NewStyle().
-				Padding(0, 1).
-				Width(27).
-				Foreground(ColorWhite).
-				Background(ColorPrimary)
-
-	InputAreaStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorBorder).
-			Background(ColorSurface).
+			BorderForeground(CurrentTheme.Border).
 			Padding(0, 1)
+	}
 
-	ToastErrorStyle = lipgloss.NewStyle().
-			Background(ColorDanger).
-			Foreground(ColorWhite).
+	UserPrefix = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.Accent).Bold(true)
+	}
+
+	AsstPrefix = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.TextPrimary).Bold(true)
+	}
+
+	ThinkStyle = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.TextSecondary).Italic(true)
+	}
+
+	SysStyle = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.TextSecondary).Italic(true)
+	}
+
+	TimeStyle = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.TextSecondary)
+	}
+
+	DiffStyle = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.Border)
+	}
+
+	ToolExec = func() lipgloss.Style {
+		return lipgloss.NewStyle().Foreground(CurrentTheme.Accent)
+	}
+	ToolOK = func() lipgloss.Style {
+		return lipgloss.NewStyle().Foreground(CurrentTheme.Success)
+	}
+	ToolFail = func() lipgloss.Style {
+		return lipgloss.NewStyle().Foreground(CurrentTheme.Error)
+	}
+	ToolWait = func() lipgloss.Style {
+		return lipgloss.NewStyle().Foreground(CurrentTheme.Warning)
+	}
+	ToolNameStyle = func() lipgloss.Style {
+		return lipgloss.NewStyle().Bold(true)
+	}
+	ToolDetail = func() lipgloss.Style {
+		return lipgloss.NewStyle().Foreground(CurrentTheme.TextSecondary)
+	}
+
+	OverlayStyle = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.TextPrimary)
+	}
+
+	OverlayBoxStyle = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(CurrentTheme.Border).
 			Padding(1, 2)
+	}
 
-	ToastInfoStyle = lipgloss.NewStyle().
-			Background(ColorInfo).
-			Foreground(ColorWhite).
-			Padding(1, 2)
+	OverlayTitleStyle = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.Accent).Bold(true)
+	}
 
-	ApprovalBadgeStyle = lipgloss.NewStyle().
-				Foreground(ColorWarning).
-				Bold(true)
+	OverlayMutedStyle = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.TextSecondary)
+	}
 
-	AutoApprovedBadgeStyle = lipgloss.NewStyle().
-				Foreground(ColorSuccess).
-				Italic(true)
-
-	RiskHighStyle = lipgloss.NewStyle().
-			Foreground(ColorDanger).
-			Bold(true)
-
-	RiskMediumStyle = lipgloss.NewStyle().
-			Foreground(ColorWarning).
-			Bold(true)
-
-	RiskLowStyle = lipgloss.NewStyle().
-			Foreground(ColorSuccess)
-
-	ThinkingStyle = lipgloss.NewStyle().
-			Foreground(ColorMuted).
-			Italic(true)
-
-	ThinkingCollapsedStyle = lipgloss.NewStyle().
-				Foreground(ColorMuted).
-				Padding(0, 1)
-
-	YOLOStatusBarStyle = lipgloss.NewStyle().
-				Border(lipgloss.NormalBorder(), false, false, true, false).
-				BorderForeground(ColorWarning).
-				Background(ColorWarning).
-				Foreground(ColorBg).
-				Padding(0, 1)
-
-	YOLOBadgeStyle = lipgloss.NewStyle().
-			Background(ColorWarning).
-			Foreground(ColorBg).
+	PanelHeaderStyle = func(w int) lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.TextPrimary).
 			Bold(true).
-			Padding(0, 1)
+			Padding(0, 1).
+			Width(w)
+	}
 
-	YOLOSmallBadgeStyle = lipgloss.NewStyle().
-				Foreground(ColorWarning).
-				Bold(true)
+	PanelFooterStyle = func(w int) lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.TextSecondary).
+			Padding(0, 1).
+			Width(w).
+			Align(lipgloss.Center)
+	}
+
+	PanelSeparator = func(w int) lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.Border).
+			Width(w)
+	}
+
+	ToastError = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.Error).
+			Padding(0, 2)
+	}
+
+	ToastSuccess = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.Success).
+			Padding(0, 2)
+	}
+
+	ToastInfo = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.Accent).
+			Padding(0, 2)
+	}
 )
-
-func RiskStyle(level string) lipgloss.Style {
-	switch level {
-	case "high":
-		return RiskHighStyle
-	case "medium":
-		return RiskMediumStyle
-	case "low":
-		return RiskLowStyle
-	default:
-		return RiskLowStyle
-	}
-}
-
-func StateColor(state string) lipgloss.Color {
-	if c, ok := StateColors[state]; ok {
-		return c
-	}
-	return ColorMuted
-}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -15,6 +16,7 @@ import (
 var (
 	tuiLogFile    *os.File
 	tuiLoggerOnce sync.Once
+	tuiSlogMu     sync.Mutex
 )
 
 func initLogger() {
@@ -44,11 +46,22 @@ func Log(format string, args ...interface{}) {
 
 func RedirectStdLog() {
 	initLogger()
+
+	var w io.Writer = io.Discard
 	if tuiLogFile != nil {
-		log.SetOutput(tuiLogFile)
-	} else {
-		log.SetOutput(io.Discard)
+		w = tuiLogFile
 	}
+
+	log.SetOutput(w)
+
+	tuiSlogMu.Lock()
+	defer tuiSlogMu.Unlock()
+
+	handler := slog.NewTextHandler(w, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+	logging.Logger = slog.New(handler)
+	slog.SetDefault(logging.Logger)
 }
 
 func LogFilePath() string {

@@ -1,147 +1,106 @@
 package components
 
 import (
-	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 type StatusBar struct {
-	AppName         string
-	SessionTitle    string
-	SessionState    string
-	ServerPort      int
-	ServerConnected bool
-	Mode            string
-	Width           int
-	YOLOMode        bool
-	SpinnerFrame    int
-	ActivityStream  string
-	ActivityActive  bool
-	ToastMessage    string
-	ToastActive     bool
-	ToastIsError    bool
+	AppName    string
+	Session    string
+	Processing bool
+	Paused     bool
+	Yolo       bool
+	Connected  bool
+	Width      int
 }
-
-var spinnerChars = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
 
 func NewStatusBar() StatusBar {
 	return StatusBar{
-		AppName:         "Devo",
-		SessionTitle:    "",
-		SessionState:    "Idle",
-		ServerPort:      0,
-		ServerConnected: true,
+		AppName:   "Devo",
+		Connected: true,
 	}
 }
 
-func (s *StatusBar) SetActivity(stream string) {
-	s.ActivityStream = stream
-	s.ActivityActive = true
-}
-
-func (s *StatusBar) ClearActivity() {
-	s.ActivityActive = false
-	s.ActivityStream = ""
-}
-
-func (s *StatusBar) View() string {
-	stateColor := StateColor(s.SessionState)
-	stateDot := lipgloss.NewStyle().Foreground(stateColor).Render("●")
-	stateDisplay := lipgloss.NewStyle().Foreground(stateColor).Render(s.SessionState)
-
-	serverIndicator := lipgloss.NewStyle().Foreground(ColorSuccess).Render("[Connected]")
-	if !s.ServerConnected {
-		serverIndicator = lipgloss.NewStyle().Foreground(ColorDanger).Render("[Disconnected]")
+func (s *StatusBar) Render() string {
+	w := s.Width
+	if w < 10 {
+		w = 10
 	}
 
-	left := ""
-	if s.SessionTitle != "" {
-		left = s.SessionTitle
-		left += " · "
+	app := lipgloss.NewStyle().Foreground(ColorAccent()).Bold(true).Render("\U0001f680 " + s.AppName)
+	divider := lipgloss.NewStyle().Foreground(ColorBorder()).Render(" · ")
+	session := lipgloss.NewStyle().Foreground(ColorText()).Render(s.Session)
+
+	statusColor := ColorSuccess()
+	statusText := "\u25cf idle"
+	if s.Processing {
+		statusColor = ColorAccent()
+		statusText = "\u25cf Processing"
 	}
-	left += stateDot + " " + stateDisplay
-
-	if s.YOLOMode {
-		yoloBadge := YOLOSmallBadgeStyle.Render("YOLO")
-		left += " " + yoloBadge
+	if s.Paused {
+		statusColor = ColorMuted()
+		statusText = "\u25cf Paused"
 	}
+	statusDot := lipgloss.NewStyle().Foreground(statusColor).Render(statusText)
 
-	if s.Mode != "" {
-		modeStyle := lipgloss.NewStyle().
-			Background(ColorInfo).
-			Foreground(ColorWhite).
-			Padding(0, 1).
-			Render(s.Mode)
-		left += " " + modeStyle
-	}
-
-	right := fmt.Sprintf(":%d %s", s.ServerPort, serverIndicator)
-
-	innerWidth := s.Width - 4
-	leftWidth := lipgloss.Width(left)
-	rightWidth := lipgloss.Width(right)
-	spacerWidth := innerWidth - leftWidth - rightWidth
-	if spacerWidth < 1 {
-		spacerWidth = 1
+	yolo := ""
+	if s.Yolo {
+		yolo = lipgloss.NewStyle().
+			Foreground(ColorWarning()).Bold(true).
+			Render(" YOLO ")
 	}
 
-	var middle string
+	left := app + divider + session + "  " + statusDot
+	if yolo != "" {
+		left += "  " + yolo
+	}
 
-	if s.ToastActive && s.ToastMessage != "" {
-		toastW := innerWidth - leftWidth
-		if toastW < 4 {
-			toastW = 4
+	var center string
+	if s.Processing {
+		spinner := lipgloss.NewStyle().Foreground(ColorAccent()).Render("\u23f3")
+		activity := lipgloss.NewStyle().Foreground(ColorMuted()).Render("Processing...")
+		center = spinner + " " + activity
+	}
+
+	conn := lipgloss.NewStyle().Foreground(ColorSuccess()).Render("\u2713")
+	if !s.Connected {
+		conn = lipgloss.NewStyle().Foreground(ColorError()).Render("\u2717")
+	}
+	themeIconStr := "\U0001f319"
+	if !CurrentTheme.IsDark {
+		themeIconStr = "\u2600\ufe0f"
+	}
+	themeIcon := lipgloss.NewStyle().Foreground(ColorMuted()).Render(themeIconStr)
+
+	right := conn + "  " + themeIcon
+
+	leftW := lipgloss.Width(left)
+	centerW := lipgloss.Width(center)
+	rightW := lipgloss.Width(right)
+
+	var content string
+	if centerW > 0 {
+		midPad := w - 2 - leftW - centerW - rightW
+		if midPad < 2 {
+			midPad = 2
 		}
-		toastColor := ColorSuccess
-		if s.ToastIsError {
-			toastColor = ColorDanger
-		}
-		text := lipgloss.NewStyle().Foreground(toastColor).Render(s.ToastMessage)
-		if lipgloss.Width(text) > toastW {
-			text = truncateToWidth(text, toastW)
-		}
-		middle = lipgloss.NewStyle().Width(toastW).MaxHeight(1).Padding(0, 1).Render(text)
-		right = ""
-	} else if s.ActivityActive && s.ActivityStream != "" {
-		activityW := innerWidth - leftWidth
-		if activityW < 4 {
-			activityW = 4
-		}
-		spinner := spinnerChars[s.SpinnerFrame%len(spinnerChars)]
-		clean := strings.ReplaceAll(s.ActivityStream, "\n", " ")
-		clean = strings.ReplaceAll(clean, "\r", "")
-		text := spinner + " " + clean
-		text = lipgloss.NewStyle().Foreground(ColorMuted).Render(text)
-		if lipgloss.Width(text) > activityW {
-			text = truncateToWidth(text, activityW)
-		}
-		middle = lipgloss.NewStyle().Width(activityW).MaxHeight(1).Padding(0, 1).Render(text)
-		right = ""
+		mid := midPad / 2
+		content = left + strings.Repeat(" ", mid) + center + strings.Repeat(" ", midPad-mid) + right
 	} else {
-		middle = lipgloss.NewStyle().Width(spacerWidth).MaxHeight(1).Render("")
-	}
-
-	content := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
-
-	baseStyle := StatusBarStyle
-	if s.YOLOMode {
-		baseStyle = YOLOStatusBarStyle
-	}
-
-	return baseStyle.Copy().Width(s.Width).Render(content)
-}
-
-func truncateToWidth(s string, maxWidth int) string {
-	runes := []rune(s)
-	w := 0
-	for i := range runes {
-		rw := lipgloss.Width(string(runes[i]))
-		if w+rw > maxWidth {
-			return string(runes[:i])
+		pad := w - 2 - leftW - rightW
+		if pad < 1 {
+			pad = 1
 		}
-		w += rw
+		content = left + strings.Repeat(" ", pad) + right
 	}
-	return s
+
+	headerLine := StatusBarBg().Width(w).Render(content)
+
+	sep := lipgloss.NewStyle().
+		Foreground(ColorBorder()).
+		Render(strings.Repeat("\u2500", w))
+
+	return headerLine + "\n" + sep
 }

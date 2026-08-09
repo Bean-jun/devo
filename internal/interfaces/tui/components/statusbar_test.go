@@ -5,58 +5,76 @@ import (
 	"testing"
 )
 
-func TestStatusBar_YOLOMode(t *testing.T) {
-	s := NewStatusBar()
-	s.SessionState = "idle"
-	s.Width = 80
-	s.YOLOMode = true
+func TestStatusBar_Render(t *testing.T) {
+	sb := NewStatusBar()
+	sb.Width = 80
+	sb.Session = "test-session"
 
-	view := s.View()
-	if !strings.Contains(view, "YOLO") {
-		t.Error("status bar should display YOLO when YOLOMode is true")
+	result := sb.Render()
+	if !strings.Contains(result, "Devo") {
+		t.Error("渲染结果应包含应用名称 Devo")
+	}
+	if !strings.Contains(result, "test-session") {
+		t.Error("渲染结果应包含会话名称")
+	}
+	if !strings.Contains(result, "idle") {
+		t.Error("渲染结果应包含状态 idle")
+	}
+	if !strings.Contains(result, "─") {
+		t.Error("渲染结果应包含分隔线")
 	}
 }
 
-func TestStatusBar_YOLOModeOff(t *testing.T) {
-	s := NewStatusBar()
-	s.SessionState = "idle"
-	s.Width = 80
-	s.YOLOMode = false
+func TestStatusBar_Processing(t *testing.T) {
+	sb := NewStatusBar()
+	sb.Width = 80
+	sb.Processing = true
 
-	view := s.View()
-	if strings.Contains(view, "YOLO") {
-		t.Error("status bar should not display YOLO when YOLOMode is false")
+	result := sb.Render()
+	if !strings.Contains(result, "Processing") {
+		t.Error("处理中状态应显示 Processing")
 	}
 }
 
-func TestStatusBar_StateDot(t *testing.T) {
-	s := NewStatusBar()
-	s.SessionState = "idle"
-	s.Width = 80
+func TestStatusBar_Paused(t *testing.T) {
+	sb := NewStatusBar()
+	sb.Width = 80
+	sb.Paused = true
 
-	view := s.View()
-	if !strings.Contains(view, "●") {
-		t.Error("status bar should display a state dot ●")
+	result := sb.Render()
+	if !strings.Contains(result, "Paused") {
+		t.Error("暂停状态应显示 Paused")
 	}
 }
 
-func TestStatusBar_AllStates(t *testing.T) {
-	states := []string{
-		"idle", "thinking", "tool_executing", "processing",
-		"awaiting_approval", "paused", "cancelled", "completed", "archived",
+func TestStatusBar_Yolo(t *testing.T) {
+	sb := NewStatusBar()
+	sb.Width = 80
+	sb.Yolo = true
+
+	result := sb.Render()
+	if !strings.Contains(result, "YOLO") {
+		t.Error("YOLO 模式应显示 YOLO 标记")
 	}
+}
 
-	for _, state := range states {
-		s := NewStatusBar()
-		s.SessionState = state
-		s.Width = 80
+func TestStatusBar_Disconnected(t *testing.T) {
+	sb := NewStatusBar()
+	sb.Width = 80
+	sb.Connected = false
 
-		view := s.View()
-		if view == "" {
-			t.Errorf("status bar view should not be empty for state %q", state)
-		}
-		if !strings.Contains(view, "●") {
-			t.Errorf("status bar should have state dot for state %q", state)
-		}
+	result := sb.Render()
+	if !strings.Contains(result, "✗") {
+		t.Error("断开连接状态应显示 ✗")
+	}
+}
+
+func TestStatusBar_MinWidth(t *testing.T) {
+	sb := NewStatusBar()
+	sb.Width = 5
+
+	result := sb.Render()
+	if result == "" {
+		t.Error("即使宽度很小也应能渲染")
 	}
 }
