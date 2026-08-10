@@ -44,6 +44,7 @@ type Model struct {
 	backgroundPanel overlays.BackgroundPanel
 	dashboardPanel  overlays.DashboardPanel
 	settingsPanel   overlays.SettingsPanel
+	reasoningPicker overlays.ReasoningPicker
 	apiClient       *api.Client
 	sseClient       *api.SSEClient
 	baseURL         string
@@ -55,6 +56,8 @@ type Model struct {
 	initialized     bool
 	activeSessionID string
 	loading         map[overlays.OverlayType]bool
+	enableReasoning bool
+	reasoningEffort string
 }
 
 func NewModel(baseURL string, version string) Model {
@@ -101,6 +104,7 @@ func NewModel(baseURL string, version string) Model {
 	}
 
 	m.statusBar.ServerPort = extractPort(baseURL)
+	m.reasoningEffort = "medium"
 
 	return m
 }
@@ -130,13 +134,16 @@ type sseEventMsg struct {
 }
 
 func (m *Model) initFromAPI() tea.Cmd {
-	return func() tea.Msg {
-		sessions, err := m.apiClient.ListSessions()
-		if err != nil {
-			return apiResponseMsg{kind: "sessions_error", err: err}
-		}
-		return apiResponseMsg{kind: "sessions_loaded", data: sessions}
-	}
+	return tea.Batch(
+		func() tea.Msg {
+			sessions, err := m.apiClient.ListSessions()
+			if err != nil {
+				return apiResponseMsg{kind: "sessions_error", err: err}
+			}
+			return apiResponseMsg{kind: "sessions_loaded", data: sessions}
+		},
+		m.fetchGlobalConfigFromAPI(),
+	)
 }
 
 func (m *Model) setLoading(t overlays.OverlayType, v bool) {
@@ -817,6 +824,9 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 	case "/toggle-theme":
 		components.ToggleTheme()
 		m.toast.Show("主题已切换", false)
+	case "/reasoning":
+		m.reasoningPicker = overlays.NewReasoningPicker(m.enableReasoning, m.reasoningEffort)
+		m.overlay.Open(overlays.OverlayReasoning)
 	case "/pause":
 		if m.activeSessionID != "" {
 			return m.pauseSessionFromAPI(m.activeSessionID)
@@ -899,16 +909,56 @@ func (m *Model) updateStatusInfo() {
 	}
 
 	m.statusPanel.Info = overlays.StatusInfo{
-		SessionName:   sessionName,
-		SessionStatus: status,
-		Yolo:          m.statusBar.Yolo,
-		WorkingDir:    m.workingDir,
-		Version:       m.version,
-		InputTokens:   inputTokens,
-		OutputTokens:  outputTokens,
-		ContextTokens: contextTokens,
-		Processing:    m.statusBar.Processing,
+		SessionName:      sessionName,
+		SessionStatus:    status,
+		Yolo:             m.statusBar.Yolo,
+		WorkingDir:       m.workingDir,
+		Version:          m.version,
+		InputTokens:      inputTokens,
+		OutputTokens:     outputTokens,
+		ContextTokens:    contextTokens,
+		Processing:       m.statusBar.Processing,
+		ReasoningEnabled: m.enableReasoning,
+		ReasoningEffort:  m.reasoningEffort,
 	}
+}
+
+func (m *Model) applyReasoningOption(opt overlays.ReasoningOption) {
+	if opt.Value == "off" {
+		m.enableReasoning = false
+		m.reasoningEffort = "medium"
+		m.toast.Show("思维链: 关闭", false)
+	} else {
+		m.enableReasoning = true
+		m.reasoningEffort = opt.Effort
+		m.toast.Show("思维链: "+opt.Label, false)
+	}
+	m.statusBar.ReasoningEnabled = m.enableReasoning
+	m.statusBar.ReasoningEffort = m.reasoningEffort
+}
+
+func (m *Model) updateReasoningConfig() tea.Cmd {
+	body := map[string]interface{}{
+		"llm": map[string]interface{}{
+			"enable_reasoning": m.enableReasoning,
+			"reasoning_effort": m.reasoningEffort,
+		},
+	}
+	return m.saveGlobalConfigFromAPI(body)
+}
+
+func (m *Model) syncReasoningFromConfig(cfg *api.GlobalConfigInfo) {
+	if cfg.LLM != nil {
+		m.enableReasoning = cfg.LLM.EnableReasoning
+		if cfg.LLM.ReasoningEffort != "" {
+			m.reasoningEffort = cfg.LLM.ReasoningEffort
+		}
+	} else {
+		m.enableReasoning = false
+		m.reasoningEffort = ""
+	}
+	m.statusBar.ReasoningEnabled = m.enableReasoning
+	m.statusBar.ReasoningEffort = m.reasoningEffort
 }
 
 func getWorkingDir() string {

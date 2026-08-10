@@ -498,7 +498,9 @@ type GlobalConfigInfo struct {
 }
 
 type LLMConfigInfo struct {
-	MaxTokens *int `json:"max_tokens"`
+	MaxTokens       *int   `json:"max_tokens"`
+	EnableReasoning bool   `json:"enable_reasoning"`
+	ReasoningEffort string `json:"reasoning_effort"`
 }
 
 func (c *Client) GetProjectConfig() (*ProjectConfigInfo, error) {

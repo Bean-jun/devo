@@ -21,6 +21,7 @@ const (
 	OverlayBackground
 	OverlayDashboard
 	OverlaySettings
+	OverlayReasoning
 )
 
 type OverlayStack struct {

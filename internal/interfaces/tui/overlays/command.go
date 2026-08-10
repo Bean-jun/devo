@@ -72,6 +72,7 @@ func NewCommandSheet() CommandSheet {
 				Name: "APP",
 				Commands: []CommandItem{
 					{"/toggle-theme", "切换主题"},
+					{"/reasoning", "切换思维链模式 (关/低/中/高)"},
 					{"/status", "查看当前状态"},
 					{"/version", "查看应用版本"},
 				},

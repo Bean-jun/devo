@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -374,5 +375,55 @@ func TestHandleOverlayKey_ApprovalY(t *testing.T) {
 	_, cmd := m.handleOverlayKey(tea.KeyPressMsg{Text: "y", Code: 'y'})
 	if cmd == nil {
 		t.Error("审批面板按 y 应返回审批命令")
+	}
+}
+
+func TestTruncateActivity_Short(t *testing.T) {
+	result := truncateActivity("hello")
+	if result != "hello" {
+		t.Errorf("短文本不应被截断, got %s", result)
+	}
+}
+
+func TestTruncateActivity_Long(t *testing.T) {
+	long := "这是一段很长的文本用于测试截断功能看看会不会超过四十个字符还需要更多文字才行继续添加更多内容"
+	result := truncateActivity(long)
+	if len([]rune(result)) > 43 {
+		t.Errorf("超长文本应被截断, got len=%d", len([]rune(result)))
+	}
+	if !strings.HasSuffix(result, "...") {
+		t.Errorf("截断文本应以 ... 结尾, got %s", result)
+	}
+}
+
+func TestTruncateActivity_Newlines(t *testing.T) {
+	result := truncateActivity("hello\nworld")
+	if strings.Contains(result, "\n") {
+		t.Error("换行符应被替换为空格")
+	}
+	if !strings.Contains(result, "hello world") {
+		t.Errorf("换行符应替换为空格, got %s", result)
+	}
+}
+
+func TestTruncateActivity_CarriageReturn(t *testing.T) {
+	result := truncateActivity("hello\rworld")
+	if strings.Contains(result, "\r") {
+		t.Error("回车符应被移除")
+	}
+}
+
+func TestTruncateActivity_StreamingToken(t *testing.T) {
+	result := truncateActivity("这是一段流式响应")
+	if result != "这是一段流式响应" {
+		t.Errorf("正常流式令牌不应被修改, got %s", result)
+	}
+}
+
+func TestTruncateActivity_ReasoningPrefix(t *testing.T) {
+	chunk := "让我们来分析一下这个问题的各个方面"
+	result := truncateActivity(chunk)
+	if !strings.HasPrefix(result, chunk) {
+		t.Error("短推理内容不应被截断")
 	}
 }

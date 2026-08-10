@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/textarea"
@@ -520,6 +521,7 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 		if cfg, ok := msg.data.(*api.GlobalConfigInfo); ok {
 			m.settingsPanel.GlobalConfig = cfg
 			m.settingsPanel.BuildFields()
+			m.syncReasoningFromConfig(cfg)
 		}
 
 	case "global_config_error":
@@ -730,6 +732,10 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.backgroundPanel.ToggleExpand()
 			return m, nil
 		}
+		if m.overlay.Current == overlays.OverlayReasoning {
+			m.reasoningPicker.Selected = (m.reasoningPicker.Selected + 1) % len(overlays.ReasoningOptions)
+			return m, nil
+		}
 		return m, nil
 
 	case key == " " || key == "space":
@@ -931,6 +937,13 @@ func (m *Model) handleOverlayEnter() (tea.Model, tea.Cmd) {
 			return m, m.stopBackgroundProcessFromAPI(m.activeSessionID, pid)
 		}
 		return m, nil
+
+	case overlays.OverlayReasoning:
+		opt := m.reasoningPicker.SelectedOption()
+		m.applyReasoningOption(opt)
+		m.overlay.Close()
+		m.refreshViewport()
+		return m, m.updateReasoningConfig()
 	}
 
 	return m, nil
@@ -958,6 +971,8 @@ func (m *Model) handleOverlayCursorUp() {
 		if !m.settingsPanel.Editing {
 			m.settingsPanel.CursorUp()
 		}
+	case overlays.OverlayReasoning:
+		m.reasoningPicker.CursorUp()
 	}
 }
 
@@ -983,6 +998,8 @@ func (m *Model) handleOverlayCursorDown() {
 		if !m.settingsPanel.Editing {
 			m.settingsPanel.CursorDown()
 		}
+	case overlays.OverlayReasoning:
+		m.reasoningPicker.CursorDown()
 	}
 }
 
@@ -1003,6 +1020,12 @@ func (m *Model) handleSSEEvent(msg sseEventMsg) (tea.Model, tea.Cmd) {
 	switch eventType {
 	case "thinking":
 		m.statusBar.Processing = true
+		m.statusBar.ActivityActive = true
+		if msg, ok := evt.Data["message"].(string); ok && msg != "" {
+			m.statusBar.Activity = msg
+		} else {
+			m.statusBar.Activity = "思考中..."
+		}
 		m.refreshViewport()
 
 	case "reasoning_token":
@@ -1013,6 +1036,8 @@ func (m *Model) handleSSEEvent(msg sseEventMsg) (tea.Model, tea.Cmd) {
 			chunk = reasoning
 		}
 		if chunk != "" {
+			m.statusBar.ActivityActive = true
+			m.statusBar.Activity = "思考中: " + truncateActivity(chunk)
 			if len(m.messages) > 0 && m.messages[len(m.messages)-1].Role == "assistant" {
 				last := &m.messages[len(m.messages)-1]
 				last.Thinking += chunk
@@ -1043,6 +1068,8 @@ func (m *Model) handleSSEEvent(msg sseEventMsg) (tea.Model, tea.Cmd) {
 			content = c
 		}
 		if content != "" {
+			m.statusBar.ActivityActive = true
+			m.statusBar.Activity = truncateActivity(content)
 			if len(m.messages) > 0 && m.messages[len(m.messages)-1].Role == "assistant" {
 				last := &m.messages[len(m.messages)-1]
 				last.Content += content
@@ -1165,6 +1192,8 @@ func (m *Model) handleSSEEvent(msg sseEventMsg) (tea.Model, tea.Cmd) {
 			m.messages[len(m.messages)-1].IsStreaming = false
 		}
 		m.statusBar.Processing = false
+		m.statusBar.ActivityActive = false
+		m.statusBar.Activity = ""
 		if m.activeSessionID != "" && evt.Data["input_tokens"] != nil {
 			for i := range m.sessions {
 				if m.sessions[i].ID == m.activeSessionID {
@@ -1330,6 +1359,8 @@ func (m *Model) handleSSEEvent(msg sseEventMsg) (tea.Model, tea.Cmd) {
 			m.messages[len(m.messages)-1].IsStreaming = false
 		}
 		m.statusBar.Processing = false
+		m.statusBar.ActivityActive = false
+		m.statusBar.Activity = ""
 		m.refreshViewportToBottom()
 
 	case "delta", "message":
@@ -1431,4 +1462,13 @@ func (m *Model) handleSSEEvent(msg sseEventMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, m.listenSSE()
+}
+
+func truncateActivity(s string) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", "")
+	if len([]rune(s)) > 40 {
+		return string([]rune(s)[:40]) + "..."
+	}
+	return s
 }

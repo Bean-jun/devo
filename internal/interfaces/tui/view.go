@@ -129,6 +129,8 @@ func (m Model) getPanelContent() string {
 		return m.dashboardPanel.Render()
 	case overlays.OverlaySettings:
 		return m.settingsPanel.Render()
+	case overlays.OverlayReasoning:
+		return m.reasoningPicker.Render()
 	default:
 		return ""
 	}

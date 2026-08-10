@@ -10,15 +10,17 @@ import (
 )
 
 type StatusInfo struct {
-	SessionName   string
-	SessionStatus string
-	Yolo          bool
-	WorkingDir    string
-	Version       string
-	InputTokens   int
-	OutputTokens  int
-	ContextTokens int
-	Processing    bool
+	SessionName      string
+	SessionStatus    string
+	Yolo             bool
+	WorkingDir       string
+	Version          string
+	InputTokens      int
+	OutputTokens     int
+	ContextTokens    int
+	Processing       bool
+	ReasoningEnabled bool
+	ReasoningEffort  string
 }
 
 type StatusPanel struct {
@@ -46,6 +48,11 @@ func (sp *StatusPanel) Render() string {
 		processingStatus = "处理中"
 	}
 
+	reasoningStatus := "关闭"
+	if sp.Info.ReasoningEnabled {
+		reasoningStatus = sp.Info.ReasoningEffort
+	}
+
 	rows := []struct {
 		key string
 		val string
@@ -54,6 +61,7 @@ func (sp *StatusPanel) Render() string {
 		{"状态", sp.Info.SessionStatus},
 		{"处理", processingStatus},
 		{"YOLO", yoloStatus},
+		{"思维链", reasoningStatus},
 		{"工作目录", sp.Info.WorkingDir},
 		{"版本", sp.Info.Version},
 		{"上下文 Tokens", formatTokenCount(sp.Info.ContextTokens)},

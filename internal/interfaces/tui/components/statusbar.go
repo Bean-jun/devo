@@ -7,14 +7,18 @@ import (
 )
 
 type StatusBar struct {
-	AppName    string
-	Session    string
-	Processing bool
-	Paused     bool
-	Yolo       bool
-	Connected  bool
-	Width      int
-	ServerPort string
+	AppName          string
+	Session          string
+	Processing       bool
+	Paused           bool
+	Yolo             bool
+	Connected        bool
+	Width            int
+	ServerPort       string
+	ReasoningEnabled bool
+	ReasoningEffort  string
+	Activity         string
+	ActivityActive   bool
 }
 
 func NewStatusBar() StatusBar {
@@ -57,10 +61,26 @@ func (s *StatusBar) Render() string {
 	}
 
 	var center string
-	if s.Processing {
+	if s.ActivityActive && s.Activity != "" {
+		spinner := lipgloss.NewStyle().Foreground(ColorAccent()).Render("\u23f3")
+		text := s.Activity
+		activity := lipgloss.NewStyle().Foreground(ColorMuted()).Render(text)
+		center = spinner + " " + activity
+	} else if s.Processing && !s.ActivityActive {
 		spinner := lipgloss.NewStyle().Foreground(ColorAccent()).Render("\u23f3")
 		activity := lipgloss.NewStyle().Foreground(ColorMuted()).Render("Processing...")
 		center = spinner + " " + activity
+	}
+
+	reasoning := ""
+	if s.ReasoningEnabled && s.ReasoningEffort != "" {
+		reasoning = lipgloss.NewStyle().
+			Foreground(ColorAccent()).
+			Render("\U0001f9e0 "+s.ReasoningEffort) + "  "
+	} else if !s.ReasoningEnabled {
+		reasoning = lipgloss.NewStyle().
+			Foreground(ColorMuted()).
+			Render("\U0001f9e0 off") + "  "
 	}
 
 	conn := lipgloss.NewStyle().Foreground(ColorSuccess()).Render("\u2713")
@@ -72,7 +92,7 @@ func (s *StatusBar) Render() string {
 		port = lipgloss.NewStyle().Foreground(ColorMuted()).Render(":" + s.ServerPort + " ")
 	}
 
-	right := port + conn
+	right := reasoning + port + conn
 
 	leftW := lipgloss.Width(left)
 	centerW := lipgloss.Width(center)
@@ -80,12 +100,13 @@ func (s *StatusBar) Render() string {
 
 	var content string
 	if centerW > 0 {
-		midPad := w - 2 - leftW - centerW - rightW
-		if midPad < 2 {
-			midPad = 2
+		sep := lipgloss.NewStyle().Foreground(ColorBorder()).Render(" \u2502 ")
+		sepW := lipgloss.Width(sep)
+		pad := w - 2 - leftW - sepW - centerW - rightW
+		if pad < 1 {
+			pad = 1
 		}
-		mid := midPad / 2
-		content = left + strings.Repeat(" ", mid) + center + strings.Repeat(" ", midPad-mid) + right
+		content = left + sep + center + strings.Repeat(" ", pad) + right
 	} else {
 		pad := w - 2 - leftW - rightW
 		if pad < 1 {

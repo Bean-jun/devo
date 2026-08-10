@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"devo/internal/interfaces/tui/api"
 	"devo/internal/interfaces/tui/components"
 	"devo/internal/interfaces/tui/overlays"
 	"devo/internal/interfaces/tui/types"
@@ -195,6 +196,110 @@ func TestModel_RouteCommandSettings(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Error("settings 命令应返回 API Cmd")
+	}
+}
+
+func TestModel_RouteCommandReasoning(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.routeCommand("/reasoning")
+	if m.overlay.Current != overlays.OverlayReasoning {
+		t.Errorf("/reasoning 应打开 ReasoningPicker 面板, got %v", m.overlay.Current)
+	}
+}
+
+func TestModel_RouteCommandReasoningSyncsStatusBar(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+
+	m.applyReasoningOption(overlays.ReasoningOptions[1])
+	if !m.enableReasoning {
+		t.Error("选择 low 应启用思维链")
+	}
+	if m.reasoningEffort != "low" {
+		t.Errorf("选择 low 后 reasoningEffort 应为 low, got %s", m.reasoningEffort)
+	}
+	if !m.statusBar.ReasoningEnabled {
+		t.Error("statusBar 应同步 ReasoningEnabled=true")
+	}
+	if m.statusBar.ReasoningEffort != "low" {
+		t.Errorf("statusBar 应同步 ReasoningEffort=low, got %s", m.statusBar.ReasoningEffort)
+	}
+
+	m.applyReasoningOption(overlays.ReasoningOptions[3])
+	if m.reasoningEffort != "high" {
+		t.Errorf("选择 high 后 reasoningEffort 应为 high, got %s", m.reasoningEffort)
+	}
+
+	m.applyReasoningOption(overlays.ReasoningOptions[0])
+	if m.enableReasoning {
+		t.Error("选择 off 应关闭思维链")
+	}
+	if m.statusBar.ReasoningEnabled {
+		t.Error("关闭后 statusBar 应同步 ReasoningEnabled=false")
+	}
+}
+
+func TestModel_SyncReasoningFromConfig(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+
+	cfg := &api.GlobalConfigInfo{
+		LLM: &api.LLMConfigInfo{
+			EnableReasoning: true,
+			ReasoningEffort: "high",
+		},
+	}
+	m.syncReasoningFromConfig(cfg)
+
+	if !m.enableReasoning {
+		t.Error("syncReasoningFromConfig 应设置 enableReasoning=true")
+	}
+	if m.reasoningEffort != "high" {
+		t.Errorf("syncReasoningFromConfig 应设置 reasonEffort=high, got %s", m.reasoningEffort)
+	}
+	if !m.statusBar.ReasoningEnabled {
+		t.Error("syncReasoningFromConfig 应同步 statusBar.ReasoningEnabled=true")
+	}
+	if m.statusBar.ReasoningEffort != "high" {
+		t.Errorf("syncReasoningFromConfig 应同步 statusBar.ReasoningEffort=high, got %s", m.statusBar.ReasoningEffort)
+	}
+}
+
+func TestModel_SyncReasoningFromConfigNilLLM(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.enableReasoning = true
+	m.reasoningEffort = "medium"
+
+	cfg := &api.GlobalConfigInfo{
+		LLM: nil,
+	}
+	m.syncReasoningFromConfig(cfg)
+
+	if m.enableReasoning {
+		t.Error("LLM 为 nil 时 enableReasoning 应为 false")
+	}
+	if m.reasoningEffort != "" {
+		t.Errorf("LLM 为 nil 时 reasoningEffort 应为空, got %s", m.reasoningEffort)
+	}
+}
+
+func TestModel_UpdateReasoningConfig(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.enableReasoning = true
+	m.reasoningEffort = "medium"
+
+	cmd := m.updateReasoningConfig()
+	if cmd == nil {
+		t.Error("updateReasoningConfig 应返回 API Cmd")
+	}
+}
+
+func TestModel_NewModelDefaultReasoning(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+
+	if m.enableReasoning {
+		t.Error("新 Model 默认 enableReasoning 应为 false")
+	}
+	if m.reasoningEffort != "medium" {
+		t.Errorf("新 Model 默认 reasoningEffort 应为 medium, got %s", m.reasoningEffort)
 	}
 }
 
