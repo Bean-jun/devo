@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -60,8 +61,8 @@ func (r *MsgRenderer) buildMdRenderer() {
 		style = "light"
 	}
 	mdRenderer, err := glamour.NewTermRenderer(
-		glamour.WithStylePath(style),
-		glamour.WithWordWrap(r.width-4),
+		glamour.WithStandardStyle(style),
+		glamour.WithWordWrap(0),
 	)
 	if err == nil {
 		r.mdRenderer = mdRenderer
@@ -123,13 +124,15 @@ func (r *MsgRenderer) renderMessage(msg types.Message) string {
 		return r.renderUser(msg)
 	case "assistant":
 		return r.renderAssistant(msg)
+	case "tool":
+		return r.renderToolMessage(msg)
 	default:
 		return r.renderSystem(msg)
 	}
 }
 
 func (r *MsgRenderer) renderUser(msg types.Message) string {
-	prefix := components.UserPrefix().Render("\u23fa")
+	prefix := components.UserPrefix().Render("\u25b6")
 	prefixW := lipgloss.Width(prefix)
 	bodyW := r.width - prefixW - 1
 	if bodyW < 10 {
@@ -146,15 +149,13 @@ func (r *MsgRenderer) renderUser(msg types.Message) string {
 		b.WriteString("\n" + indent + line)
 	}
 
-	ts := components.TimeStyle().Render("  " + msg.CreatedAt)
-	b.WriteString("\n" + ts)
 	return b.String()
 }
 
 func (r *MsgRenderer) renderAssistant(msg types.Message) string {
 	var b strings.Builder
 
-	prefix := components.AsstPrefix().Render("\u23fa")
+	prefix := components.AsstPrefix().Render("\u25cf")
 	prefixW := lipgloss.Width(prefix)
 	bodyW := r.width - prefixW - 1
 	if bodyW < 10 {
@@ -166,7 +167,7 @@ func (r *MsgRenderer) renderAssistant(msg types.Message) string {
 	if r.mdRenderer != nil {
 		rendered, err := r.mdRenderer.Render(preWrapped)
 		if err == nil {
-			body = strings.TrimSpace(rendered)
+			body = stripBlockChars(strings.TrimSpace(rendered))
 		}
 	}
 	if body == "" {
@@ -187,7 +188,7 @@ func (r *MsgRenderer) renderAssistant(msg types.Message) string {
 			if line == "" {
 				continue
 			}
-			b.WriteString(components.ThinkStyle().Render("  \u00b7 ") + components.ThinkStyle().Render(line) + "\n")
+			b.WriteString(components.ThinkStyle().Render("  - ") + components.ThinkStyle().Render(line) + "\n")
 		}
 	}
 
@@ -197,8 +198,6 @@ func (r *MsgRenderer) renderAssistant(msg types.Message) string {
 			b.WriteString(r.renderToolCall(tc))
 		}
 	}
-
-	b.WriteString("\n" + components.TimeStyle().Render("  "+msg.CreatedAt))
 
 	return strings.TrimRight(b.String(), "\n")
 }
@@ -214,10 +213,10 @@ func (r *MsgRenderer) renderToolCall(tc types.ToolCall) string {
 		prefix = "\u2717"
 		styleFn = components.ToolFail
 	case "pending", "awaiting_approval":
-		prefix = "\u23fa"
+		prefix = "\u25cb"
 		styleFn = components.ToolWait
 	default:
-		prefix = "\u23fa"
+		prefix = "\u25cb"
 		styleFn = components.ToolExec
 	}
 
@@ -236,19 +235,45 @@ func (r *MsgRenderer) renderToolCall(tc types.ToolCall) string {
 
 	line := styleFn().Render("  "+prefix) +
 		" " + components.ToolNameStyle().Render(name) +
-		"  " + components.ToolDetail().Render(summary+"  \u00b7  "+tc.Status+"  \u00b7  "+duration)
+		"  " + components.ToolDetail().Render(summary+"  -  "+tc.Status+"  -  "+duration)
 
-	if tc.Diff != "" && tc.Expanded {
-		for _, dl := range strings.Split(tc.Diff, "\n") {
-			dl = strings.TrimSpace(dl)
-			if dl == "" {
-				continue
+	if tc.Expanded {
+		if tc.Diff != "" {
+			for _, dl := range strings.Split(tc.Diff, "\n") {
+				dl = strings.TrimSpace(dl)
+				if dl == "" {
+					continue
+				}
+				line += "\n" + components.DiffStyle().Render("  \u2502  "+dl)
 			}
-			line += "\n" + components.DiffStyle().Render("  \u2502  "+dl)
+		}
+		if tc.Output != "" {
+			line += "\n" + components.DiffStyle().Render("  \u2502  "+strings.Repeat("\u2500", 8)+" output "+strings.Repeat("\u2500", 8))
+			for _, ol := range strings.Split(tc.Output, "\n") {
+				ol = strings.TrimSpace(ol)
+				if ol == "" {
+					continue
+				}
+				line += "\n" + components.DiffStyle().Render("  \u2502  "+ol)
+			}
 		}
 	}
 
 	return line
+}
+
+func (r *MsgRenderer) renderToolMessage(msg types.Message) string {
+	if len(msg.ToolCalls) == 0 {
+		if msg.Content != "" {
+			return r.renderSystem(msg)
+		}
+		return ""
+	}
+	var b strings.Builder
+	for _, tc := range msg.ToolCalls {
+		b.WriteString(r.renderToolCall(tc))
+	}
+	return b.String()
 }
 
 func (r *MsgRenderer) renderSystem(msg types.Message) string {
@@ -327,4 +352,19 @@ func (r *MsgRenderer) GetCacheLineCount(index int) int {
 		return 0
 	}
 	return strings.Count(r.cache.cache[index], "\n") + 1
+}
+
+var reAnsiBg = regexp.MustCompile(`\x1b\[(?:4[0-7]|10[0-7]|48(?:;[0-9]+)*|49)m`)
+
+func stripBlockChars(s string) string {
+	s = reAnsiBg.ReplaceAllString(s, "")
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 0x2500 && r <= 0x27BF) || (r >= 0x2580 && r <= 0x259F) {
+			b.WriteRune(' ')
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

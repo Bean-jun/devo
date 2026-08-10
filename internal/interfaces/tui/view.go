@@ -103,8 +103,6 @@ func (m Model) getPanelContent() string {
 		return m.sessPicker.Render()
 	case overlays.OverlayHelp:
 		return m.helpPanel.Render()
-	case overlays.OverlayFiles:
-		return m.filesPanel.Render()
 	case overlays.OverlaySkills:
 		return m.skillsPanel.Render()
 	case overlays.OverlayMCP:
@@ -121,6 +119,16 @@ func (m Model) getPanelContent() string {
 		return m.rollback.Render()
 	case overlays.OverlayApproval:
 		return m.approval.Render()
+	case overlays.OverlayStatus:
+		return m.statusPanel.Render()
+	case overlays.OverlayVersion:
+		return m.versionPanel.Render()
+	case overlays.OverlayBackground:
+		return m.backgroundPanel.Render()
+	case overlays.OverlayDashboard:
+		return m.dashboardPanel.Render()
+	case overlays.OverlaySettings:
+		return m.settingsPanel.Render()
 	default:
 		return ""
 	}

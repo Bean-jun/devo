@@ -76,11 +76,10 @@ func TestModel_RouteCommand(t *testing.T) {
 		{"/switch", overlays.OverlaySession},
 		{"/rename", overlays.OverlayRename},
 		{"/rollback", overlays.OverlayRollback},
-		{"/files", overlays.OverlayFiles},
 		{"/skills", overlays.OverlaySkills},
 		{"/mcp", overlays.OverlayMCP},
 		{"/memory", overlays.OverlayMemory},
-		{"/workspace", overlays.OverlayWorkspace},
+		{"/workspace-switch", overlays.OverlayWorkspace},
 		{"/help", overlays.OverlayHelp},
 	}
 
@@ -95,30 +94,39 @@ func TestModel_RouteCommand(t *testing.T) {
 	}
 }
 
-func TestModel_RouteCommandTheme(t *testing.T) {
+func TestModel_RouteCommandToggleTheme(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
-	m.routeCommand("/theme")
+	m.routeCommand("/toggle-theme")
 	if m.toast.Duration != 3 {
-		t.Error("theme 命令应触发 Toast")
+		t.Error("toggle-theme 命令应触发 Toast")
 	}
 	components.CurrentTheme = components.Dark
 }
 
-func TestModel_RouteCommandYolo(t *testing.T) {
+func TestModel_RouteCommandPause(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
-	oldYolo := m.statusBar.Yolo
-	m.routeCommand("/yolo")
-	if m.statusBar.Yolo == oldYolo {
-		t.Error("yolo 命令应切换 YOLO 状态")
+	m.activeSessionID = "test-session-1"
+	cmd := m.routeCommand("/pause")
+	if cmd == nil {
+		t.Error("pause 命令应返回 API Cmd")
 	}
 }
 
-func TestModel_RouteCommandPause(t *testing.T) {
+func TestModel_RouteCommandResume(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
-	oldPaused := m.statusBar.Paused
-	m.routeCommand("/pause")
-	if m.statusBar.Paused == oldPaused {
-		t.Error("pause 命令应切换暂停状态")
+	m.activeSessionID = "test-session-1"
+	cmd := m.routeCommand("/resume")
+	if cmd == nil {
+		t.Error("resume 命令应返回 API Cmd")
+	}
+}
+
+func TestModel_RouteCommandCompact(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-session-1"
+	cmd := m.routeCommand("/compact")
+	if cmd == nil {
+		t.Error("compact 命令应返回 API Cmd")
 	}
 }
 
@@ -139,19 +147,54 @@ func TestModel_RouteCommandExport(t *testing.T) {
 	}
 }
 
-func TestModel_RouteCommandWCreate(t *testing.T) {
+func TestModel_RouteCommandVersion(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
-	m.routeCommand("/w-create")
-	if m.toast.Duration != 3 {
-		t.Error("w-create 命令应触发 Toast")
+	m.routeCommand("/version")
+	if m.overlay.Current != overlays.OverlayVersion {
+		t.Errorf("version 命令应打开 Version 面板, got %v", m.overlay.Current)
 	}
 }
 
-func TestModel_RouteCommandQuit(t *testing.T) {
+func TestModel_RouteCommandStatus(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
-	cmd := m.routeCommand("/quit")
+	m.routeCommand("/status")
+	if m.overlay.Current != overlays.OverlayStatus {
+		t.Errorf("status 命令应打开 Status 面板, got %v", m.overlay.Current)
+	}
+}
+
+func TestModel_RouteCommandBackground(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-session-1"
+	cmd := m.routeCommand("/background")
+	if m.overlay.Current != overlays.OverlayBackground {
+		t.Errorf("background 命令应打开 Background 面板, got %v", m.overlay.Current)
+	}
 	if cmd == nil {
-		t.Error("quit 命令应返回退出 Cmd")
+		t.Error("background 命令应返回 API Cmd")
+	}
+}
+
+func TestModel_RouteCommandDashboard(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-session-1"
+	cmd := m.routeCommand("/dashboard")
+	if m.overlay.Current != overlays.OverlayDashboard {
+		t.Errorf("dashboard 命令应打开 Dashboard 面板, got %v", m.overlay.Current)
+	}
+	if cmd == nil {
+		t.Error("dashboard 命令应返回 API Cmd")
+	}
+}
+
+func TestModel_RouteCommandSettings(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	cmd := m.routeCommand("/settings")
+	if m.overlay.Current != overlays.OverlaySettings {
+		t.Errorf("settings 命令应打开 Settings 面板, got %v", m.overlay.Current)
+	}
+	if cmd == nil {
+		t.Error("settings 命令应返回 API Cmd")
 	}
 }
 
@@ -224,17 +267,167 @@ func TestModel_Init(t *testing.T) {
 func TestModel_LoadingState(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
 
-	if m.isLoading(overlays.OverlayFiles) {
+	if m.isLoading(overlays.OverlaySkills) {
 		t.Error("新 Model 不应有加载状态")
 	}
 
-	m.setLoading(overlays.OverlayFiles, true)
-	if !m.isLoading(overlays.OverlayFiles) {
+	m.setLoading(overlays.OverlaySkills, true)
+	if !m.isLoading(overlays.OverlaySkills) {
 		t.Error("setLoading 后应返回 true")
 	}
 
-	m.setLoading(overlays.OverlayFiles, false)
-	if m.isLoading(overlays.OverlayFiles) {
+	m.setLoading(overlays.OverlaySkills, false)
+	if m.isLoading(overlays.OverlaySkills) {
 		t.Error("取消加载后应返回 false")
+	}
+}
+
+func TestModel_IsEditing_Rename(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayRename)
+	if !m.isEditing() {
+		t.Error("重命名面板应处于编辑模式")
+	}
+}
+
+func TestModel_IsEditing_Command(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayCommand)
+	if !m.isEditing() {
+		t.Error("命令面板应处于编辑模式")
+	}
+}
+
+func TestModel_IsEditing_SkillsIdle(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlaySkills)
+	if m.isEditing() {
+		t.Error("技能面板未编辑时不应处于编辑模式")
+	}
+}
+
+func TestModel_IsEditing_SkillsEditing(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlaySkills)
+	m.skillsPanel.StartEditing()
+	if !m.isEditing() {
+		t.Error("技能面板编辑中应处于编辑模式")
+	}
+}
+
+func TestModel_IsEditing_MCPIdle(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayMCP)
+	if m.isEditing() {
+		t.Error("MCP 面板未编辑时不应处于编辑模式")
+	}
+}
+
+func TestModel_IsEditing_MCPEditing(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayMCP)
+	m.mcpPanel.StartEditing()
+	if !m.isEditing() {
+		t.Error("MCP 面板编辑中应处于编辑模式")
+	}
+}
+
+func TestModel_IsEditing_MemoryIdle(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayMemory)
+	if m.isEditing() {
+		t.Error("记忆面板未编辑时不应处于编辑模式")
+	}
+}
+
+func TestModel_IsEditing_MemoryEditing(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayMemory)
+	m.memoryPanel.StartEditing()
+	if !m.isEditing() {
+		t.Error("记忆面板编辑中应处于编辑模式")
+	}
+}
+
+func TestModel_IsEditing_SettingsIdle(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlaySettings)
+	if m.isEditing() {
+		t.Error("设置面板未编辑时不应处于编辑模式")
+	}
+}
+
+func TestModel_IsEditing_Help(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayHelp)
+	if m.isEditing() {
+		t.Error("帮助面板不应处于编辑模式")
+	}
+}
+
+func TestModel_AppendEditChar_Rename(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayRename)
+	m.appendEditChar("n")
+	m.appendEditChar("y")
+	m.appendEditChar("j")
+	m.appendEditChar("k")
+	if m.renameModal.NewName != "nyjk" {
+		t.Errorf("重命名面板输入应为 nyjk, got %s", m.renameModal.NewName)
+	}
+}
+
+func TestModel_AppendEditChar_Command(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayCommand)
+	m.appendEditChar("n")
+	m.appendEditChar("y")
+	if m.cmdSheet.Filter != "ny" {
+		t.Errorf("命令面板过滤应为 ny, got %s", m.cmdSheet.Filter)
+	}
+}
+
+func TestModel_AppendEditChar_Skills(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlaySkills)
+	m.skillsPanel.StartEditing()
+	m.appendEditChar("y")
+	m.appendEditChar("n")
+	if m.skillsPanel.EditBuffer != "yn" {
+		t.Errorf("技能面板编辑缓冲应为 yn, got %s", m.skillsPanel.EditBuffer)
+	}
+}
+
+func TestModel_AppendEditChar_MCP(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayMCP)
+	m.mcpPanel.StartEditing()
+	m.appendEditChar("j")
+	m.appendEditChar("k")
+	if m.mcpPanel.EditBuffer != "jk" {
+		t.Errorf("MCP 面板编辑缓冲应为 jk, got %s", m.mcpPanel.EditBuffer)
+	}
+}
+
+func TestModel_AppendEditChar_Memory(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayMemory)
+	m.memoryPanel.StartEditing()
+	m.appendEditChar("n")
+	m.appendEditChar("y")
+	if m.memoryPanel.EditBuffer != "ny" {
+		t.Errorf("记忆面板编辑缓冲应为 ny, got %s", m.memoryPanel.EditBuffer)
+	}
+}
+
+func TestModel_ExtractPort(t *testing.T) {
+	if p := extractPort("http://localhost:8080"); p != "8080" {
+		t.Errorf("端口应为 8080, got %s", p)
+	}
+	if p := extractPort("http://127.0.0.1:3000"); p != "3000" {
+		t.Errorf("端口应为 3000, got %s", p)
+	}
+	if p := extractPort("invalid-url"); p != "" {
+		t.Errorf("无效 URL 应返回空字符串, got %s", p)
 	}
 }

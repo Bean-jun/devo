@@ -9,11 +9,9 @@ func TestStatusBar_Render(t *testing.T) {
 	sb := NewStatusBar()
 	sb.Width = 80
 	sb.Session = "test-session"
+	sb.ServerPort = "8080"
 
 	result := sb.Render()
-	if !strings.Contains(result, "Devo") {
-		t.Error("渲染结果应包含应用名称 Devo")
-	}
 	if !strings.Contains(result, "test-session") {
 		t.Error("渲染结果应包含会话名称")
 	}
@@ -22,6 +20,9 @@ func TestStatusBar_Render(t *testing.T) {
 	}
 	if !strings.Contains(result, "─") {
 		t.Error("渲染结果应包含分隔线")
+	}
+	if !strings.Contains(result, ":8080") {
+		t.Error("渲染结果应包含端口号 :8080")
 	}
 }
 

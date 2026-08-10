@@ -2,8 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/textarea"
@@ -32,7 +32,6 @@ type Model struct {
 	sessPicker      overlays.SessionPicker
 	approval        overlays.ApprovalModal
 	helpPanel       overlays.HelpPanel
-	filesPanel      overlays.FilesPanel
 	skillsPanel     overlays.SkillsPanel
 	mcpPanel        overlays.MCPPanel
 	memoryPanel     overlays.MemoryPanel
@@ -40,6 +39,11 @@ type Model struct {
 	renameModal     overlays.RenameModal
 	rollback        overlays.RollbackPicker
 	newSessModal    overlays.NewSessionModal
+	statusPanel     overlays.StatusPanel
+	versionPanel    overlays.VersionPanel
+	backgroundPanel overlays.BackgroundPanel
+	dashboardPanel  overlays.DashboardPanel
+	settingsPanel   overlays.SettingsPanel
 	apiClient       *api.Client
 	sseClient       *api.SSEClient
 	baseURL         string
@@ -70,29 +74,33 @@ func NewModel(baseURL string, version string) Model {
 	ta.Focus()
 
 	m := Model{
-		viewport:     vp,
-		textarea:     ta,
-		renderer:     renderer.New(80),
-		statusBar:    components.NewStatusBar(),
-		cmdSheet:     overlays.NewCommandSheet(),
-		helpPanel:    overlays.HelpPanel{},
-		filesPanel:   overlays.NewFilesPanel(),
-		skillsPanel:  overlays.NewSkillsPanel(),
-		mcpPanel:     overlays.NewMCPPanel(),
-		memoryPanel:  overlays.NewMemoryPanel(),
-		wsPanel:      overlays.NewWorkspacePanel(),
-		rollback:     overlays.NewRollbackPicker(nil),
-		newSessModal: overlays.NewSessionModal{},
-		apiClient:    api.NewClient(baseURL),
-		sseClient:    api.NewSSEClient(baseURL),
-		baseURL:      baseURL,
-		version:      version,
-		workingDir:   getWorkingDir(),
-		width:        80,
-		height:       24,
-		ready:        true,
-		loading:      make(map[overlays.OverlayType]bool),
+		viewport:        vp,
+		textarea:        ta,
+		renderer:        renderer.New(80),
+		statusBar:       components.NewStatusBar(),
+		cmdSheet:        overlays.NewCommandSheet(),
+		helpPanel:       overlays.HelpPanel{},
+		skillsPanel:     overlays.NewSkillsPanel(),
+		mcpPanel:        overlays.NewMCPPanel(),
+		memoryPanel:     overlays.NewMemoryPanel(),
+		wsPanel:         overlays.NewWorkspacePanel(),
+		rollback:        overlays.NewRollbackPicker(nil),
+		newSessModal:    overlays.NewSessionModal{},
+		backgroundPanel: overlays.NewBackgroundPanel(),
+		dashboardPanel:  overlays.NewDashboardPanel(),
+		settingsPanel:   overlays.NewSettingsPanel(),
+		apiClient:       api.NewClient(baseURL),
+		sseClient:       api.NewSSEClient(baseURL),
+		baseURL:         baseURL,
+		version:         version,
+		workingDir:      getWorkingDir(),
+		width:           80,
+		height:          24,
+		ready:           true,
+		loading:         make(map[overlays.OverlayType]bool),
 	}
+
+	m.statusBar.ServerPort = extractPort(baseURL)
 
 	return m
 }
@@ -145,6 +153,43 @@ func (m *Model) isLoading(t overlays.OverlayType) bool {
 	return m.loading[t]
 }
 
+func (m *Model) isEditing() bool {
+	switch m.overlay.Current {
+	case overlays.OverlayRename:
+		return true
+	case overlays.OverlayCommand:
+		return true
+	case overlays.OverlaySettings:
+		return m.settingsPanel.Editing
+	case overlays.OverlaySkills:
+		return m.skillsPanel.Editing
+	case overlays.OverlayMCP:
+		return m.mcpPanel.Editing
+	case overlays.OverlayMemory:
+		return m.memoryPanel.Editing
+	}
+	return false
+}
+
+func (m *Model) appendEditChar(s string) {
+	switch m.overlay.Current {
+	case overlays.OverlayRename:
+		m.renameModal.NewName += s
+	case overlays.OverlayCommand:
+		m.cmdSheet.Filter += s
+		m.cmdSheet.Selected = 0
+		m.cmdSheet.BuildFlat()
+	case overlays.OverlaySettings:
+		m.settingsPanel.EditBuffer += s
+	case overlays.OverlaySkills:
+		m.skillsPanel.EditBuffer += s
+	case overlays.OverlayMCP:
+		m.mcpPanel.EditBuffer += s
+	case overlays.OverlayMemory:
+		m.memoryPanel.EditBuffer += s
+	}
+}
+
 func (m *Model) fetchSessionsFromAPI() tea.Cmd {
 	m.setLoading(overlays.OverlaySession, true)
 	return func() tea.Msg {
@@ -163,17 +208,6 @@ func (m *Model) fetchMessagesFromAPI(sessionID string) tea.Cmd {
 			return apiResponseMsg{kind: "messages_error", err: err}
 		}
 		return apiResponseMsg{kind: "messages_loaded", data: msgs, sessionID: sessionID}
-	}
-}
-
-func (m *Model) fetchFilesFromAPI() tea.Cmd {
-	m.setLoading(overlays.OverlayFiles, true)
-	return func() tea.Msg {
-		files, err := m.apiClient.GetFiles("", "")
-		if err != nil {
-			return apiResponseMsg{kind: "files_error", err: err}
-		}
-		return apiResponseMsg{kind: "files_loaded", data: files}
 	}
 }
 
@@ -202,11 +236,13 @@ func (m *Model) fetchMCPServersFromAPI() tea.Cmd {
 func (m *Model) fetchMemoriesFromAPI(sessionID string) tea.Cmd {
 	m.setLoading(overlays.OverlayMemory, true)
 	return func() tea.Msg {
-		memories, err := m.apiClient.GetMemories(sessionID)
-		if err != nil {
-			return apiResponseMsg{kind: "memory_error", err: err}
+		userMemories, userErr := m.apiClient.GetMemories(sessionID, "user")
+		projMemories, projErr := m.apiClient.GetMemories(sessionID, "project")
+		if userErr != nil && projErr != nil {
+			return apiResponseMsg{kind: "memory_error", err: userErr}
 		}
-		return apiResponseMsg{kind: "memory_loaded", data: memories}
+		all := append(userMemories, projMemories...)
+		return apiResponseMsg{kind: "memory_loaded", data: all}
 	}
 }
 
@@ -301,6 +337,16 @@ func (m *Model) archiveSessionFromAPI(sessionID string) tea.Cmd {
 	}
 }
 
+func (m *Model) compactSessionFromAPI(sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		result, err := m.apiClient.CompactSession(sessionID)
+		if err != nil {
+			return apiResponseMsg{kind: "compact_error", err: err}
+		}
+		return apiResponseMsg{kind: "compact_done", data: result}
+	}
+}
+
 func (m *Model) approveFromAPI(sessionID string, approvalID string) tea.Cmd {
 	return func() tea.Msg {
 		req := types.ApproveRequest{Decision: "approve", ApprovalID: approvalID}
@@ -312,9 +358,9 @@ func (m *Model) approveFromAPI(sessionID string, approvalID string) tea.Cmd {
 	}
 }
 
-func (m *Model) upsertMemoryFromAPI(sessionID string, key, content string) tea.Cmd {
+func (m *Model) upsertMemoryFromAPI(sessionID string, memoryType string, key, content string) tea.Cmd {
 	return func() tea.Msg {
-		err := m.apiClient.UpsertMemory(sessionID, key, content)
+		err := m.apiClient.UpsertMemory(sessionID, memoryType, key, content)
 		if err != nil {
 			return apiResponseMsg{kind: "memory_upsert_error", err: err}
 		}
@@ -381,6 +427,26 @@ func (m *Model) toggleMCPServerFromAPI(serverID string) tea.Cmd {
 	}
 }
 
+func (m *Model) installSkillFromAPI(value string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.apiClient.InstallSkill(value)
+		if err != nil {
+			return apiResponseMsg{kind: "skill_install_error", err: err}
+		}
+		return apiResponseMsg{kind: "skill_installed"}
+	}
+}
+
+func (m *Model) addMCPServerFromAPI(serverID, endpoint string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.apiClient.AddMCPServer(serverID, endpoint, "sse", "project")
+		if err != nil {
+			return apiResponseMsg{kind: "mcp_add_error", err: err}
+		}
+		return apiResponseMsg{kind: "mcp_added"}
+	}
+}
+
 func (m *Model) deleteMemoryFromAPI(sessionID string, memoryID string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.apiClient.DeleteMemory(sessionID, memoryID)
@@ -388,6 +454,86 @@ func (m *Model) deleteMemoryFromAPI(sessionID string, memoryID string) tea.Cmd {
 			return apiResponseMsg{kind: "memory_delete_error", err: err}
 		}
 		return apiResponseMsg{kind: "memory_deleted", id: memoryID}
+	}
+}
+
+func (m *Model) fetchBackgroundProcessesFromAPI(sessionID string) tea.Cmd {
+	m.setLoading(overlays.OverlayBackground, true)
+	return func() tea.Msg {
+		processes, err := m.apiClient.GetBackgroundProcesses(sessionID)
+		if err != nil {
+			return apiResponseMsg{kind: "background_error", err: err}
+		}
+		return apiResponseMsg{kind: "background_loaded", data: processes}
+	}
+}
+
+func (m *Model) stopBackgroundProcessFromAPI(sessionID string, pid int) tea.Cmd {
+	return func() tea.Msg {
+		err := m.apiClient.StopBackgroundProcess(sessionID, pid)
+		if err != nil {
+			return apiResponseMsg{kind: "background_stop_error", err: err}
+		}
+		return apiResponseMsg{kind: "background_stopped"}
+	}
+}
+
+func (m *Model) fetchDashboardDataFromAPI(sessionID string) tea.Cmd {
+	m.setLoading(overlays.OverlayDashboard, true)
+	return func() tea.Msg {
+		sessionUsage, err := m.apiClient.GetSessionUsage(sessionID)
+		if err != nil {
+			return apiResponseMsg{kind: "dashboard_error", err: err}
+		}
+		projectUsage, err := m.apiClient.GetProjectUsage(m.workingDir, "date")
+		if err != nil {
+			projectUsage = nil
+		}
+		return apiResponseMsg{kind: "dashboard_loaded", data: map[string]interface{}{
+			"session_usage": sessionUsage,
+			"project_usage": projectUsage,
+		}}
+	}
+}
+
+func (m *Model) fetchProjectConfigFromAPI() tea.Cmd {
+	m.setLoading(overlays.OverlaySettings, true)
+	return func() tea.Msg {
+		cfg, err := m.apiClient.GetProjectConfig()
+		if err != nil {
+			return apiResponseMsg{kind: "project_config_error", err: err}
+		}
+		return apiResponseMsg{kind: "project_config_loaded", data: cfg}
+	}
+}
+
+func (m *Model) fetchGlobalConfigFromAPI() tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := m.apiClient.GetGlobalConfig()
+		if err != nil {
+			return apiResponseMsg{kind: "global_config_error", err: err}
+		}
+		return apiResponseMsg{kind: "global_config_loaded", data: cfg}
+	}
+}
+
+func (m *Model) saveProjectConfigFromAPI(body map[string]interface{}) tea.Cmd {
+	return func() tea.Msg {
+		err := m.apiClient.UpdateProjectConfig(body)
+		if err != nil {
+			return apiResponseMsg{kind: "project_config_save_error", err: err}
+		}
+		return apiResponseMsg{kind: "project_config_saved"}
+	}
+}
+
+func (m *Model) saveGlobalConfigFromAPI(body map[string]interface{}) tea.Cmd {
+	return func() tea.Msg {
+		err := m.apiClient.UpdateGlobalConfig(body)
+		if err != nil {
+			return apiResponseMsg{kind: "global_config_save_error", err: err}
+		}
+		return apiResponseMsg{kind: "global_config_saved"}
 	}
 }
 
@@ -409,27 +555,6 @@ func (m *Model) applyMessagesData(msgs []types.Message) {
 		}
 		m.refreshViewportToBottom()
 	}
-}
-
-func (m *Model) applyFilesData(files []types.FileInfo) {
-	var entries []overlays.FileEntry
-	for _, f := range files {
-		ext := ""
-		if idx := strings.LastIndex(f.Name, "."); idx >= 0 {
-			ext = f.Name[idx+1:]
-		}
-		size := fmt.Sprintf("%d", f.Size)
-		if f.Size > 1024 {
-			size = fmt.Sprintf("%.1fK", float64(f.Size)/1024)
-		}
-		entries = append(entries, overlays.FileEntry{
-			Name:     f.Name,
-			Size:     size,
-			Type:     ext,
-			Modified: "N/A",
-		})
-	}
-	m.filesPanel.Files = entries
 }
 
 func (m *Model) applySkillsData(skills []api.SkillInfo) {
@@ -461,6 +586,7 @@ func (m *Model) applyMemoriesData(memories []api.MemoryItem) {
 	for _, mem := range memories {
 		entries = append(entries, overlays.MemoryEntry{
 			ID:      mem.ID,
+			Type:    mem.Type,
 			Key:     mem.Key,
 			Content: mem.Content,
 		})
@@ -520,7 +646,7 @@ func (m *Model) refreshViewportToBottom() {
 }
 
 func (m *Model) buildFooterText() string {
-	wd := "/home/project"
+	wd := m.workingDir
 	contextTokens := 0
 	var tokenUsage types.TokenUsage
 	if m.activeSessionID != "" {
@@ -589,7 +715,6 @@ func (m *Model) applySize(w, h int) {
 	m.approval.Height = m.height
 	m.helpPanel.Width = pw
 	m.helpPanel.Height = m.height
-	m.filesPanel.Width = pw
 	m.skillsPanel.Width = pw
 	m.mcpPanel.Width = pw
 	m.memoryPanel.Width = pw
@@ -597,6 +722,13 @@ func (m *Model) applySize(w, h int) {
 	m.renameModal.Width = pw
 	m.rollback.Width = pw
 	m.newSessModal.Width = pw
+	m.statusPanel.Width = pw
+	m.versionPanel.Width = pw
+	m.backgroundPanel.Width = pw
+	m.dashboardPanel.Width = pw
+	m.dashboardPanel.Height = m.height
+	m.settingsPanel.Width = pw
+	m.settingsPanel.Height = m.height
 
 	m.refreshViewport()
 }
@@ -665,9 +797,6 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 		}
 		m.rollback = overlays.NewRollbackPicker(items)
 		m.overlay.Open(overlays.OverlayRollback)
-	case "/files":
-		m.overlay.Open(overlays.OverlayFiles)
-		return m.fetchFilesFromAPI()
 	case "/skills":
 		m.overlay.Open(overlays.OverlaySkills)
 		return m.fetchSkillsFromAPI()
@@ -676,58 +805,110 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 		return m.fetchMCPServersFromAPI()
 	case "/memory":
 		m.overlay.Open(overlays.OverlayMemory)
-		return m.fetchMemoriesFromAPI(m.activeSessionID)
-	case "/workspace":
+		if m.activeSessionID != "" {
+			return m.fetchMemoriesFromAPI(m.activeSessionID)
+		}
+		m.toast.Show("没有活动会话", true)
+	case "/workspace-switch":
 		m.overlay.Open(overlays.OverlayWorkspace)
 		return m.fetchWorkspacesFromAPI()
 	case "/help":
 		m.overlay.Open(overlays.OverlayHelp)
-	case "/theme":
+	case "/toggle-theme":
 		components.ToggleTheme()
 		m.toast.Show("主题已切换", false)
-	case "/yolo":
-		m.statusBar.Yolo = !m.statusBar.Yolo
-		msg := "YOLO 模式已启用"
-		if !m.statusBar.Yolo {
-			msg = "YOLO 模式已禁用"
-		}
-		m.toast.Show(msg, false)
 	case "/pause":
-		m.statusBar.Paused = !m.statusBar.Paused
 		if m.activeSessionID != "" {
-			if m.statusBar.Paused {
-				return m.pauseSessionFromAPI(m.activeSessionID)
-			}
+			return m.pauseSessionFromAPI(m.activeSessionID)
+		}
+		m.toast.Show("没有活动会话可暂停", true)
+	case "/resume":
+		if m.activeSessionID != "" {
 			return m.resumeSessionFromAPI(m.activeSessionID)
 		}
-		msg := "已暂停"
-		if !m.statusBar.Paused {
-			msg = "已恢复"
-		}
-		m.toast.Show(msg, false)
+		m.toast.Show("没有活动会话可恢复", true)
 	case "/cancel":
 		if m.activeSessionID != "" {
 			return m.cancelSessionFromAPI(m.activeSessionID)
 		}
 		m.toast.Show("没有活动会话可取消", true)
-	case "/archive":
-		if m.activeSessionID != "" {
-			return m.archiveSessionFromAPI(m.activeSessionID)
-		}
-		m.toast.Show("没有活动会话可归档", true)
 	case "/export":
 		if m.activeSessionID != "" {
 			return m.exportSessionFromAPI(m.activeSessionID)
 		}
 		m.toast.Show("没有活动会话可导出", true)
-	case "/w-create":
-		m.toast.Show("请输入工作区路径创建新工作区", false)
-	case "/quit":
-		return tea.Quit
+	case "/compact":
+		if m.activeSessionID != "" {
+			return m.compactSessionFromAPI(m.activeSessionID)
+		}
+		m.toast.Show("没有活动会话可压缩", true)
+	case "/background":
+		m.backgroundPanel = overlays.NewBackgroundPanel()
+		m.overlay.Open(overlays.OverlayBackground)
+		if m.activeSessionID != "" {
+			return m.fetchBackgroundProcessesFromAPI(m.activeSessionID)
+		}
+		m.toast.Show("没有活动会话", true)
+	case "/dashboard":
+		m.overlay.Open(overlays.OverlayDashboard)
+		if m.activeSessionID != "" {
+			return m.fetchDashboardDataFromAPI(m.activeSessionID)
+		}
+		m.toast.Show("没有活动会话", true)
+	case "/settings":
+		m.overlay.Open(overlays.OverlaySettings)
+		return tea.Batch(
+			m.fetchProjectConfigFromAPI(),
+			m.fetchGlobalConfigFromAPI(),
+		)
+	case "/status":
+		m.updateStatusInfo()
+		m.overlay.Open(overlays.OverlayStatus)
+	case "/version":
+		m.versionPanel.Version = m.version
+		m.overlay.Open(overlays.OverlayVersion)
 	default:
 		m.toast.Show("未知命令: "+cmd, true)
 	}
 	return nil
+}
+
+func (m *Model) updateStatusInfo() {
+	sessionName := m.statusBar.Session
+	if sessionName == "" {
+		sessionName = "无"
+	}
+	status := "空闲"
+	if m.statusBar.Paused {
+		status = "已暂停"
+	} else if m.statusBar.Processing {
+		status = "处理中"
+	}
+
+	contextTokens := 0
+	var inputTokens, outputTokens int
+	if m.activeSessionID != "" {
+		for _, s := range m.sessions {
+			if s.ID == m.activeSessionID {
+				contextTokens = s.CurrentContextTokens
+				inputTokens = s.TokenUsage.Input
+				outputTokens = s.TokenUsage.Output
+				break
+			}
+		}
+	}
+
+	m.statusPanel.Info = overlays.StatusInfo{
+		SessionName:   sessionName,
+		SessionStatus: status,
+		Yolo:          m.statusBar.Yolo,
+		WorkingDir:    m.workingDir,
+		Version:       m.version,
+		InputTokens:   inputTokens,
+		OutputTokens:  outputTokens,
+		ContextTokens: contextTokens,
+		Processing:    m.statusBar.Processing,
+	}
 }
 
 func getWorkingDir() string {
@@ -736,6 +917,14 @@ func getWorkingDir() string {
 		return "."
 	}
 	return wd
+}
+
+func extractPort(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return u.Port()
 }
 
 func defaultSessionTitle() string {

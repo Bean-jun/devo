@@ -14,6 +14,7 @@ type StatusBar struct {
 	Yolo       bool
 	Connected  bool
 	Width      int
+	ServerPort string
 }
 
 func NewStatusBar() StatusBar {
@@ -29,8 +30,6 @@ func (s *StatusBar) Render() string {
 		w = 10
 	}
 
-	app := lipgloss.NewStyle().Foreground(ColorAccent()).Bold(true).Render("\U0001f680 " + s.AppName)
-	divider := lipgloss.NewStyle().Foreground(ColorBorder()).Render(" · ")
 	session := lipgloss.NewStyle().Foreground(ColorText()).Render(s.Session)
 
 	statusColor := ColorSuccess()
@@ -52,7 +51,7 @@ func (s *StatusBar) Render() string {
 			Render(" YOLO ")
 	}
 
-	left := app + divider + session + "  " + statusDot
+	left := session + "  " + statusDot
 	if yolo != "" {
 		left += "  " + yolo
 	}
@@ -68,13 +67,12 @@ func (s *StatusBar) Render() string {
 	if !s.Connected {
 		conn = lipgloss.NewStyle().Foreground(ColorError()).Render("\u2717")
 	}
-	themeIconStr := "\U0001f319"
-	if !CurrentTheme.IsDark {
-		themeIconStr = "\u2600\ufe0f"
+	port := ""
+	if s.ServerPort != "" {
+		port = lipgloss.NewStyle().Foreground(ColorMuted()).Render(":" + s.ServerPort + " ")
 	}
-	themeIcon := lipgloss.NewStyle().Foreground(ColorMuted()).Render(themeIconStr)
 
-	right := conn + "  " + themeIcon
+	right := port + conn
 
 	leftW := lipgloss.Width(left)
 	centerW := lipgloss.Width(center)

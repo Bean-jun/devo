@@ -144,6 +144,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					for j := range m.messages[i].ToolCalls {
 						m.messages[i].ToolCalls[j].Expanded = !m.messages[i].ToolCalls[j].Expanded
 					}
+					m.renderer.Invalidate(i)
 					m.refreshViewport()
 					break
 				}
@@ -243,18 +244,6 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 
 	case "messages_error":
 		m.toast.Show("获取消息失败: "+msg.err.Error(), true)
-
-	case "files_loaded":
-		if files, ok := msg.data.([]types.FileInfo); ok {
-			m.applyFilesData(files)
-		} else {
-			m.toast.Show("文件数据格式错误", true)
-		}
-		m.setLoading(overlays.OverlayFiles, false)
-
-	case "files_error":
-		m.toast.Show("获取文件列表失败: "+msg.err.Error(), true)
-		m.setLoading(overlays.OverlayFiles, false)
 
 	case "skills_loaded":
 		if skills, ok := msg.data.([]api.SkillInfo); ok {
@@ -394,6 +383,20 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 	case "mcp_toggle_error":
 		m.toast.Show("MCP 切换失败: "+msg.err.Error(), true)
 
+	case "skill_installed":
+		m.toast.Show("技能安装成功", false)
+		return m, m.fetchSkillsFromAPI()
+
+	case "skill_install_error":
+		m.toast.Show("技能安装失败: "+msg.err.Error(), true)
+
+	case "mcp_added":
+		m.toast.Show("MCP 服务器添加成功", false)
+		return m, m.fetchMCPServersFromAPI()
+
+	case "mcp_add_error":
+		m.toast.Show("MCP 添加失败: "+msg.err.Error(), true)
+
 	case "memory_deleted":
 		var filtered []overlays.MemoryEntry
 		for _, mem := range m.memoryPanel.Memories {
@@ -437,6 +440,29 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 	case "archive_error":
 		m.toast.Show("归档失败: "+msg.err.Error(), true)
 
+	case "compact_done":
+		result, ok := msg.data.(map[string]interface{})
+		if ok {
+			compressedCount := 0
+			tokensRemoved := 0
+			if v, ok := result["compressed_count"].(float64); ok {
+				compressedCount = int(v)
+			}
+			if v, ok := result["tokens_removed"].(float64); ok {
+				tokensRemoved = int(v)
+			}
+			if compressedCount > 0 {
+				m.toast.Show(fmt.Sprintf("上下文已压缩，压缩了 %d 条消息，减少约 %d tokens", compressedCount, tokensRemoved), false)
+			} else {
+				m.toast.Show("当前上下文无需压缩", false)
+			}
+		} else {
+			m.toast.Show("上下文压缩完成", false)
+		}
+
+	case "compact_error":
+		m.toast.Show("压缩失败: "+msg.err.Error(), true)
+
 	case "approve_done":
 		m.toast.Show("已批准操作", false)
 		m.overlay.Close()
@@ -444,6 +470,72 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 
 	case "approve_error":
 		m.toast.Show("批准失败: "+msg.err.Error(), true)
+
+	case "background_loaded":
+		if processes, ok := msg.data.([]api.BackgroundProcessInfo); ok {
+			m.backgroundPanel.Processes = processes
+		}
+		m.setLoading(overlays.OverlayBackground, false)
+
+	case "background_error":
+		m.toast.Show("获取后台进程失败: "+msg.err.Error(), true)
+		m.setLoading(overlays.OverlayBackground, false)
+
+	case "background_stopped":
+		m.toast.Show("后台进程已停止", false)
+		if m.activeSessionID != "" {
+			return m, m.fetchBackgroundProcessesFromAPI(m.activeSessionID)
+		}
+
+	case "background_stop_error":
+		m.toast.Show("停止后台进程失败: "+msg.err.Error(), true)
+
+	case "dashboard_loaded":
+		if data, ok := msg.data.(map[string]interface{}); ok {
+			if su, ok := data["session_usage"].(*api.SessionUsageInfo); ok {
+				m.dashboardPanel.SessionUsage = su
+			}
+			if pu, ok := data["project_usage"].(*api.ProjectUsageInfo); ok {
+				m.dashboardPanel.ProjectUsage = pu
+			}
+		}
+		m.setLoading(overlays.OverlayDashboard, false)
+
+	case "dashboard_error":
+		m.toast.Show("获取仪表盘数据失败: "+msg.err.Error(), true)
+		m.setLoading(overlays.OverlayDashboard, false)
+
+	case "project_config_loaded":
+		if cfg, ok := msg.data.(*api.ProjectConfigInfo); ok {
+			m.settingsPanel.ProjectConfig = cfg
+			m.settingsPanel.BuildFields()
+		}
+		m.setLoading(overlays.OverlaySettings, false)
+
+	case "project_config_error":
+		m.toast.Show("获取项目配置失败: "+msg.err.Error(), true)
+		m.setLoading(overlays.OverlaySettings, false)
+
+	case "global_config_loaded":
+		if cfg, ok := msg.data.(*api.GlobalConfigInfo); ok {
+			m.settingsPanel.GlobalConfig = cfg
+			m.settingsPanel.BuildFields()
+		}
+
+	case "global_config_error":
+		m.toast.Show("获取全局配置失败: "+msg.err.Error(), true)
+
+	case "project_config_saved":
+		m.toast.Show("项目配置已保存", false)
+
+	case "project_config_save_error":
+		m.toast.Show("保存项目配置失败: "+msg.err.Error(), true)
+
+	case "global_config_saved":
+		m.toast.Show("全局配置已保存", false)
+
+	case "global_config_save_error":
+		m.toast.Show("保存全局配置失败: "+msg.err.Error(), true)
 
 	case "memory_upserted":
 		m.toast.Show("记忆已保存", false)
@@ -465,6 +557,22 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	keyCode := msg.Key().Code
 	switch {
 	case key == "esc" || keyCode == tea.KeyEsc:
+		if m.overlay.Current == overlays.OverlaySettings && m.settingsPanel.Editing {
+			m.settingsPanel.CancelEditing()
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlaySkills && m.skillsPanel.Editing {
+			m.skillsPanel.CancelEditing()
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlayMCP && m.mcpPanel.Editing {
+			m.mcpPanel.CancelEditing()
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlayMemory && m.memoryPanel.Editing {
+			m.memoryPanel.CancelEditing()
+			return m, nil
+		}
 		m.cmdSheet.Filter = ""
 		m.overlay.Close()
 		m.refreshViewport()
@@ -475,7 +583,13 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			approvalID := m.approval.ApprovalID
 			return m, m.approveFromAPI(m.activeSessionID, approvalID)
 		}
-		return m, nil
+		if m.isEditing() {
+			s := key
+			if len(s) == 1 {
+				m.appendEditChar(s)
+			}
+			return m, nil
+		}
 
 	case key == "n" || key == "N":
 		if m.overlay.Current == overlays.OverlayApproval {
@@ -484,21 +598,111 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.toast.Show("已拒绝审批请求", false)
 			return m, nil
 		}
-		return m, nil
+		if m.isEditing() {
+			s := key
+			if len(s) == 1 {
+				m.appendEditChar(s)
+			}
+			return m, nil
+		}
 
 	case key == "enter":
+		if m.overlay.Current == overlays.OverlaySkills && m.skillsPanel.Editing {
+			value := m.skillsPanel.ConfirmEditing()
+			if value != "" {
+				return m, m.installSkillFromAPI(value)
+			}
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlayMCP && m.mcpPanel.Editing {
+			serverID, endpoint := m.mcpPanel.ConfirmEditing()
+			if serverID != "" && endpoint != "" {
+				return m, m.addMCPServerFromAPI(serverID, endpoint)
+			}
+			m.toast.Show("请输入 server_id endpoint", true)
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlayMemory && m.memoryPanel.Editing {
+			key, content := m.memoryPanel.ConfirmEditing()
+			if key != "" && content != "" {
+				if m.activeSessionID == "" {
+					m.toast.Show("没有活动会话", true)
+					return m, nil
+				}
+				return m, m.upsertMemoryFromAPI(m.activeSessionID, "user", key, content)
+			}
+			m.toast.Show("请输入 key content", true)
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlaySettings && m.settingsPanel.Editing {
+			f, _, ok := m.settingsPanel.ConfirmEditing()
+			if ok && f != nil {
+				if f.Group == "project" {
+					return m, m.saveProjectConfigFromAPI(m.settingsPanel.BuildProjectSaveBody())
+				}
+				return m, m.saveGlobalConfigFromAPI(m.settingsPanel.BuildGlobalSaveBody())
+			}
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlaySettings {
+			f := m.settingsPanel.SelectedField()
+			if f != nil && f.FieldType == "int" {
+				m.settingsPanel.StartEditing()
+				return m, nil
+			}
+		}
 		m.cmdSheet.Filter = ""
 		return m.handleOverlayEnter()
 
-	case key == "up" || key == "k":
+	case key == "up":
 		m.handleOverlayCursorUp()
 		return m, nil
 
-	case key == "down" || key == "j":
+	case key == "k":
+		if m.isEditing() {
+			m.appendEditChar("k")
+			return m, nil
+		}
+		m.handleOverlayCursorUp()
+		return m, nil
+
+	case key == "down":
+		m.handleOverlayCursorDown()
+		return m, nil
+
+	case key == "j":
+		if m.isEditing() {
+			m.appendEditChar("j")
+			return m, nil
+		}
 		m.handleOverlayCursorDown()
 		return m, nil
 
 	case key == "backspace":
+		if m.overlay.Current == overlays.OverlaySettings && m.settingsPanel.Editing {
+			if len(m.settingsPanel.EditBuffer) > 0 {
+				m.settingsPanel.EditBuffer = m.settingsPanel.EditBuffer[:len(m.settingsPanel.EditBuffer)-1]
+			}
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlaySkills && m.skillsPanel.Editing {
+			if len(m.skillsPanel.EditBuffer) > 0 {
+				m.skillsPanel.EditBuffer = m.skillsPanel.EditBuffer[:len(m.skillsPanel.EditBuffer)-1]
+			}
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlayMCP && m.mcpPanel.Editing {
+			if len(m.mcpPanel.EditBuffer) > 0 {
+				m.mcpPanel.EditBuffer = m.mcpPanel.EditBuffer[:len(m.mcpPanel.EditBuffer)-1]
+			}
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlayMemory && m.memoryPanel.Editing {
+			if len(m.memoryPanel.EditBuffer) > 0 {
+				m.memoryPanel.EditBuffer = m.memoryPanel.EditBuffer[:len(m.memoryPanel.EditBuffer)-1]
+			}
+			return m, nil
+		}
 		if m.overlay.Current == overlays.OverlayCommand {
 			if len(m.cmdSheet.Filter) > 0 {
 				m.cmdSheet.Filter = m.cmdSheet.Filter[:len(m.cmdSheet.Filter)-1]
@@ -513,12 +717,6 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		if m.overlay.Current == overlays.OverlayMemory {
-			if m.memoryPanel.Selected < len(m.memoryPanel.Memories) {
-				mem := m.memoryPanel.Memories[m.memoryPanel.Selected]
-				return m, m.deleteMemoryFromAPI(m.activeSessionID, mem.ID)
-			}
-		}
 		if m.overlay.Current == overlays.OverlaySession {
 			if m.sessPicker.Selected < len(m.sessPicker.Sessions) {
 				sess := m.sessPicker.Sessions[m.sessPicker.Selected]
@@ -527,9 +725,30 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key == "tab":
+		if m.overlay.Current == overlays.OverlayBackground {
+			m.backgroundPanel.ToggleExpand()
+			return m, nil
+		}
+		return m, nil
+
 	case key == " " || key == "space":
+		if m.overlay.Current == overlays.OverlaySettings {
+			f := m.settingsPanel.CycleEnum()
+			if f != nil {
+				if f.Group == "project" {
+					return m, m.saveProjectConfigFromAPI(m.settingsPanel.BuildProjectSaveBody())
+				}
+				return m, m.saveGlobalConfigFromAPI(m.settingsPanel.BuildGlobalSaveBody())
+			}
+			return m, nil
+		}
 		if m.overlay.Current == overlays.OverlaySkills {
 			if m.skillsPanel.Selected < len(m.skillsPanel.Skills) {
+				if m.activeSessionID == "" {
+					m.toast.Show("没有活动会话", true)
+					return m, nil
+				}
 				skill := m.skillsPanel.Skills[m.skillsPanel.Selected]
 				skill.Enabled = !skill.Enabled
 				m.skillsPanel.Skills[m.skillsPanel.Selected] = skill
@@ -547,6 +766,10 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key == "delete":
 		if m.overlay.Current == overlays.OverlayMemory {
 			if m.memoryPanel.Selected < len(m.memoryPanel.Memories) {
+				if m.activeSessionID == "" {
+					m.toast.Show("没有活动会话", true)
+					return m, nil
+				}
 				mem := m.memoryPanel.Memories[m.memoryPanel.Selected]
 				return m, m.deleteMemoryFromAPI(m.activeSessionID, mem.ID)
 			}
@@ -560,6 +783,34 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	default:
+		if m.overlay.Current == overlays.OverlaySettings && m.settingsPanel.Editing {
+			s := key
+			if len(s) == 1 && s >= "0" && s <= "9" {
+				m.settingsPanel.EditBuffer += s
+			}
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlaySkills && m.skillsPanel.Editing {
+			s := key
+			if len(s) == 1 {
+				m.skillsPanel.EditBuffer += s
+			}
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlayMCP && m.mcpPanel.Editing {
+			s := key
+			if len(s) == 1 {
+				m.mcpPanel.EditBuffer += s
+			}
+			return m, nil
+		}
+		if m.overlay.Current == overlays.OverlayMemory && m.memoryPanel.Editing {
+			s := key
+			if len(s) == 1 {
+				m.memoryPanel.EditBuffer += s
+			}
+			return m, nil
+		}
 		if m.overlay.Current == overlays.OverlayCommand {
 			s := key
 			if len(s) == 1 {
@@ -575,6 +826,20 @@ func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.renameModal.NewName += s
 			}
 			return m, nil
+		}
+		if key == "a" {
+			if m.overlay.Current == overlays.OverlaySkills {
+				m.skillsPanel.StartEditing()
+				return m, nil
+			}
+			if m.overlay.Current == overlays.OverlayMCP {
+				m.mcpPanel.StartEditing()
+				return m, nil
+			}
+			if m.overlay.Current == overlays.OverlayMemory {
+				m.memoryPanel.StartEditing()
+				return m, nil
+			}
 		}
 	}
 
@@ -605,13 +870,6 @@ func (m *Model) handleOverlayEnter() (tea.Model, tea.Cmd) {
 				m.fetchMessagesFromAPI(sess.ID),
 				m.connectSSE(sess.ID),
 			)
-		}
-		return m, nil
-
-	case overlays.OverlayFiles:
-		if m.filesPanel.Selected < len(m.filesPanel.Files) {
-			f := m.filesPanel.Files[m.filesPanel.Selected]
-			m.toast.Show("选中文件: "+f.Name, false)
 		}
 		return m, nil
 
@@ -666,6 +924,13 @@ func (m *Model) handleOverlayEnter() (tea.Model, tea.Cmd) {
 			return m, m.rollbackFromAPI(m.activeSessionID, targetMsgID)
 		}
 		return m, nil
+
+	case overlays.OverlayBackground:
+		pid := m.backgroundPanel.SelectedPID()
+		if pid > 0 && m.activeSessionID != "" {
+			return m, m.stopBackgroundProcessFromAPI(m.activeSessionID, pid)
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -677,8 +942,6 @@ func (m *Model) handleOverlayCursorUp() {
 		m.cmdSheet.CursorUp()
 	case overlays.OverlaySession:
 		m.sessPicker.CursorUp()
-	case overlays.OverlayFiles:
-		m.filesPanel.CursorUp()
 	case overlays.OverlaySkills:
 		m.skillsPanel.CursorUp()
 	case overlays.OverlayMCP:
@@ -689,6 +952,12 @@ func (m *Model) handleOverlayCursorUp() {
 		m.wsPanel.CursorUp()
 	case overlays.OverlayRollback:
 		m.rollback.CursorUp()
+	case overlays.OverlayBackground:
+		m.backgroundPanel.CursorUp()
+	case overlays.OverlaySettings:
+		if !m.settingsPanel.Editing {
+			m.settingsPanel.CursorUp()
+		}
 	}
 }
 
@@ -698,8 +967,6 @@ func (m *Model) handleOverlayCursorDown() {
 		m.cmdSheet.CursorDown()
 	case overlays.OverlaySession:
 		m.sessPicker.CursorDown()
-	case overlays.OverlayFiles:
-		m.filesPanel.CursorDown()
 	case overlays.OverlaySkills:
 		m.skillsPanel.CursorDown()
 	case overlays.OverlayMCP:
@@ -710,6 +977,12 @@ func (m *Model) handleOverlayCursorDown() {
 		m.wsPanel.CursorDown()
 	case overlays.OverlayRollback:
 		m.rollback.CursorDown()
+	case overlays.OverlayBackground:
+		m.backgroundPanel.CursorDown()
+	case overlays.OverlaySettings:
+		if !m.settingsPanel.Editing {
+			m.settingsPanel.CursorDown()
+		}
 	}
 }
 
@@ -807,7 +1080,7 @@ func (m *Model) handleSSEEvent(msg sseEventMsg) (tea.Model, tea.Cmd) {
 				ToolName: toolName,
 				Name:     toolName,
 				Status:   "pending",
-				Expanded: true,
+				Expanded: false,
 			}
 			if params, ok := evt.Data["params"].(map[string]interface{}); ok {
 				tc.Params = params
@@ -1090,7 +1363,7 @@ func (m *Model) handleSSEEvent(msg sseEventMsg) (tea.Model, tea.Cmd) {
 			if toolName, ok := evt.Data["tool_name"].(string); ok {
 				tc := types.ToolCall{
 					Name:     toolName,
-					Expanded: true,
+					Expanded: false,
 				}
 				if toolInput, ok := evt.Data["tool_input"].(string); ok {
 					tc.Input = toolInput

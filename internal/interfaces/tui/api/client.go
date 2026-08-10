@@ -204,6 +204,12 @@ func (c *Client) RemoveSessionSkill(sessionID string, skillName string) error {
 	return c.del("/api/v1/sessions/" + sessionID + "/skills/" + skillName)
 }
 
+func (c *Client) InstallSkill(value string) error {
+	return c.post("/api/v1/skills/install", map[string]interface{}{
+		"value": value,
+	}, nil)
+}
+
 // ─── MCP ───
 
 type MCPServerInfo struct {
@@ -231,31 +237,42 @@ func (c *Client) ToggleMcpServer(serverID string) error {
 	return c.post("/api/v1/mcp/servers/"+serverID+"/toggle", nil, nil)
 }
 
+func (c *Client) AddMCPServer(serverID, endpoint, transport, scope string) error {
+	return c.post("/api/v1/mcp/servers", map[string]interface{}{
+		"server_id": serverID,
+		"endpoint":  endpoint,
+		"transport": transport,
+		"scope":     scope,
+	}, nil)
+}
+
 // ─── Memory ───
 
 type MemoryItem struct {
 	ID      string `json:"id"`
+	Type    string `json:"type"`
 	Key     string `json:"key"`
 	Content string `json:"content"`
-	Scope   string `json:"scope"`
 }
 
 type MemoryResponse struct {
 	Memories []MemoryItem `json:"memories"`
 }
 
-func (c *Client) GetMemories(sessionID string) ([]MemoryItem, error) {
+func (c *Client) GetMemories(sessionID string, memoryType string) ([]MemoryItem, error) {
 	var resp MemoryResponse
-	if err := c.get("/api/v1/sessions/"+sessionID+"/memory", &resp); err != nil {
+	if err := c.get("/api/v1/sessions/"+sessionID+"/memory?type="+memoryType, &resp); err != nil {
 		return nil, err
 	}
 	return resp.Memories, nil
 }
 
-func (c *Client) UpsertMemory(sessionID string, key, content string) error {
-	return c.post("/api/v1/sessions/"+sessionID+"/memory", map[string]string{
+func (c *Client) UpsertMemory(sessionID string, memoryType string, key, content string) error {
+	return c.post("/api/v1/sessions/"+sessionID+"/memory", map[string]interface{}{
+		"type":    memoryType,
 		"key":     key,
 		"content": content,
+		"action":  "upsert",
 	}, nil)
 }
 
@@ -362,6 +379,14 @@ func (c *Client) SyncArchive(sessionID string) (interface{}, error) {
 	return result, nil
 }
 
+func (c *Client) CompactSession(sessionID string) (interface{}, error) {
+	var result interface{}
+	if err := c.post("/api/v1/sessions/"+sessionID+"/compact", nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // ─── Version ───
 
 func (c *Client) GetVersion() (string, error) {
@@ -372,4 +397,130 @@ func (c *Client) GetVersion() (string, error) {
 		return "", err
 	}
 	return resp.Version, nil
+}
+
+// ─── Background Processes ───
+
+type BackgroundProcessInfo struct {
+	PID       int    `json:"pid"`
+	Cmd       string `json:"cmd"`
+	SessionID string `json:"session_id"`
+	StartedAt string `json:"started_at"`
+	Status    string `json:"status"`
+}
+
+type BackgroundProcessesResponse struct {
+	Processes []BackgroundProcessInfo `json:"processes"`
+}
+
+func (c *Client) GetBackgroundProcesses(sessionID string) ([]BackgroundProcessInfo, error) {
+	var resp BackgroundProcessesResponse
+	if err := c.get("/api/v1/sessions/"+sessionID+"/background", &resp); err != nil {
+		return nil, err
+	}
+	return resp.Processes, nil
+}
+
+func (c *Client) StopBackgroundProcess(sessionID string, pid int) error {
+	return c.post(fmt.Sprintf("/api/v1/sessions/%s/background/%d/stop", sessionID, pid), nil, nil)
+}
+
+// ─── Usage / Dashboard ───
+
+type SessionUsageInfo struct {
+	TotalInputTokens  int             `json:"total_input_tokens"`
+	TotalOutputTokens int             `json:"total_output_tokens"`
+	TotalTokens       int             `json:"total_tokens"`
+	CompressionCount  int             `json:"compression_count"`
+	Steps             []UsageStepInfo `json:"steps"`
+}
+
+type UsageStepInfo struct {
+	StepSeq      int `json:"step_seq"`
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+}
+
+type ProjectUsageInfo struct {
+	Summary ProjectUsageSummary `json:"summary"`
+	Groups  []ProjectUsageGroup `json:"groups"`
+}
+
+type ProjectUsageSummary struct {
+	Input  int `json:"input"`
+	Output int `json:"output"`
+	Total  int `json:"total"`
+}
+
+type ProjectUsageGroup struct {
+	Key          string `json:"key"`
+	InputTokens  int    `json:"input_tokens"`
+	OutputTokens int    `json:"output_tokens"`
+	TotalTokens  int    `json:"total_tokens"`
+}
+
+func (c *Client) GetSessionUsage(sessionID string) (*SessionUsageInfo, error) {
+	var info SessionUsageInfo
+	if err := c.get("/api/v1/sessions/"+sessionID+"/usage", &info); err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
+
+func (c *Client) GetProjectUsage(project, groupBy string) (*ProjectUsageInfo, error) {
+	path := fmt.Sprintf("/api/v1/usage/stats?project=%s&group_by=%s", project, groupBy)
+	var info ProjectUsageInfo
+	if err := c.get(path, &info); err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
+
+// ─── Config / Settings ───
+
+type ApprovalPolicy map[string]string
+
+type ProjectConfigInfo struct {
+	Skills           []string       `json:"skills"`
+	MCP              []string       `json:"mcp"`
+	ApprovalPolicy   ApprovalPolicy `json:"approval_policy"`
+	ToolCallLimit    *int           `json:"tool_call_limit"`
+	MaxContextTokens *int           `json:"max_context_tokens"`
+	KeepRecent       *int           `json:"keep_recent"`
+}
+
+type GlobalConfigInfo struct {
+	ToolCallLimit    *int           `json:"tool_call_limit"`
+	MaxContextTokens *int           `json:"max_context_tokens"`
+	KeepRecent       *int           `json:"keep_recent"`
+	LLM              *LLMConfigInfo `json:"llm"`
+	ApprovalPolicy   ApprovalPolicy `json:"approval_policy"`
+}
+
+type LLMConfigInfo struct {
+	MaxTokens *int `json:"max_tokens"`
+}
+
+func (c *Client) GetProjectConfig() (*ProjectConfigInfo, error) {
+	var cfg ProjectConfigInfo
+	if err := c.get("/api/v1/project/config", &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func (c *Client) GetGlobalConfig() (*GlobalConfigInfo, error) {
+	var cfg GlobalConfigInfo
+	if err := c.get("/api/v1/global/config", &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func (c *Client) UpdateProjectConfig(body map[string]interface{}) error {
+	return c.put("/api/v1/project/config", body, nil)
+}
+
+func (c *Client) UpdateGlobalConfig(body map[string]interface{}) error {
+	return c.put("/api/v1/global/config", body, nil)
 }

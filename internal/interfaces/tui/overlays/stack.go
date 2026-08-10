@@ -9,7 +9,6 @@ const (
 	OverlayCommand
 	OverlaySession
 	OverlayToast
-	OverlayFiles
 	OverlaySkills
 	OverlayMCP
 	OverlayMemory
@@ -17,6 +16,11 @@ const (
 	OverlayNewSession
 	OverlayRename
 	OverlayRollback
+	OverlayStatus
+	OverlayVersion
+	OverlayBackground
+	OverlayDashboard
+	OverlaySettings
 )
 
 type OverlayStack struct {

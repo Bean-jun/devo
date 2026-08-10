@@ -198,12 +198,6 @@ func TestHandleOverlayEnter_Rollback(t *testing.T) {
 	_, _ = m.handleOverlayEnter()
 }
 
-func TestHandleOverlayEnter_Files(t *testing.T) {
-	m := NewModel("http://localhost:8080", "1.0.0")
-	m.overlay.Open(overlays.OverlayFiles)
-	_, _ = m.handleOverlayEnter()
-}
-
 func TestHandleOverlayEnter_Skills(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
 	m.overlay.Open(overlays.OverlaySkills)
@@ -226,12 +220,13 @@ func TestHandleOverlayCursorUp_AllTypes(t *testing.T) {
 	panels := []overlays.OverlayType{
 		overlays.OverlayCommand,
 		overlays.OverlaySession,
-		overlays.OverlayFiles,
 		overlays.OverlaySkills,
 		overlays.OverlayMCP,
 		overlays.OverlayMemory,
 		overlays.OverlayWorkspace,
 		overlays.OverlayRollback,
+		overlays.OverlayBackground,
+		overlays.OverlaySettings,
 	}
 	for _, pt := range panels {
 		m := NewModel("http://localhost:8080", "1.0.0")
@@ -244,12 +239,13 @@ func TestHandleOverlayCursorDown_AllTypes(t *testing.T) {
 	panels := []overlays.OverlayType{
 		overlays.OverlayCommand,
 		overlays.OverlaySession,
-		overlays.OverlayFiles,
 		overlays.OverlaySkills,
 		overlays.OverlayMCP,
 		overlays.OverlayMemory,
 		overlays.OverlayWorkspace,
 		overlays.OverlayRollback,
+		overlays.OverlayBackground,
+		overlays.OverlaySettings,
 	}
 	for _, pt := range panels {
 		m := NewModel("http://localhost:8080", "1.0.0")
@@ -293,5 +289,90 @@ func TestUpdate_JumpBlockedWhenTyping(t *testing.T) {
 
 	if len(updated.messages) != msgCount {
 		t.Error("输入框有内容时不应触发跳转（消息列表不应变化）")
+	}
+}
+
+func TestHandleOverlayKey_JK_EditMode(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayRename)
+	m.renameModal.NewName = ""
+	_, _ = m.handleOverlayKey(tea.KeyPressMsg{Text: "j", Code: 'j'})
+	_, _ = m.handleOverlayKey(tea.KeyPressMsg{Text: "k", Code: 'k'})
+	if m.renameModal.NewName != "jk" {
+		t.Errorf("编辑模式下 j/k 应输入字符, got %s", m.renameModal.NewName)
+	}
+}
+
+func TestHandleOverlayKey_JK_NavMode(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlaySkills)
+	m.skillsPanel.Skills = []overlays.SkillEntry{{Name: "a"}, {Name: "b"}, {Name: "c"}}
+	m.skillsPanel.Selected = 0
+	_, _ = m.handleOverlayKey(tea.KeyPressMsg{Text: "j", Code: 'j'})
+	if m.skillsPanel.Selected != 1 {
+		t.Errorf("非编辑模式下 j 应导航下移, Selected=%d", m.skillsPanel.Selected)
+	}
+	_, _ = m.handleOverlayKey(tea.KeyPressMsg{Text: "k", Code: 'k'})
+	if m.skillsPanel.Selected != 0 {
+		t.Errorf("非编辑模式下 k 应导航上移, Selected=%d", m.skillsPanel.Selected)
+	}
+}
+
+func TestHandleOverlayKey_UpDown_AlwaysNav(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayRename)
+	m.skillsPanel.Skills = []overlays.SkillEntry{{Name: "a"}, {Name: "b"}}
+	m.skillsPanel.Selected = 0
+
+	m.overlay.Open(overlays.OverlaySkills)
+	_, _ = m.handleOverlayKey(tea.KeyPressMsg{Code: tea.KeyDown})
+	if m.skillsPanel.Selected != 1 {
+		t.Error("箭头下键应始终导航")
+	}
+	_, _ = m.handleOverlayKey(tea.KeyPressMsg{Code: tea.KeyUp})
+	if m.skillsPanel.Selected != 0 {
+		t.Error("箭头上键应始终导航")
+	}
+}
+
+func TestHandleOverlayKey_NY_EditMode(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayRename)
+	m.renameModal.NewName = ""
+	_, _ = m.handleOverlayKey(tea.KeyPressMsg{Text: "n", Code: 'n'})
+	_, _ = m.handleOverlayKey(tea.KeyPressMsg{Text: "y", Code: 'y'})
+	if m.renameModal.NewName != "ny" {
+		t.Errorf("编辑模式下 n/y 应输入字符, got %s", m.renameModal.NewName)
+	}
+}
+
+func TestHandleOverlayKey_NY_NonEdit(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlaySkills)
+	m.skillsPanel.Skills = []overlays.SkillEntry{{Name: "test", Enabled: true}}
+	m.skillsPanel.Selected = 0
+	_, _ = m.handleOverlayKey(tea.KeyPressMsg{Text: "n", Code: 'n'})
+	_, _ = m.handleOverlayKey(tea.KeyPressMsg{Text: "y", Code: 'y'})
+	if m.skillsPanel.EditBuffer != "" {
+		t.Error("非编辑模式下 n/y 不应追加到编辑缓冲")
+	}
+}
+
+func TestHandleOverlayKey_ApprovalN(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayApproval)
+	newModel, _ := m.handleOverlayKey(tea.KeyPressMsg{Text: "n", Code: 'n'})
+	updated := newModel.(*Model)
+	if updated.overlay.IsOpen() {
+		t.Error("审批面板按 n 应关闭面板")
+	}
+}
+
+func TestHandleOverlayKey_ApprovalY(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.overlay.Open(overlays.OverlayApproval)
+	_, cmd := m.handleOverlayKey(tea.KeyPressMsg{Text: "y", Code: 'y'})
+	if cmd == nil {
+		t.Error("审批面板按 y 应返回审批命令")
 	}
 }

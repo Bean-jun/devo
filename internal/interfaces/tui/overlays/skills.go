@@ -15,10 +15,12 @@ type SkillEntry struct {
 }
 
 type SkillsPanel struct {
-	Width    int
-	Height   int
-	Selected int
-	Skills   []SkillEntry
+	Width      int
+	Height     int
+	Selected   int
+	Skills     []SkillEntry
+	Editing    bool
+	EditBuffer string
 }
 
 func NewSkillsPanel() SkillsPanel {
@@ -38,7 +40,26 @@ func (sp *SkillsPanel) CursorDown() {
 }
 
 func (sp *SkillsPanel) Toggle() {
-	sp.Skills[sp.Selected].Enabled = !sp.Skills[sp.Selected].Enabled
+	if sp.Selected < len(sp.Skills) {
+		sp.Skills[sp.Selected].Enabled = !sp.Skills[sp.Selected].Enabled
+	}
+}
+
+func (sp *SkillsPanel) StartEditing() {
+	sp.Editing = true
+	sp.EditBuffer = ""
+}
+
+func (sp *SkillsPanel) CancelEditing() {
+	sp.Editing = false
+	sp.EditBuffer = ""
+}
+
+func (sp *SkillsPanel) ConfirmEditing() string {
+	sp.Editing = false
+	v := sp.EditBuffer
+	sp.EditBuffer = ""
+	return v
 }
 
 func (sp *SkillsPanel) Render() string {
@@ -74,6 +95,19 @@ func (sp *SkillsPanel) Render() string {
 		}
 	}
 
-	lines = append(lines, components.PanelFooterStyle(innerW).Render("[\u2191\u2193] 导航  [Space] 启用/停用  [Esc] 关闭"))
+	footer := "[\u2191\u2193] 导航  [Space] 切换  [a] 安装  [Esc] 关闭"
+	if sp.Editing {
+		footer = "[Enter] 确认安装  [Esc] 取消"
+	}
+	lines = append(lines, components.PanelFooterStyle(innerW).Render(footer))
+	if sp.Editing {
+		inputBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(components.ColorAccent()).
+			Width(innerW - 2).
+			Render(sp.EditBuffer + lipgloss.NewStyle().Foreground(components.ColorMuted()).Render("\u2588"))
+		lines = append(lines, " "+inputBox)
+		lines = append(lines, " "+lipgloss.NewStyle().Foreground(components.ColorMuted()).Render("输入技能路径或 URL"))
+	}
 	return strings.Join(lines, "\n")
 }
