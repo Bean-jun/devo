@@ -47,12 +47,12 @@ describe('formatDuration', () => {
 })
 
 describe('formatTokenCount', () => {
-  it('should return string for small numbers', () => {
-    expect(formatTokenCount(500)).toBe('500')
+  it('should format small numbers with K suffix', () => {
+    expect(formatTokenCount(500)).toBe('0.5K')
   })
 
   it('should format with K suffix', () => {
-    expect(formatTokenCount(1500)).toBe('1.5k')
+    expect(formatTokenCount(1500)).toBe('1.5K')
   })
 })
 
