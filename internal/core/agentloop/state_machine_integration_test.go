@@ -142,6 +142,11 @@ func TestIntegration_ApprovalRequired(t *testing.T) {
 	if approvalID != "" {
 		loop.ResolveApproval("sess-approval", approvalID, "reject")
 	}
+
+	_, ok := waitForEvent(ch, "session_state_change", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for session_state_change (completed)")
+	}
 }
 
 func TestIntegration_EventSequence(t *testing.T) {
