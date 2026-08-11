@@ -251,6 +251,11 @@ func TestParallelToolExecution_WithApproval(t *testing.T) {
 	if !approvalFound {
 		t.Error("expected approval_required event when mixed tool calls include write_file")
 	}
+
+	_, ok := waitForEvent(ch, "session_state_change", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for session_state_change (completed)")
+	}
 }
 
 func TestParallelToolExecution_ToolCallLimit(t *testing.T) {
