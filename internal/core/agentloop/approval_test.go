@@ -427,6 +427,11 @@ func TestApprovalRequiredEventFields(t *testing.T) {
 	if approvalID, ok := data["approval_id"].(string); ok && approvalID != "" {
 		loop.ResolveApproval("sess-1", approvalID, "reject")
 	}
+
+	_, ok = waitForEvent(ch, "session_state_change", 3*time.Second)
+	if !ok {
+		t.Fatal("timed out waiting for session_state_change (completed)")
+	}
 }
 
 type policyAutoApprovalMockClient struct {
