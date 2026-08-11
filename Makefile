@@ -73,10 +73,12 @@ build-go:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(BUILD_CMD) $(BUILD_FLAGS) build -trimpath -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(GO_ENTRY)
 	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-linux-amd64 2>/dev/null,)
 	@echo "[BUILD]   macOS (amd64)..."
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(BUILD_CMD) $(BUILD_FLAGS) build -trimpath -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
+# 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(BUILD_CMD) $(BUILD_FLAGS) build -trimpath -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(GO_ENTRY)
 	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 --force-macos 2>/dev/null,)
 	@echo "[BUILD]   macOS (arm64)..."
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(BUILD_CMD) $(BUILD_FLAGS) build -trimpath -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
+# 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(BUILD_CMD) $(BUILD_FLAGS) build -trimpath -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.Version=$(FULL_VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(GO_ENTRY)
 	-$(if $(UPX),upx -9 $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 --force-macos 2>/dev/null,)
 	@echo "[OK] 3 platforms (4 binaries) built"
 

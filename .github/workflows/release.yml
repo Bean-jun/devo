@@ -1,0 +1,188 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 0.2.0)'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "$VERSION" > VERSION
+
+      - name: Build frontend
+        run: cd web && npm ci && npm run build
+
+      - name: Build Go binaries
+        run: make build-go
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: go-binaries
+          path: build/
+
+  electron-linux:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - name: Install libfuse2 (AppImage dependency)
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: go-binaries
+          path: electron/resources/bin
+
+      - name: Set version
+        run: |
+          cd electron
+          node -e "var p=require('./package.json');p.version='${{ needs.build.outputs.version }}';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+
+      - name: Install dependencies
+        run: cd electron && npm ci
+
+      - name: Package Linux
+        run: cd electron && npx electron-builder --linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: electron-linux
+          path: electron/dist/devo-desktop*
+
+  electron-windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: go-binaries
+          path: electron/resources/bin
+
+      - name: Set version
+        run: |
+          cd electron
+          node -e "var p=require('./package.json');p.version='${{ needs.build.outputs.version }}';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+
+      - name: Install dependencies
+        run: cd electron && npm ci
+
+      - name: Package Windows
+        run: cd electron && npx electron-builder --win
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: electron-windows
+          path: electron/dist/devo-desktop*
+
+  vsix:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: go-binaries
+          path: vscode-extension/bin
+
+      - name: Set version
+        run: |
+          cd vscode-extension
+          node -e "var p=require('./package.json');p.version='${{ needs.build.outputs.version }}';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+
+      - name: Install and package
+        run: |
+          cd vscode-extension
+          npm ci
+          npm run vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: vscode-extension/devo-*.vsix
+
+  release:
+    needs: [build, electron-linux, electron-windows, vsix]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: go-binaries
+          path: artifacts
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: electron-linux
+          path: artifacts
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: electron-windows
+          path: artifacts
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vsix
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ needs.build.outputs.version }}
+          files: artifacts/*
+          generate_release_notes: true
