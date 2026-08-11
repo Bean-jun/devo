@@ -92,7 +92,10 @@ func TestCancel_FromIdle(t *testing.T) {
 	}
 	store.Create(sess)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/cancel", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/cancel", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {
@@ -104,7 +107,10 @@ func TestCancel_NotFound(t *testing.T) {
 	server, _ := setupTestServer()
 	defer server.Close()
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/nonexistent/cancel", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/nonexistent/cancel", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -160,7 +166,10 @@ func TestPause_FromIdle(t *testing.T) {
 	}
 	store.Create(sess)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/pause", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/pause", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {
@@ -172,7 +181,10 @@ func TestPause_NotFound(t *testing.T) {
 	server, _ := setupTestServer()
 	defer server.Close()
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/nonexistent/pause", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/nonexistent/pause", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -228,7 +240,10 @@ func TestResume_FromIdle(t *testing.T) {
 	}
 	store.Create(sess)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/resume", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/resume", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {
@@ -240,7 +255,10 @@ func TestResume_NotFound(t *testing.T) {
 	server, _ := setupTestServer()
 	defer server.Close()
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/nonexistent/resume", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/nonexistent/resume", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -331,7 +349,10 @@ func TestComplete_FromArchived(t *testing.T) {
 	}
 	store.Create(sess)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/complete", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/complete", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {
@@ -343,7 +364,10 @@ func TestComplete_NotFound(t *testing.T) {
 	server, _ := setupTestServer()
 	defer server.Close()
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/nonexistent/complete", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/nonexistent/complete", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -399,7 +423,10 @@ func TestArchive_FromIdle(t *testing.T) {
 	}
 	store.Create(sess)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/archive", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/archive", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {
@@ -411,7 +438,10 @@ func TestArchive_NotFound(t *testing.T) {
 	server, _ := setupTestServer()
 	defer server.Close()
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/nonexistent/archive", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/nonexistent/archive", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -432,7 +462,10 @@ func TestFullStateMachineViaREST(t *testing.T) {
 	}
 	store.Create(sess)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/complete", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/complete", "application/json", nil)
+	if err != nil {
+		t.Fatalf("complete request failed: %v", err)
+	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("complete: expected 200, got %d", resp.StatusCode)
@@ -443,7 +476,10 @@ func TestFullStateMachineViaREST(t *testing.T) {
 		t.Fatalf("expected Completed, got %q", sessGot.State)
 	}
 
-	resp, _ = http.Post(server.URL+"/api/v1/sessions/sess-test-1/archive", "application/json", nil)
+	resp, err = http.Post(server.URL+"/api/v1/sessions/sess-test-1/archive", "application/json", nil)
+	if err != nil {
+		t.Fatalf("archive request failed: %v", err)
+	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("archive: expected 200, got %d", resp.StatusCode)

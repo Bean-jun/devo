@@ -63,7 +63,10 @@ func TestCompact_FromProcessing(t *testing.T) {
 	}
 	store.Create(sess)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/compact", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/compact", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {
@@ -75,7 +78,10 @@ func TestCompact_NotFound(t *testing.T) {
 	server, _ := setupTestServer()
 	defer server.Close()
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/nonexistent/compact", "application/json", nil)
+	resp, err := http.Post(server.URL+"/api/v1/sessions/nonexistent/compact", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
