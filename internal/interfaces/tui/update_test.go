@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -192,9 +193,13 @@ func TestHandleOverlayEnter_Rename(t *testing.T) {
 
 func TestHandleOverlayEnter_Rollback(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
-	m.rollback = overlays.NewRollbackPicker([]overlays.RollbackItem{
-		{Content: "test", Role: "user", Time: "12:00"},
+	m.messages = append(m.messages, types.Message{
+		ID: "msg-1", Role: "user", Content: "test",
 	})
+	m.rollback = overlays.NewRollbackPicker([]overlays.RollbackItem{
+		{Content: "test", Role: "user", Time: "12:00", MsgIndex: 0},
+	})
+	m.rollback.TotalMessages = 1
 	m.overlay.Open(overlays.OverlayRollback)
 	_, _ = m.handleOverlayEnter()
 }
@@ -425,5 +430,477 @@ func TestTruncateActivity_ReasoningPrefix(t *testing.T) {
 	result := truncateActivity(chunk)
 	if !strings.HasPrefix(result, chunk) {
 		t.Error("短推理内容不应被截断")
+	}
+}
+
+func TestUpdate_ShiftEnterInsertsNewline(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.textarea.SetValue("hello")
+	msg := tea.KeyMsg(tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModCtrl})
+	newModel, _ := m.Update(msg)
+	updated := newModel.(*Model)
+
+	if !strings.Contains(updated.textarea.Value(), "\n") {
+		t.Error("Ctrl+Enter 应在 textarea 中插入换行符")
+	}
+	if !strings.HasPrefix(updated.textarea.Value(), "hello") {
+		t.Error("Ctrl+Enter 应保留原有内容，在光标位置插入换行")
+	}
+}
+
+func TestUpdate_EnterSendsMessage(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.textarea.SetValue("test message")
+	msgCount := len(m.messages)
+	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	newModel, _ := m.Update(msg)
+	updated := newModel.(*Model)
+
+	if len(updated.messages) <= msgCount {
+		t.Error("Enter 应发送消息")
+	}
+}
+
+func TestUpdate_EnterSavesToHistory(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.textarea.SetValue("first message")
+	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	newModel, _ := m.Update(msg)
+	updated := newModel.(*Model)
+
+	if len(updated.inputHistory) != 1 {
+		t.Errorf("发送消息后应保存到历史，期望 1 条，实际 %d 条", len(updated.inputHistory))
+	}
+	if updated.inputHistory[0] != "first message" {
+		t.Errorf("历史内容应为 'first message'，实际为 '%s'", updated.inputHistory[0])
+	}
+}
+
+func TestUpdate_EnterSavesMultipleHistory(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	model := &m
+
+	model.textarea.SetValue("msg1")
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = newModel.(*Model)
+
+	model.textarea.SetValue("msg2")
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = newModel.(*Model)
+
+	if len(model.inputHistory) != 2 {
+		t.Errorf("应保存 2 条历史，实际 %d 条", len(model.inputHistory))
+	}
+}
+
+func TestUpdate_EnterNoDuplicateHistory(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	model := &m
+
+	model.textarea.SetValue("same")
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = newModel.(*Model)
+
+	model.textarea.SetValue("same")
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = newModel.(*Model)
+
+	if len(model.inputHistory) != 1 {
+		t.Errorf("连续相同内容不应重复保存，期望 1 条，实际 %d 条", len(model.inputHistory))
+	}
+}
+
+func TestUpdate_ShiftUpHistoryPrev(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+
+	m.pushInputHistory("msg1")
+	m.pushInputHistory("msg2")
+
+	m.textarea.SetValue("current draft")
+	msg := tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}
+	newModel, _ := m.Update(msg)
+	updated := newModel.(*Model)
+
+	if updated.textarea.Value() != "msg2" {
+		t.Errorf("Shift+Up 应恢复最近一条历史，期望 'msg2'，实际 '%s'", updated.textarea.Value())
+	}
+	if updated.historyIndex != 0 {
+		t.Errorf("historyIndex 应为 0，实际 %d", updated.historyIndex)
+	}
+	if updated.historyDraft != "current draft" {
+		t.Errorf("应保存草稿 'current draft'，实际 '%s'", updated.historyDraft)
+	}
+}
+
+func TestUpdate_ShiftUpHistoryPrevTwice(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	model := &m
+
+	model.pushInputHistory("msg1")
+	model.pushInputHistory("msg2")
+
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift})
+	model = newModel.(*Model)
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift})
+	model = newModel.(*Model)
+
+	if model.textarea.Value() != "msg1" {
+		t.Errorf("两次 Shift+Up 应恢复更早的历史，期望 'msg1'，实际 '%s'", model.textarea.Value())
+	}
+	if model.historyIndex != 1 {
+		t.Errorf("historyIndex 应为 1，实际 %d", model.historyIndex)
+	}
+}
+
+func TestUpdate_ShiftDownHistoryNext(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	model := &m
+
+	model.pushInputHistory("msg1")
+	model.pushInputHistory("msg2")
+
+	model.textarea.SetValue("draft")
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}) // go to msg2
+	model = newModel.(*Model)
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}) // go to msg1
+	model = newModel.(*Model)
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}) // go back to msg2
+	model = newModel.(*Model)
+
+	if model.textarea.Value() != "msg2" {
+		t.Errorf("Shift+Down 应返回较新的历史，期望 'msg2'，实际 '%s'", model.textarea.Value())
+	}
+}
+
+func TestUpdate_ShiftDownRestoresDraft(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	model := &m
+
+	model.pushInputHistory("msg1")
+
+	model.textarea.SetValue("my draft")
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}) // go to msg1
+	model = newModel.(*Model)
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}) // go back to draft
+	model = newModel.(*Model)
+
+	if model.textarea.Value() != "my draft" {
+		t.Errorf("Shift+Down 到最后应恢复草稿，期望 'my draft'，实际 '%s'", model.textarea.Value())
+	}
+	if model.historyIndex != -1 {
+		t.Errorf("historyIndex 应恢复为 -1，实际 %d", model.historyIndex)
+	}
+}
+
+func TestUpdate_ShiftUpEmptyHistory(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.textarea.SetValue("some text")
+	msg := tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}
+	newModel, _ := m.Update(msg)
+	updated := newModel.(*Model)
+
+	if updated.textarea.Value() != "some text" {
+		t.Error("没有历史时 Shift+Up 不应改变内容")
+	}
+}
+
+func TestUpdate_ShiftDownEmptyHistory(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.textarea.SetValue("some text")
+	msg := tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}
+	newModel, _ := m.Update(msg)
+	updated := newModel.(*Model)
+
+	if updated.textarea.Value() != "some text" {
+		t.Error("没有历史时 Shift+Down 不应改变内容")
+	}
+}
+
+func TestUpdate_EnterResetsHistoryIndex(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	model := &m
+
+	model.pushInputHistory("msg1")
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift})
+	model = newModel.(*Model)
+	model.textarea.SetValue("new message")
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	model = newModel.(*Model)
+
+	if model.historyIndex != -1 {
+		t.Errorf("发送消息后 historyIndex 应重置为 -1，实际 %d", model.historyIndex)
+	}
+	if model.historyDraft != "" {
+		t.Errorf("发送消息后 historyDraft 应清空，实际 '%s'", model.historyDraft)
+	}
+}
+
+func TestShouldFoldPaste_LargeText(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	oldVal := "hello"
+	newVal := "hello" + strings.Repeat("x", 250)
+
+	if !m.shouldFoldPaste(oldVal, newVal) {
+		t.Error("粘贴超过 200 字符应触发折叠")
+	}
+}
+
+func TestShouldFoldPaste_ManyLines(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	oldVal := "hello"
+	newVal := "hello\nline2\nline3\nline4\nline5\nline6"
+
+	if !m.shouldFoldPaste(oldVal, newVal) {
+		t.Error("粘贴超过 4 行应触发折叠")
+	}
+}
+
+func TestShouldFoldPaste_SmallText(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	oldVal := "hello"
+	newVal := "hello world"
+
+	if m.shouldFoldPaste(oldVal, newVal) {
+		t.Error("少量粘贴不应触发折叠")
+	}
+}
+
+func TestShouldFoldPaste_NormalTyping(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	oldVal := "hello"
+	newVal := "hello!"
+
+	if m.shouldFoldPaste(oldVal, newVal) {
+		t.Error("正常输入不应触发折叠")
+	}
+}
+
+func TestResolvePasteBuffer_WithPaste(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.pasteBuffer = "full pasted text"
+	result := m.resolvePasteBuffer("[Pasted text +100 chars, 3 lines]")
+
+	if result != "full pasted text" {
+		t.Errorf("应替换标记为粘贴内容，期望 'full pasted text'，实际 '%s'", result)
+	}
+}
+
+func TestResolvePasteBuffer_WithExtraText(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.pasteBuffer = "hello\nworld"
+	result := m.resolvePasteBuffer("[Pasted text +11 chars, 2 lines] extra")
+
+	if result != "hello\nworld extra" {
+		t.Errorf("应保留标记后的额外文本，期望 'hello\\nworld extra'，实际 '%s'", result)
+	}
+}
+
+func TestResolvePasteBuffer_WithPrefix(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.pasteBuffer = "hello\nworld"
+	result := m.resolvePasteBuffer("prefix [Pasted text +11 chars, 2 lines] suffix")
+
+	if result != "prefix hello\nworld suffix" {
+		t.Errorf("应保留标记前后的文本，期望 'prefix hello\\nworld suffix'，实际 '%s'", result)
+	}
+}
+
+func TestResolvePasteBuffer_WithoutPaste(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.pasteBuffer = ""
+	result := m.resolvePasteBuffer("normal text")
+
+	if result != "normal text" {
+		t.Errorf("无 pasteBuffer 时应返回原值，期望 'normal text'，实际 '%s'", result)
+	}
+}
+
+func TestHandleEscNoOverlay_Idle(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-1"
+	m.sessions = []types.SessionInfo{
+		{ID: "test-1", State: types.SessionStateIdle},
+	}
+	_, cmd := m.handleEscNoOverlay()
+	if cmd != nil {
+		t.Error("idle 状态第一次 ESC 不应返回 API 命令")
+	}
+}
+
+func TestHandleEscNoOverlay_ToolExecuting(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-1"
+	m.sessions = []types.SessionInfo{
+		{ID: "test-1", State: types.SessionStateToolExecuting},
+	}
+	_, cmd := m.handleEscNoOverlay()
+	if cmd == nil {
+		t.Error("tool_executing 状态 ESC 应返回暂停命令")
+	}
+}
+
+func TestHandleEscNoOverlay_Paused(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-1"
+	m.sessions = []types.SessionInfo{
+		{ID: "test-1", State: types.SessionStatePaused},
+	}
+	_, cmd := m.handleEscNoOverlay()
+	if cmd == nil {
+		t.Error("paused 状态 ESC 应返回取消命令")
+	}
+}
+
+func TestHandleEscNoOverlay_Thinking(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-1"
+	m.sessions = []types.SessionInfo{
+		{ID: "test-1", State: types.SessionStateThinking},
+	}
+	_, cmd := m.handleEscNoOverlay()
+	if cmd == nil {
+		t.Error("thinking 状态 ESC 应返回取消命令")
+	}
+}
+
+func TestHandleEscNoOverlay_Processing(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-1"
+	m.sessions = []types.SessionInfo{
+		{ID: "test-1", State: types.SessionStateProcessing},
+	}
+	_, cmd := m.handleEscNoOverlay()
+	if cmd == nil {
+		t.Error("processing 状态 ESC 应返回取消命令")
+	}
+}
+
+func TestHandleEscNoOverlay_AwaitingApproval(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-1"
+	m.sessions = []types.SessionInfo{
+		{ID: "test-1", State: types.SessionStateAwaitingApproval},
+	}
+	_, cmd := m.handleEscNoOverlay()
+	if cmd == nil {
+		t.Error("awaiting_approval 状态 ESC 应返回取消命令")
+	}
+}
+
+func TestHandleEscNoOverlay_DoubleEsc(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-1"
+	m.sessions = []types.SessionInfo{
+		{ID: "test-1", State: types.SessionStateIdle},
+	}
+	m.messages = append(m.messages, types.Message{
+		Role: "user", Content: "test",
+	})
+	m.lastEscAt = time.Now().Add(-200 * time.Millisecond)
+	newModel, _ := m.handleEscNoOverlay()
+	updated := newModel.(*Model)
+
+	if !updated.overlay.IsOpen() {
+		t.Error("双击 ESC 应打开回滚面板")
+	}
+	if updated.overlay.Current != overlays.OverlayRollback {
+		t.Errorf("双击 ESC 应打开回滚面板，实际 %v", updated.overlay.Current)
+	}
+}
+
+func TestHandleEscNoOverlay_NoActiveSession(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = ""
+	_, cmd := m.handleEscNoOverlay()
+	if cmd != nil {
+		t.Error("无活动会话时 ESC 不应返回命令")
+	}
+}
+
+func TestGetActiveSessionState(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-1"
+	m.sessions = []types.SessionInfo{
+		{ID: "test-1", State: types.SessionStateThinking},
+	}
+	state := m.getActiveSessionState()
+	if state != types.SessionStateThinking {
+		t.Errorf("应返回活动会话状态，期望 thinking，实际 %s", state)
+	}
+}
+
+func TestGetActiveSessionState_NoSession(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = ""
+	state := m.getActiveSessionState()
+	if state != types.SessionStateIdle {
+		t.Errorf("无活动会话时应返回 idle，实际 %s", state)
+	}
+}
+
+func TestGetActiveSessionState_NotFound(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "nonexistent"
+	m.sessions = []types.SessionInfo{
+		{ID: "other", State: types.SessionStateThinking},
+	}
+	state := m.getActiveSessionState()
+	if state != types.SessionStateIdle {
+		t.Errorf("找不到时应返回 idle，实际 %s", state)
+	}
+}
+
+func TestFindPasteContent_Append(t *testing.T) {
+	prefix, paste, suffix := findPasteContent("hello", "helloworld")
+	if prefix != "hello" {
+		t.Errorf("prefix should be 'hello', got '%s'", prefix)
+	}
+	if paste != "world" {
+		t.Errorf("paste should be 'world', got '%s'", paste)
+	}
+	if suffix != "" {
+		t.Errorf("suffix should be empty, got '%s'", suffix)
+	}
+}
+
+func TestFindPasteContent_Insert(t *testing.T) {
+	prefix, paste, suffix := findPasteContent("hello world", "hello big world")
+	if prefix != "hello " {
+		t.Errorf("prefix should be 'hello ', got '%s'", prefix)
+	}
+	if paste != "big " {
+		t.Errorf("paste should be 'big ', got '%s'", paste)
+	}
+	if suffix != "world" {
+		t.Errorf("suffix should be 'world', got '%s'", suffix)
+	}
+}
+
+func TestPasteMarker(t *testing.T) {
+	marker := pasteMarker(250, 5)
+	if marker != "[Pasted text +250 chars, 5 lines]" {
+		t.Errorf("marker should be '[Pasted text +250 chars, 5 lines]', got '%s'", marker)
+	}
+}
+
+func TestAutoResizeTextarea_SingleLine(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.height = 30
+	m.textarea.SetValue("hello")
+	m.autoResizeTextarea()
+
+	if m.textarea.Height() != 3 {
+		t.Errorf("single line: textarea height should be 3, got %d", m.textarea.Height())
+	}
+}
+
+func TestAutoResizeTextarea_MultiLine(t *testing.T) {
+	m := NewModel("http://localhost:8080", "1.0.0")
+	m.height = 30
+	m.textarea.SetValue("line1\nline2\nline3\nline4\nline5")
+	m.autoResizeTextarea()
+
+	if m.textarea.Height() != 6 {
+		t.Errorf("multi line: textarea height should be 6, got %d", m.textarea.Height())
 	}
 }

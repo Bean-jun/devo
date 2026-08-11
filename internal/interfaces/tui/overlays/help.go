@@ -27,12 +27,17 @@ func (hp *HelpPanel) Render() string {
 		{"Navigation", []string{
 			"\u2191/\u2193      行滚动",
 			"PgUp/Dn  页滚动",
-			"Ctrl+U   跳到上一条用户消息",
-			"Ctrl+D   跳到下一条用户消息",
+			"Ctrl+U   跳到上一条用户消息（输入框为空）",
+			"Ctrl+D   跳到下一条用户消息（输入框为空）",
+			"Ctrl+B   跳到聊天底部",
 			"Tab      展开/折叠工具卡片",
 		}},
 		{"Chat", []string{
 			"Enter    发送消息",
+			"F3       粘贴剪贴板图片",
+			"Ctrl+Enter  插入换行",
+			"Ctrl+\u2191  上一条历史输入",
+			"Ctrl+\u2193  下一条历史输入",
 			"/        打开命令面板（输入框为空时）",
 			"Ctrl+N   新建会话",
 			"Ctrl+S   会话列表",
@@ -44,10 +49,16 @@ func (hp *HelpPanel) Render() string {
 			"Ctrl+P   暂停/恢复",
 		}},
 		{"Overlay", []string{
-			"Esc      关闭覆盖层/面板",
+			"Esc      关闭覆盖层",
 			"?        打开帮助",
-			"\u2191/\u2193/j/k 面板内光标移动",
+			"\u2191/\u2193 面板内光标移动",
 			"Enter    面板内确认选择",
+		}},
+		{"Smart Esc", []string{
+			"Esc      工具执行中 → 暂停",
+			"Esc      已暂停 → 取消会话",
+			"Esc      思考/处理中 → 取消",
+			"Esc+Esc  空闲时 → 打开回滚",
 		}},
 		{"System", []string{
 			"Ctrl+C   退出",

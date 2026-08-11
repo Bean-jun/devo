@@ -26,7 +26,8 @@ type ToolCall struct {
 }
 
 type SendMessageRequest struct {
-	Content string `json:"content"`
+	Content string   `json:"content"`
+	Images  []string `json:"images,omitempty"`
 }
 
 type GetMessagesResponse struct {

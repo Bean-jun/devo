@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"sync"
-	"time"
 
 	"gorm.io/gorm"
 
@@ -46,8 +45,4 @@ func (s *GormStore) Close() error {
 
 func (s *GormStore) DB() *gorm.DB {
 	return s.db
-}
-
-func init() {
-	time.Local = time.UTC
 }
