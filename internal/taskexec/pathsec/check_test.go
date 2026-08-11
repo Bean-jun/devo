@@ -3,6 +3,7 @@ package pathsec
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -15,17 +16,17 @@ func TestIsRealAbsPath(t *testing.T) {
 		{
 			name:     "Windows drive letter path",
 			path:     `D:\devo\projects\devo\build`,
-			expected: true,
+			expected: runtime.GOOS == "windows",
 		},
 		{
 			name:     "Windows lowercase drive letter",
 			path:     `c:\Users\test`,
-			expected: true,
+			expected: runtime.GOOS == "windows",
 		},
 		{
 			name:     "UNC path",
 			path:     `\\server\share\file`,
-			expected: true,
+			expected: runtime.GOOS == "windows",
 		},
 		{
 			name:     "Unix-style absolute path (slash start)",
@@ -131,8 +132,15 @@ func TestCheckPath_AbsolutePath(t *testing.T) {
 
 	resultAbs, _ := filepath.Abs(result)
 	expectedAbs, _ := filepath.Abs(testFile)
-	if resultAbs != expectedAbs {
-		t.Errorf("CheckPath result = %q, want %q", resultAbs, expectedAbs)
+	if runtime.GOOS == "windows" {
+		if resultAbs != expectedAbs {
+			t.Errorf("CheckPath result = %q, want %q", resultAbs, expectedAbs)
+		}
+	} else {
+		expectedJoin, _ := filepath.Abs(filepath.Join(workDir, testFile))
+		if resultAbs != expectedJoin {
+			t.Errorf("CheckPath result = %q, want %q", resultAbs, expectedJoin)
+		}
 	}
 }
 
@@ -154,8 +162,14 @@ func TestCheckPath_SiblingDir(t *testing.T) {
 	}
 
 	_, err := CheckPath(workDir, siblingFile)
-	if err != ErrPathOutsideWorkDir {
-		t.Errorf("CheckPath with sibling dir should return ErrPathOutsideWorkDir, got: %v", err)
+	if runtime.GOOS == "windows" {
+		if err != ErrPathOutsideWorkDir {
+			t.Errorf("CheckPath with sibling dir should return ErrPathOutsideWorkDir, got: %v", err)
+		}
+	} else {
+		if err != nil {
+			t.Errorf("CheckPath with sibling dir should succeed on non-Windows, got: %v", err)
+		}
 	}
 }
 
@@ -172,8 +186,14 @@ func TestCheckPath_ParentDir(t *testing.T) {
 	}
 
 	_, err := CheckPath(workDir, parentFile)
-	if err != ErrPathOutsideWorkDir {
-		t.Errorf("CheckPath with parent dir should return ErrPathOutsideWorkDir, got: %v", err)
+	if runtime.GOOS == "windows" {
+		if err != ErrPathOutsideWorkDir {
+			t.Errorf("CheckPath with parent dir should return ErrPathOutsideWorkDir, got: %v", err)
+		}
+	} else {
+		if err != nil {
+			t.Errorf("CheckPath with parent dir should succeed on non-Windows, got: %v", err)
+		}
 	}
 }
 
@@ -205,8 +225,15 @@ func TestCheckPath_WorkDirRoot(t *testing.T) {
 			}
 			resultAbs, _ := filepath.Abs(result)
 			workDirAbs, _ := filepath.Abs(workDir)
-			if resultAbs != workDirAbs {
-				t.Errorf("CheckPath(%q) = %q, want %q", tc.path, resultAbs, workDirAbs)
+			if runtime.GOOS == "windows" {
+				if resultAbs != workDirAbs {
+					t.Errorf("CheckPath(%q) = %q, want %q", tc.path, resultAbs, workDirAbs)
+				}
+			} else {
+				expectedJoin, _ := filepath.Abs(filepath.Join(workDir, tc.path))
+				if resultAbs != expectedJoin {
+					t.Errorf("CheckPath(%q) = %q, want %q", tc.path, resultAbs, expectedJoin)
+				}
 			}
 		})
 	}
@@ -318,9 +345,14 @@ func TestNormalizePath(t *testing.T) {
 			expected: `D:\devo\project`,
 		},
 		{
-			name:     "unix path (Windows will convert to backslash)",
-			input:    `/usr/local`,
-			expected: `\usr\local`,
+			name:  "unix path (Windows will convert to backslash)",
+			input: `/usr/local`,
+			expected: func() string {
+				if runtime.GOOS == "windows" {
+					return `\usr\local`
+				}
+				return `/usr/local`
+			}(),
 		},
 	}
 

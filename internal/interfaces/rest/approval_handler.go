@@ -47,6 +47,11 @@ func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if sess.State != session.StateAwaitingApproval {
+		writeError(w, http.StatusConflict, "session is not in AwaitingApproval state")
+		return
+	}
+
 	approvalManager := h.loop.GetApprovalManager()
 	approvalReq, exists := approvalManager.GetRequest(approvalID)
 	if !exists {
@@ -83,11 +88,6 @@ func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
 			response["location"] = skill.Location
 		}
 		writeJSON(w, http.StatusOK, response)
-		return
-	}
-
-	if sess.State != session.StateAwaitingApproval {
-		writeError(w, http.StatusConflict, "session is not in AwaitingApproval state")
 		return
 	}
 

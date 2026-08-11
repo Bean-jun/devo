@@ -88,6 +88,11 @@ describe('SessionStore', () => {
       const store = useSessionStore()
       store.sessions = [...mockSessions]
 
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockSessions[1]),
+      } as Response)
+
       const ok = await store.switchSessionById('sess-002')
 
       expect(ok).toBe(true)

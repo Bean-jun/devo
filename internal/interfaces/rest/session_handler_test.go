@@ -108,7 +108,10 @@ func TestCreateSession_DefaultTitle(t *testing.T) {
 	}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions", "application/json", bytes.NewReader(jsonBody))
+	resp, err := http.Post(server.URL+"/api/v1/sessions", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	var result createSessionResponse

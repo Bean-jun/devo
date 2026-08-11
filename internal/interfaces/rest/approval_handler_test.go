@@ -70,7 +70,10 @@ func TestSetTrustLevel_InvalidValue(t *testing.T) {
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/sess-test-1/trust", bytes.NewReader(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusBadRequest {
@@ -87,7 +90,10 @@ func TestSetTrustLevel_NotFound(t *testing.T) {
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/nonexistent/trust", bytes.NewReader(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -167,7 +173,10 @@ func TestSetApprovalPolicy_PartialUpdate(t *testing.T) {
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/sess-test-1/approval-policy", bytes.NewReader(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -203,7 +212,10 @@ func TestSetApprovalPolicy_InvalidOperationType(t *testing.T) {
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/sess-test-1/approval-policy", bytes.NewReader(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusBadRequest {
@@ -231,7 +243,10 @@ func TestSetApprovalPolicy_InvalidPolicyLevel(t *testing.T) {
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/sess-test-1/approval-policy", bytes.NewReader(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusBadRequest {
@@ -250,7 +265,10 @@ func TestSetApprovalPolicy_NotFound(t *testing.T) {
 
 	req, _ := http.NewRequest("PUT", server.URL+"/api/v1/sessions/nonexistent/approval-policy", bytes.NewReader(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -403,7 +421,10 @@ func TestApprove_InvalidDecision(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	url := fmt.Sprintf("%s/api/v1/sessions/sess-test-1/approve/dummy-id", server.URL)
-	resp, _ := http.Post(url, "application/json", bytes.NewReader(jsonBody))
+	resp, err := http.Post(url, "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusBadRequest {
@@ -461,7 +482,10 @@ loop:
 	jsonBody, _ := json.Marshal(body)
 
 	url := fmt.Sprintf("%s/api/v1/sessions/sess-test-1/approve/%s", server.URL, approvalID)
-	resp, _ := http.Post(url, "application/json", bytes.NewReader(jsonBody))
+	resp, err := http.Post(url, "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {
@@ -477,7 +501,10 @@ func TestApprove_SessionNotFound(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	url := fmt.Sprintf("%s/api/v1/sessions/nonexistent/approve/dummy-id", server.URL)
-	resp, _ := http.Post(url, "application/json", bytes.NewReader(jsonBody))
+	resp, err := http.Post(url, "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -502,7 +529,10 @@ func TestApprove_NotAwaitingApproval(t *testing.T) {
 	jsonBody, _ := json.Marshal(body)
 
 	url := fmt.Sprintf("%s/api/v1/sessions/sess-test-1/approve/dummy-id", server.URL)
-	resp, _ := http.Post(url, "application/json", bytes.NewReader(jsonBody))
+	resp, err := http.Post(url, "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {

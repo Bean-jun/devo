@@ -41,7 +41,7 @@ describe('InputArea', () => {
     await editor.trigger('keydown', { key: 'Enter', shiftKey: false })
 
     expect(wrapper.emitted('send')).toBeTruthy()
-    expect(wrapper.emitted('send')![0]).toEqual(['Hello, world!'])
+    expect(wrapper.emitted('send')![0]).toEqual(['Hello, world!', undefined])
   })
 
   it('should not emit send event on Shift+Enter', async () => {
@@ -193,7 +193,7 @@ describe('InputArea', () => {
     await editor.trigger('keydown', { key: 'Enter', shiftKey: false })
 
     expect(wrapper.emitted('send')).toBeTruthy()
-    expect(wrapper.emitted('send')![0]).toEqual([multiLineText])
+    expect(wrapper.emitted('send')![0]).toEqual([multiLineText, undefined])
   })
 
   it('should send large text without folding', async () => {
@@ -206,7 +206,7 @@ describe('InputArea', () => {
     await setEditorText(editor, largeText)
     await editor.trigger('keydown', { key: 'Enter', shiftKey: false })
 
-    expect(wrapper.emitted('send')![0]).toEqual([largeText])
+    expect(wrapper.emitted('send')![0]).toEqual([largeText, undefined])
   })
 
   it('should show placeholder class when empty', () => {

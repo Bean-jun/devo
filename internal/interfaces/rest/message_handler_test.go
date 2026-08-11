@@ -56,7 +56,10 @@ func TestPostMessage_SessionNotFound(t *testing.T) {
 	body := map[string]string{"content": "Hello"}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/nonexistent/messages", "application/json", bytes.NewReader(jsonBody))
+	resp, err := http.Post(server.URL+"/api/v1/sessions/nonexistent/messages", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -80,7 +83,10 @@ func TestPostMessage_ConflictWhenProcessing(t *testing.T) {
 	body := map[string]string{"content": "Hello"}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/messages", "application/json", bytes.NewReader(jsonBody))
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/messages", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {
@@ -104,7 +110,10 @@ func TestPostMessage_ArchivedReturns409(t *testing.T) {
 	body := map[string]string{"content": "Hello from archived"}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/messages", "application/json", bytes.NewReader(jsonBody))
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/messages", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusConflict {
@@ -128,7 +137,10 @@ func TestPostMessage_PausedAutoResumes(t *testing.T) {
 	body := map[string]string{"content": "Hello from paused"}
 	jsonBody, _ := json.Marshal(body)
 
-	resp, _ := http.Post(server.URL+"/api/v1/sessions/sess-test-1/messages", "application/json", bytes.NewReader(jsonBody))
+	resp, err := http.Post(server.URL+"/api/v1/sessions/sess-test-1/messages", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted {
@@ -213,7 +225,10 @@ func TestGetMessages_Pagination(t *testing.T) {
 		})
 	}
 
-	resp, _ := http.Get(server.URL + "/api/v1/sessions/sess-test-1/messages?limit=2&offset=1")
+	resp, err := http.Get(server.URL + "/api/v1/sessions/sess-test-1/messages?limit=2&offset=1")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	var result getMessagesResponse
@@ -231,7 +246,10 @@ func TestGetMessages_NotFound(t *testing.T) {
 	server, _ := setupTestServer()
 	defer server.Close()
 
-	resp, _ := http.Get(server.URL + "/api/v1/sessions/nonexistent/messages")
+	resp, err := http.Get(server.URL + "/api/v1/sessions/nonexistent/messages")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNotFound {
@@ -250,7 +268,10 @@ func TestFullConversationFlow(t *testing.T) {
 		"title":             "Integration Test",
 	}
 	createJSON, _ := json.Marshal(createBody)
-	resp, _ := http.Post(server.URL+"/api/v1/sessions", "application/json", bytes.NewReader(createJSON))
+	resp, err := http.Post(server.URL+"/api/v1/sessions", "application/json", bytes.NewReader(createJSON))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
@@ -262,7 +283,10 @@ func TestFullConversationFlow(t *testing.T) {
 
 	msgBody := map[string]string{"content": "First question"}
 	msgJSON, _ := json.Marshal(msgBody)
-	resp2, _ := http.Post(server.URL+"/api/v1/sessions/"+created.ID+"/messages", "application/json", bytes.NewReader(msgJSON))
+	resp2, err := http.Post(server.URL+"/api/v1/sessions/"+created.ID+"/messages", "application/json", bytes.NewReader(msgJSON))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp2.Body.Close()
 
 	if resp2.StatusCode != http.StatusAccepted {
@@ -271,7 +295,10 @@ func TestFullConversationFlow(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	resp3, _ := http.Get(server.URL + "/api/v1/sessions/" + created.ID + "/messages")
+	resp3, err := http.Get(server.URL + "/api/v1/sessions/" + created.ID + "/messages")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp3.Body.Close()
 
 	var msgsResp getMessagesResponse
@@ -281,7 +308,10 @@ func TestFullConversationFlow(t *testing.T) {
 		t.Errorf("expected 2 messages in history after async processing, got %d", msgsResp.Total)
 	}
 
-	resp4, _ := http.Get(server.URL + "/api/v1/sessions/" + created.ID)
+	resp4, err := http.Get(server.URL + "/api/v1/sessions/" + created.ID)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp4.Body.Close()
 
 	var sessResp getSessionResponse

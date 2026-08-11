@@ -126,6 +126,7 @@ func TestHandleOverlayKey_JK(t *testing.T) {
 
 func TestHandleOverlayKey_SpaceInSkills(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
+	m.activeSessionID = "test-session"
 	m.skillsPanel.Skills = []overlays.SkillEntry{
 		{Name: "code-reviewer", Description: "代码审查", Enabled: true},
 	}
@@ -517,12 +518,12 @@ func TestUpdate_ShiftUpHistoryPrev(t *testing.T) {
 	m.pushInputHistory("msg2")
 
 	m.textarea.SetValue("current draft")
-	msg := tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}
+	msg := tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModCtrl}
 	newModel, _ := m.Update(msg)
 	updated := newModel.(*Model)
 
 	if updated.textarea.Value() != "msg2" {
-		t.Errorf("Shift+Up 应恢复最近一条历史，期望 'msg2'，实际 '%s'", updated.textarea.Value())
+		t.Errorf("Ctrl+Up 应恢复最近一条历史，期望 'msg2'，实际 '%s'", updated.textarea.Value())
 	}
 	if updated.historyIndex != 0 {
 		t.Errorf("historyIndex 应为 0，实际 %d", updated.historyIndex)
@@ -539,13 +540,13 @@ func TestUpdate_ShiftUpHistoryPrevTwice(t *testing.T) {
 	model.pushInputHistory("msg1")
 	model.pushInputHistory("msg2")
 
-	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift})
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModCtrl})
 	model = newModel.(*Model)
-	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift})
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModCtrl})
 	model = newModel.(*Model)
 
 	if model.textarea.Value() != "msg1" {
-		t.Errorf("两次 Shift+Up 应恢复更早的历史，期望 'msg1'，实际 '%s'", model.textarea.Value())
+		t.Errorf("两次 Ctrl+Up 应恢复更早的历史，期望 'msg1'，实际 '%s'", model.textarea.Value())
 	}
 	if model.historyIndex != 1 {
 		t.Errorf("historyIndex 应为 1，实际 %d", model.historyIndex)
@@ -560,15 +561,15 @@ func TestUpdate_ShiftDownHistoryNext(t *testing.T) {
 	model.pushInputHistory("msg2")
 
 	model.textarea.SetValue("draft")
-	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}) // go to msg2
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModCtrl}) // go to msg2
 	model = newModel.(*Model)
-	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}) // go to msg1
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModCtrl}) // go to msg1
 	model = newModel.(*Model)
-	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}) // go back to msg2
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModCtrl}) // go back to msg2
 	model = newModel.(*Model)
 
 	if model.textarea.Value() != "msg2" {
-		t.Errorf("Shift+Down 应返回较新的历史，期望 'msg2'，实际 '%s'", model.textarea.Value())
+		t.Errorf("Ctrl+Down 应返回较新的历史，期望 'msg2'，实际 '%s'", model.textarea.Value())
 	}
 }
 
@@ -579,13 +580,13 @@ func TestUpdate_ShiftDownRestoresDraft(t *testing.T) {
 	model.pushInputHistory("msg1")
 
 	model.textarea.SetValue("my draft")
-	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}) // go to msg1
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModCtrl}) // go to msg1
 	model = newModel.(*Model)
-	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}) // go back to draft
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModCtrl}) // go back to draft
 	model = newModel.(*Model)
 
 	if model.textarea.Value() != "my draft" {
-		t.Errorf("Shift+Down 到最后应恢复草稿，期望 'my draft'，实际 '%s'", model.textarea.Value())
+		t.Errorf("Ctrl+Down 到最后应恢复草稿，期望 'my draft'，实际 '%s'", model.textarea.Value())
 	}
 	if model.historyIndex != -1 {
 		t.Errorf("historyIndex 应恢复为 -1，实际 %d", model.historyIndex)
@@ -595,19 +596,19 @@ func TestUpdate_ShiftDownRestoresDraft(t *testing.T) {
 func TestUpdate_ShiftUpEmptyHistory(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
 	m.textarea.SetValue("some text")
-	msg := tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}
+	msg := tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModCtrl}
 	newModel, _ := m.Update(msg)
 	updated := newModel.(*Model)
 
 	if updated.textarea.Value() != "some text" {
-		t.Error("没有历史时 Shift+Up 不应改变内容")
+		t.Error("没有历史时 Ctrl+Up 不应改变内容")
 	}
 }
 
 func TestUpdate_ShiftDownEmptyHistory(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
 	m.textarea.SetValue("some text")
-	msg := tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}
+	msg := tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModCtrl}
 	newModel, _ := m.Update(msg)
 	updated := newModel.(*Model)
 

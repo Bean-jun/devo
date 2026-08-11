@@ -52,6 +52,11 @@ describe('useSession', () => {
         { id: 'sess-2', title: 'S2', state: 'idle' } as any,
       ]
 
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 'sess-2', title: 'S2', state: 'idle' }),
+      } as Response)
+
       const { switchTo } = useSession()
       const ok = await switchTo('sess-2')
 

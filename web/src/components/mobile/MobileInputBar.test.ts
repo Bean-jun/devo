@@ -38,7 +38,7 @@ describe('MobileInputBar', () => {
     await textarea.trigger('keydown', { key: 'Enter', shiftKey: false })
 
     expect(wrapper.emitted('send')).toBeTruthy()
-    expect(wrapper.emitted('send')![0]).toEqual(['Hello, world!'])
+    expect(wrapper.emitted('send')![0]).toEqual(['Hello, world!', undefined])
   })
 
   it('should not emit send event on Shift+Enter', async () => {
