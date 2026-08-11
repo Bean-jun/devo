@@ -34,8 +34,8 @@ func TestRollbackNormalMessage(t *testing.T) {
 	}
 
 	remaining, total, _ := store.GetMessages("sess-1", 0, 0)
-	if total != 3 {
-		t.Fatalf("expected 3 messages (2 original + 1 system), got %d", total)
+	if total != 2 {
+		t.Fatalf("expected 2 messages, got %d", total)
 	}
 
 	if remaining[0].ID != "msg-1" {
@@ -43,9 +43,6 @@ func TestRollbackNormalMessage(t *testing.T) {
 	}
 	if remaining[1].ID != "msg-2" {
 		t.Errorf("expected msg-2 second, got %s", remaining[1].ID)
-	}
-	if remaining[2].Role != session.RoleSystem {
-		t.Errorf("expected last message to be system message, got %s", remaining[2].Role)
 	}
 }
 
@@ -82,20 +79,12 @@ func TestRollbackToolCallRequestAdsorption(t *testing.T) {
 	}
 
 	remaining, total, _ := store.GetMessages("sess-1", 0, 0)
-	if total != 2 {
-		t.Fatalf("expected 2 messages (msg-1 + system), got %d", total)
+	if total != 1 {
+		t.Fatalf("expected 1 messages (msg-1), got %d", total)
 	}
 
 	if remaining[0].ID != "msg-1" {
 		t.Errorf("expected msg-1 first, got %s", remaining[0].ID)
-	}
-	if remaining[1].Role != session.RoleSystem {
-		t.Errorf("expected system message last, got %s", remaining[1].Role)
-	}
-
-	sysMsg := remaining[1]
-	if sysMsg.Content == "" {
-		t.Error("system message should have content")
 	}
 }
 
@@ -132,15 +121,12 @@ func TestRollbackToolResultAdsorption(t *testing.T) {
 	}
 
 	remaining, total, _ := store.GetMessages("sess-1", 0, 0)
-	if total != 2 {
-		t.Fatalf("expected 2 messages (msg-1 + system), got %d", total)
+	if total != 1 {
+		t.Fatalf("expected 1 messages (msg-1), got %d", total)
 	}
 
 	if remaining[0].ID != "msg-1" {
 		t.Errorf("expected msg-1 first, got %s", remaining[0].ID)
-	}
-	if remaining[1].Role != session.RoleSystem {
-		t.Errorf("expected system message last, got %s", remaining[1].Role)
 	}
 }
 

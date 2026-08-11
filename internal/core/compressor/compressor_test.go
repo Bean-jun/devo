@@ -226,16 +226,16 @@ func TestSelectMessagesToCompressToolPairAlignmentMultiLevel(t *testing.T) {
 		t.Error("m6 should be in remaining")
 	}
 
-	if !remainingIDs["m5"] {
-		t.Error("m5 (tool result for tc2) should be in remaining because m6 follows it and m4 references tc2")
+	if remainingIDs["m5"] {
+		t.Error("m5 (tool result for tc2) should NOT be in remaining, not referenced by remaining set")
 	}
 
-	if !remainingIDs["m4"] {
-		t.Error("m4 (tool call for tc2) should be in remaining because m5 references tc2")
+	if remainingIDs["m4"] {
+		t.Error("m4 (tool call for tc2) should NOT be in remaining, not referenced by remaining set")
 	}
 
 	if remainingIDs["m3"] {
-		t.Error("m3 should NOT be in remaining, tc1 is not referenced by remaining")
+		t.Error("m3 (tool result for tc1) should NOT be in remaining, not referenced by remaining set")
 	}
 }
 

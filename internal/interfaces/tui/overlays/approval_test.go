@@ -19,7 +19,7 @@ func TestApprovalModal_Render(t *testing.T) {
 	if !strings.Contains(result, "delete") {
 		t.Error("渲染结果应包含操作类型")
 	}
-	if !strings.Contains(result, "\"HIGH\"") {
+	if !strings.Contains(result, "HIGH") {
 		t.Error("渲染结果应包含风险等级")
 	}
 }

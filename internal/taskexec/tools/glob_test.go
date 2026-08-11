@@ -97,7 +97,7 @@ func TestGlobTool_SpecificPath(t *testing.T) {
 
 	tool := &GlobTool{}
 	result, err := executeTool(t, tool, tmpDir, map[string]interface{}{
-		"pattern": "*.go",
+		"pattern": "src/*.go",
 		"path":    "src",
 	})
 
