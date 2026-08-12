@@ -396,6 +396,15 @@ func (m *Model) handleOverlayEnter() (tea.Model, tea.Cmd) {
 		m.overlay.Close()
 		m.refreshViewport()
 		return m, m.updateReasoningConfig()
+
+	case overlays.OverlayModelPicker:
+		selected := m.modelPicker.SelectedModel()
+		if selected.ID != "" && !selected.Active {
+			return m, m.activateModelFromAPI(selected.ID)
+		}
+		m.overlay.Close()
+		m.refreshViewport()
+		return m, nil
 	}
 
 	return m, nil
@@ -425,6 +434,8 @@ func (m *Model) handleOverlayCursorUp() {
 		}
 	case overlays.OverlayReasoning:
 		m.reasoningPicker.CursorUp()
+	case overlays.OverlayModelPicker:
+		m.modelPicker.CursorUp()
 	}
 }
 
@@ -452,5 +463,7 @@ func (m *Model) handleOverlayCursorDown() {
 		}
 	case overlays.OverlayReasoning:
 		m.reasoningPicker.CursorDown()
+	case overlays.OverlayModelPicker:
+		m.modelPicker.CursorDown()
 	}
 }

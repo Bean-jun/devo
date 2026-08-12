@@ -547,3 +547,33 @@ func (c *Client) CheckUpdate() (*UpdateCheckResult, error) {
 	}
 	return &result, nil
 }
+
+// ─── Models ───
+
+type ModelInfo struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Model    string `json:"model"`
+	Active   bool   `json:"active"`
+	Provider string `json:"provider"`
+}
+
+type ModelsResponse struct {
+	Models        []ModelInfo `json:"models"`
+	ActiveModelID string      `json:"active_model_id"`
+}
+
+func (c *Client) GetModels() ([]ModelInfo, error) {
+	var resp ModelsResponse
+	if err := c.get("/api/v1/global/config/models", &resp); err != nil {
+		return nil, err
+	}
+	for i := range resp.Models {
+		resp.Models[i].Active = resp.Models[i].ID == resp.ActiveModelID
+	}
+	return resp.Models, nil
+}
+
+func (c *Client) ActivateModel(modelID string) error {
+	return c.put("/api/v1/global/config/models/"+modelID+"/activate", nil, nil)
+}

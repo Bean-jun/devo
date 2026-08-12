@@ -45,6 +45,7 @@ type Model struct {
 	dashboardPanel        overlays.DashboardPanel
 	settingsPanel         overlays.SettingsPanel
 	reasoningPicker       overlays.ReasoningPicker
+	modelPicker           overlays.ModelPicker
 	apiClient             *api.Client
 	sseClient             *api.SSEClient
 	baseURL               string
@@ -56,6 +57,8 @@ type Model struct {
 	ready                 bool
 	initialized           bool
 	activeSessionID       string
+	models                []api.ModelInfo
+	activeModelName       string
 	loading               map[overlays.OverlayType]bool
 	enableReasoning       bool
 	reasoningEffort       string
@@ -158,6 +161,7 @@ func (m *Model) initFromAPI() tea.Cmd {
 		},
 		m.fetchGlobalConfigFromAPI(),
 		m.checkUpdateFromAPI(),
+		m.fetchModelsFromAPI(),
 	)
 }
 
@@ -299,6 +303,7 @@ type apiResponseMsg struct {
 	path      string
 	key       string
 	id        string
+	modelID   string
 }
 
 func (m *Model) overlayPanelWidth() int {
@@ -349,8 +354,12 @@ func (m *Model) buildFooterText() string {
 	total := tokenUsage.Input + tokenUsage.Output
 	ti := formatTokenCount(tokenUsage.Input)
 	to := formatTokenCount(tokenUsage.Output)
-	return fmt.Sprintf("Context %s  ·  Tokens %s (↑%s ↓%s)  ·  %s",
-		c, formatTokenCount(total), ti, to, wd) + m.buildImageHint()
+	modelPart := ""
+	if m.activeModelName != "" {
+		modelPart = "  ·  " + m.activeModelName
+	}
+	return fmt.Sprintf("Context %s  ·  Tokens %s (↑%s ↓%s)%s  ·  %s",
+		c, formatTokenCount(total), ti, to, modelPart, wd) + m.buildImageHint()
 }
 
 func (m *Model) buildImageHint() string {

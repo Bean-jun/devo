@@ -22,6 +22,7 @@ const (
 	OverlayDashboard
 	OverlaySettings
 	OverlayReasoning
+	OverlayModelPicker
 )
 
 type OverlayStack struct {

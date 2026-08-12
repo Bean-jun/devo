@@ -380,6 +380,36 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 	case "update_check_error":
 		// Silently ignore - update check is best-effort
 
+	case "models_loaded":
+		if models, ok := msg.data.([]api.ModelInfo); ok {
+			m.models = models
+			m.modelPicker.Models = make([]overlays.ModelInfo, 0, len(models))
+			for _, mod := range models {
+				m.modelPicker.Models = append(m.modelPicker.Models, overlays.ModelInfo{
+					ID:     mod.ID,
+					Name:   mod.Name,
+					Model:  mod.Model,
+					Active: mod.Active,
+				})
+				if mod.Active {
+					m.activeModelName = mod.Name
+					m.modelPicker.Selected = len(m.modelPicker.Models) - 1
+				}
+			}
+		}
+
+	case "models_error":
+		m.toast.Show("获取模型列表失败: "+msg.err.Error(), true)
+
+	case "model_activated":
+		m.toast.Show("模型已切换", false)
+		m.overlay.Close()
+		m.refreshViewport()
+		return m, m.fetchModelsFromAPI()
+
+	case "model_activate_error":
+		m.toast.Show("切换模型失败: "+msg.err.Error(), true)
+
 	default:
 		if msg.err != nil {
 			m.toast.Show("API 错误: "+msg.err.Error(), true)

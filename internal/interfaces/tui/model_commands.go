@@ -62,6 +62,10 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 	case "/reasoning":
 		m.reasoningPicker = overlays.NewReasoningPicker(m.enableReasoning, m.reasoningEffort)
 		m.overlay.Open(overlays.OverlayReasoning)
+	case "/model":
+		m.modelPicker = overlays.NewModelPicker()
+		m.overlay.Open(overlays.OverlayModelPicker)
+		return m.fetchModelsFromAPI()
 	case "/pause":
 		if m.activeSessionID != "" {
 			return m.pauseSessionFromAPI(m.activeSessionID)

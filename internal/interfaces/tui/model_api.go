@@ -373,3 +373,23 @@ func (m *Model) checkUpdateFromAPI() tea.Cmd {
 		return apiResponseMsg{kind: "update_checked", data: result}
 	}
 }
+
+func (m *Model) fetchModelsFromAPI() tea.Cmd {
+	return func() tea.Msg {
+		models, err := m.apiClient.GetModels()
+		if err != nil {
+			return apiResponseMsg{kind: "models_error", err: err}
+		}
+		return apiResponseMsg{kind: "models_loaded", data: models}
+	}
+}
+
+func (m *Model) activateModelFromAPI(modelID string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.apiClient.ActivateModel(modelID)
+		if err != nil {
+			return apiResponseMsg{kind: "model_activate_error", err: err}
+		}
+		return apiResponseMsg{kind: "model_activated", modelID: modelID}
+	}
+}
