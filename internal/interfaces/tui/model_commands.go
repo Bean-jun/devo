@@ -88,7 +88,6 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 		}
 		m.toast.Show("没有活动会话可压缩", true)
 	case "/background":
-		m.backgroundPanel = overlays.NewBackgroundPanel()
 		m.overlay.Open(overlays.OverlayBackground)
 		if m.activeSessionID != "" {
 			return m.fetchBackgroundProcessesFromAPI(m.activeSessionID)

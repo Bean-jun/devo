@@ -144,6 +144,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.toast.Show(yoloMsg, false)
 			m.refreshViewport()
+			if m.activeSessionID != "" {
+				level := "normal"
+				if m.statusBar.Yolo {
+					level = "elevated"
+				}
+				return m, m.setTrustLevelFromAPI(m.activeSessionID, level)
+			}
 			return m, nil
 
 		case key == "ctrl+t":

@@ -16,11 +16,21 @@ type BackgroundPanel struct {
 	Processes []api.BackgroundProcessInfo
 	Selected  int
 	Expanded  map[int]bool
+	Output    map[int]string
 }
 
 func NewBackgroundPanel() BackgroundPanel {
 	return BackgroundPanel{
 		Expanded: make(map[int]bool),
+		Output:   make(map[int]string),
+	}
+}
+
+func (bp *BackgroundPanel) AppendOutput(pid int, chunk string) {
+	bp.Output[pid] = bp.Output[pid] + chunk
+	const maxLen = 256 * 1024
+	if len(bp.Output[pid]) > maxLen {
+		bp.Output[pid] = bp.Output[pid][len(bp.Output[pid])-maxLen:]
 	}
 }
 
@@ -102,7 +112,25 @@ func (bp *BackgroundPanel) Render() string {
 			lines = append(lines, line)
 
 			if bp.Expanded[p.PID] {
-				lines = append(lines, "    "+muted.Render("已选择进程 "+fmt.Sprintf("%d", p.PID)+" - 按 Enter 停止"))
+				output := bp.Output[p.PID]
+				if output == "" {
+					lines = append(lines, "    "+muted.Render("（暂无输出）"))
+				} else {
+					outputLines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+					maxLines := bp.Height - 4 - len(bp.Processes)
+					if maxLines < 4 {
+						maxLines = 4
+					}
+					if len(outputLines) > maxLines {
+						outputLines = outputLines[len(outputLines)-maxLines:]
+					}
+					for _, ol := range outputLines {
+						if len(ol) > innerW-4 {
+							ol = ol[:innerW-4]
+						}
+						lines = append(lines, "    "+muted.Render(ol))
+					}
+				}
 			}
 		}
 	}

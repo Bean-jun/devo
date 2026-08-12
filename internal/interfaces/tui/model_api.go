@@ -175,6 +175,16 @@ func (m *Model) approveFromAPI(sessionID string, approvalID string) tea.Cmd {
 	}
 }
 
+func (m *Model) setTrustLevelFromAPI(sessionID string, level string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.apiClient.SetTrustLevel(sessionID, level)
+		if err != nil {
+			return apiResponseMsg{kind: "trust_level_error", err: err}
+		}
+		return apiResponseMsg{kind: "trust_level_updated", data: level}
+	}
+}
+
 func (m *Model) upsertMemoryFromAPI(sessionID string, memoryType string, key, content string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.apiClient.UpsertMemory(sessionID, memoryType, key, content)

@@ -59,6 +59,7 @@ type Model struct {
 	enableReasoning       bool
 	reasoningEffort       string
 	rollbackTargetContent string
+	rollbackTargetIndex   int
 
 	keyboardEnhancements int
 	pasteBuffer          string
@@ -214,6 +215,15 @@ func (m *Model) applySessionsData(sessions []types.SessionInfo) {
 	m.sessPicker.Sessions = sessions
 }
 
+func (m *Model) syncYoloFromSession(sessionID string) {
+	for _, s := range m.sessions {
+		if s.ID == sessionID {
+			m.statusBar.Yolo = s.TrustLevel == types.TrustLevelElevated
+			return
+		}
+	}
+}
+
 func (m *Model) applyMessagesData(msgs []types.Message) {
 	if len(msgs) > 0 {
 		existing := make(map[string]bool)
@@ -294,8 +304,8 @@ func (m *Model) overlayPanelWidth() int {
 		return m.width - 4
 	}
 	maxW := m.width - 8
-	if maxW > 80 {
-		maxW = 80
+	if maxW > 100 {
+		maxW = 100
 	}
 	return maxW
 }
