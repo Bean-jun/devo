@@ -147,7 +147,8 @@ func SaveGlobalConfig(cfg *Config) error {
 	}
 
 	if cfg.LLM.APIKey != "" || cfg.LLM.BaseURL != "" || cfg.LLM.Model != "" ||
-		cfg.LLM.EnableReasoning || cfg.LLM.ReasoningEffort != "" {
+		cfg.LLM.EnableReasoning || cfg.LLM.ReasoningEffort != "" ||
+		len(cfg.LLM.Models) > 0 {
 		llmData, err := json.Marshal(cfg.LLM)
 		if err != nil {
 			return fmt.Errorf("marshal llm: %w", err)

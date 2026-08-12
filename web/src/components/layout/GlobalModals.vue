@@ -10,6 +10,7 @@ const {
   HelpPanel,
   ConfigWarningDialog,
   UpdateModal,
+  ModelPicker,
 } = useGlobalModals()
 </script>
 
@@ -23,5 +24,6 @@ const {
     <HelpPanel />
     <ConfigWarningDialog />
     <UpdateModal />
+    <ModelPicker />
   </Teleport>
 </template>

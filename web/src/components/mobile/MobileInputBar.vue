@@ -28,6 +28,7 @@ const {
   canSend,
   contextUsage,
   sessionTokens,
+  activeModelName,
   focusTextarea,
   handleKeydown,
   send,
@@ -124,6 +125,8 @@ const {
         <span class="footer-item">Context <span class="context-warn">{{ contextUsage }}</span></span>
         <span class="footer-sep">·</span>
         <span class="footer-item">Tokens {{ formatTokenCount(sessionTokens.total) }} (<AppIcon name="arrow-up" :size="10" />{{ formatTokenCount(sessionTokens.input) }} <AppIcon name="arrow-down" :size="10" />{{ formatTokenCount(sessionTokens.output) }})</span>
+        <span v-if="activeModelName" class="footer-sep">·</span>
+        <span v-if="activeModelName" class="footer-item footer-model">{{ activeModelName }}</span>
       </div>
     </div>
 

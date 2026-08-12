@@ -98,6 +98,13 @@ func (l *Loop) EstimateInitialContextTokens(sess *session.Session) int {
 	return tokens
 }
 
+func (l *Loop) UpdateLLMClient(client llmclient.Client) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.llmClient = client
+	l.compressor.UpdateLLMClient(client)
+}
+
 func (l *Loop) ProcessMessage(ctx context.Context, sessionID string, msg session.Message) error {
 	sess, err := l.store.Get(sessionID)
 	if err != nil {

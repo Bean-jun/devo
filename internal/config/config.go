@@ -8,7 +8,10 @@ import (
 	"strings"
 )
 
-type LLMConfig struct {
+type ModelConfig struct {
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	Provider        string            `json:"provider,omitempty"`
 	APIKey          string            `json:"api_key"`
 	BaseURL         string            `json:"base_url"`
 	Model           string            `json:"model"`
@@ -16,6 +19,19 @@ type LLMConfig struct {
 	EnableReasoning bool              `json:"enable_reasoning,omitempty"`
 	ReasoningEffort string            `json:"reasoning_effort,omitempty"`
 	MaxTokens       int               `json:"max_tokens,omitempty"`
+}
+
+type LLMConfig struct {
+	APIKey          string            `json:"api_key,omitempty"`
+	BaseURL         string            `json:"base_url,omitempty"`
+	Model           string            `json:"model,omitempty"`
+	ExtraHeaders    map[string]string `json:"extra_headers,omitempty"`
+	EnableReasoning bool              `json:"enable_reasoning,omitempty"`
+	ReasoningEffort string            `json:"reasoning_effort,omitempty"`
+	MaxTokens       int               `json:"max_tokens,omitempty"`
+
+	Models        []ModelConfig `json:"models,omitempty"`
+	ActiveModelID string        `json:"active_model_id,omitempty"`
 }
 
 type Config struct {
@@ -50,6 +66,7 @@ func LoadGlobal() (*Config, error) {
 
 	applyEnvOverrides(cfg)
 	applyDefaults(cfg)
+	migrateLegacyConfig(cfg)
 	return cfg, nil
 }
 
@@ -67,7 +84,7 @@ func LoadFullConfig(projectDir string) (*Config, error) {
 	applyEnvOverrides(cfg)
 	applyDefaults(cfg)
 
-	if cfg.LLM.APIKey == "" {
+	if cfg.LLM.APIKey == "" && len(cfg.LLM.Models) == 0 {
 		return cfg, fmt.Errorf(
 			"LLM API key not configured.\n\n" +
 				"Create a config file at one of these locations:\n" +
@@ -223,4 +240,47 @@ func Merge(global, project *Config) *Config {
 	}
 
 	return result
+}
+
+func migrateLegacyConfig(cfg *Config) {
+	if len(cfg.LLM.Models) > 0 {
+		return
+	}
+	if cfg.LLM.APIKey != "" {
+		cfg.LLM.Models = []ModelConfig{{
+			ID:              "default",
+			Name:            cfg.LLM.Model,
+			APIKey:          cfg.LLM.APIKey,
+			BaseURL:         cfg.LLM.BaseURL,
+			Model:           cfg.LLM.Model,
+			ExtraHeaders:    cfg.LLM.ExtraHeaders,
+			EnableReasoning: cfg.LLM.EnableReasoning,
+			ReasoningEffort: cfg.LLM.ReasoningEffort,
+			MaxTokens:       cfg.LLM.MaxTokens,
+		}}
+		cfg.LLM.ActiveModelID = "default"
+	}
+}
+
+func (c *Config) GetActiveModel() *ModelConfig {
+	for i := range c.LLM.Models {
+		if c.LLM.Models[i].ID == c.LLM.ActiveModelID {
+			return &c.LLM.Models[i]
+		}
+	}
+	if len(c.LLM.Models) > 0 {
+		return &c.LLM.Models[0]
+	}
+	return nil
+}
+
+func (c *Config) IsLLMConfigured() bool {
+	return len(c.LLM.Models) > 0 || c.LLM.APIKey != ""
+}
+
+func Slugify(name string) string {
+	slug := strings.ToLower(name)
+	slug = strings.ReplaceAll(slug, " ", "-")
+	slug = strings.ReplaceAll(slug, ".", "-")
+	return slug
 }

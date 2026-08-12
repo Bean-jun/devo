@@ -9,25 +9,38 @@ import (
 	"devo/internal/taskexec/tools"
 )
 
-func NewClient(cfg *config.GlobalConfig, registry *tools.Registry) llmclient.Client {
-	if cfg.LLM.APIKey == "" {
+func NewClient(cfg *config.Config, registry *tools.Registry) llmclient.Client {
+	active := cfg.GetActiveModel()
+	if active == nil || active.APIKey == "" {
 		logging.Info(context.Background(), "llm api key not configured, using mock client")
 		return llmclient.NewMockClient()
 	}
 
+	llmCfg := &config.LLMConfig{
+		APIKey:          active.APIKey,
+		BaseURL:         active.BaseURL,
+		Model:           active.Model,
+		ExtraHeaders:    active.ExtraHeaders,
+		EnableReasoning: active.EnableReasoning,
+		ReasoningEffort: active.ReasoningEffort,
+		MaxTokens:       active.MaxTokens,
+	}
+
 	var reasoningEffort string
-	if cfg.LLM.EnableReasoning {
-		reasoningEffort = cfg.LLM.ReasoningEffort
+	if active.EnableReasoning {
+		reasoningEffort = active.ReasoningEffort
 	}
 
 	client := openai.New(openai.Config{
-		LLMConfig: &cfg.LLM,
+		LLMConfig: llmCfg,
 	}, registry)
 
 	logging.Info(context.Background(), "using llm",
-		"base_url", cfg.LLM.BaseURL,
-		"model", cfg.LLM.Model,
-		"reasoning_enabled", cfg.LLM.EnableReasoning,
+		"model_id", active.ID,
+		"model_name", active.Name,
+		"base_url", active.BaseURL,
+		"model", active.Model,
+		"reasoning_enabled", active.EnableReasoning,
 		"reasoning_effort", reasoningEffort,
 	)
 	return client

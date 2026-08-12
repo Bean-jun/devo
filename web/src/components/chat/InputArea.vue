@@ -30,6 +30,7 @@ const {
   contextUsage,
   sessionTokens,
   workingDir,
+  activeModelName,
   handleInput,
   handlePaste,
   handleKeydown,
@@ -138,6 +139,8 @@ const {
       <span class="footer-item">Context </span><span class="footer-item context-warn">{{ contextUsage }}</span>
       <span class="footer-sep">·</span>
       <span class="footer-item">Tokens {{ formatTokenCount(sessionTokens.total) }} (<AppIcon name="arrow-up" :size="10" />{{ formatTokenCount(sessionTokens.input) }} <AppIcon name="arrow-down" :size="10" />{{ formatTokenCount(sessionTokens.output) }})</span>
+      <span v-if="activeModelName" class="footer-sep">·</span>
+      <span v-if="activeModelName" class="footer-item footer-model">{{ activeModelName }}</span>
       <span v-if="workingDir" class="footer-item footer-dir">{{ workingDir }}</span>
     </div>
 

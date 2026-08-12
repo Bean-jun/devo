@@ -407,6 +407,8 @@ func (m *toolLoopMockClient) CompleteStream(ctx context.Context, messages []sess
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (m *toolLoopMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func indexOf(slice []string, item string) int {
 	for i, s := range slice {

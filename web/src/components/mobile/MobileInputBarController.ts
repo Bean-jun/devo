@@ -1,6 +1,7 @@
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
+import { useModelStore } from '@/stores/model'
 import { MAX_MESSAGE_LENGTH } from '@/utils/constants'
 import { estimateTokens, formatTokenCount } from '@/utils/formatters'
 
@@ -21,6 +22,7 @@ export function useMobileInputBar(props: MobileInputBarProps, emit: (e: string, 
   const fileInputRef = ref<HTMLInputElement | null>(null)
   const sessionStore = useSessionStore()
   const uiStore = useUiStore()
+  const modelStore = useModelStore()
 
 const inputHistory: string[] = []
 let historyIndex = -1
@@ -63,13 +65,21 @@ const sessionTokens = computed(() => {
   }
 })
 
+const activeModelName = computed(() => {
+  const m = modelStore.models.find(m => m.id === modelStore.activeModelId)
+  return m?.name ?? ''
+})
+
 function focusTextarea(): void {
   nextTick(() => {
     textareaRef.value?.focus()
   })
 }
 
-onMounted(focusTextarea)
+onMounted(() => {
+  focusTextarea()
+  modelStore.fetchModels()
+})
 
 watch(() => uiStore.focusInputCounter, focusTextarea)
 
@@ -203,6 +213,7 @@ function openCommand() {
     canSend,
     contextUsage,
     sessionTokens,
+    activeModelName,
     focusTextarea,
     handleKeydown,
     send,

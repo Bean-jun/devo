@@ -20,6 +20,7 @@ export function useHelpPanel() {
   ]
 
   const commands = [
+    { name: '/model', desc: '切换模型', args: '' },
     { name: '/new', desc: '创建新会话', args: '[名称]' },
     { name: '/switch', desc: '切换会话', args: '' },
     { name: '/rename', desc: '重命名当前会话', args: '<新名称>' },

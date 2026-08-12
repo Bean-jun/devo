@@ -65,6 +65,10 @@ func New(llmClient llmclient.Client, store session.SessionStore) *Compressor {
 	}
 }
 
+func (c *Compressor) UpdateLLMClient(client llmclient.Client) {
+	c.llmClient = client
+}
+
 type CompressResult struct {
 	CompressedCount int
 	TokensRemoved   int

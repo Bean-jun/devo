@@ -164,6 +164,9 @@ function handleCommandSelect(cmd: Command) {
     case 'help':
       uiStore.setActiveModal('help')
       break
+    case 'model':
+      uiStore.setActiveModal('model-picker')
+      break
     case 'export':
       handleExport()
       break

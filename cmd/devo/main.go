@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"devo/internal/config"
 	"devo/internal/pkg/logging"
@@ -14,6 +16,34 @@ import (
 var Version = "dev"
 
 func main() {
+	subcommand := ""
+	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+		subcommand = os.Args[1]
+	}
+
+	switch subcommand {
+	case "config":
+		if len(os.Args) > 2 && os.Args[2] == "models" {
+			runConfigModels(os.Args[3:])
+			return
+		}
+		if len(os.Args) > 2 && os.Args[2] == "onboard" {
+			runConfigOnboard()
+			return
+		}
+		fmt.Fprintln(os.Stderr, "用法: devo config models <子命令>")
+		fmt.Fprintln(os.Stderr, "      devo config onboard")
+		os.Exit(1)
+	case "":
+		runServer()
+	default:
+		fmt.Fprintf(os.Stderr, "未知子命令: %s\n", subcommand)
+		fmt.Fprintln(os.Stderr, "用法: devo [config]")
+		os.Exit(1)
+	}
+}
+
+func runServer() {
 	tuiMode := flag.Bool("tui", false, "Launch TUI mode")
 	webMode := flag.Bool("web", false, "Auto-open browser on startup")
 	portFlag := flag.Int("port", 0, "Port for web server (0 = auto-assign)")

@@ -586,3 +586,41 @@ type openaiRespMessage struct {
 	Reasoning        string           `json:"reasoning,omitempty"`
 	ToolCalls        []openaiToolCall `json:"tool_calls,omitempty"`
 }
+
+func (c *Client) TestConnection(ctx context.Context) error {
+	reqBody := openaiChatRequest{
+		Model:      c.config.LLMConfig.Model,
+		Messages:   []openaiMessage{{Role: "user", Content: "hi"}},
+		MaxTokens:  1,
+		ToolChoice: "none",
+	}
+
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshal test request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", c.config.LLMConfig.BaseURL+"/chat/completions", strings.NewReader(string(bodyJSON)))
+	if err != nil {
+		return fmt.Errorf("create test request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.config.LLMConfig.APIKey)
+	for k, v := range c.config.LLMConfig.ExtraHeaders {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("test connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return fmt.Errorf("test connection failed: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}

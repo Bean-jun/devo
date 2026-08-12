@@ -492,6 +492,8 @@ func (m *toolCallMockClient) CompleteStream(ctx context.Context, messages []sess
 	callback(llmclient.StreamEvent{Type: "done", FullText: "", ToolCalls: m.toolCalls})
 	return nil
 }
+func (m *toolCallMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 type errorMockClient struct{}
 
@@ -503,6 +505,8 @@ func (m *errorMockClient) CompleteStream(ctx context.Context, messages []session
 	callback(llmclient.StreamEvent{Type: "error", Err: errors.New("stream error")})
 	return errors.New("stream error")
 }
+func (m *errorMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestPrepareHandler_AssemblesPrompt(t *testing.T) {
 	loop, store := setupTestLoop()

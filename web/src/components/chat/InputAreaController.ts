@@ -2,6 +2,7 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useCommandStore } from '@/stores/command'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
+import { useModelStore } from '@/stores/model'
 import { MAX_MESSAGE_LENGTH } from '@/utils/constants'
 import { estimateTokens, formatTokenCount } from '@/utils/formatters'
 import {
@@ -31,6 +32,7 @@ export function useInputArea(props: InputAreaProps, emit: (e: string, ...args: a
   const commandStore = useCommandStore()
   const sessionStore = useSessionStore()
   const uiStore = useUiStore()
+  const modelStore = useModelStore()
 
 const {
   segments,
@@ -100,6 +102,11 @@ const sessionTokens = computed(() => {
 
 const workingDir = computed(() => sessionStore.currentSession?.workingDirectory ?? '')
 
+const activeModelName = computed(() => {
+  const m = modelStore.models.find(m => m.id === modelStore.activeModelId)
+  return m?.name ?? ''
+})
+
 function focusEditor(): void {
   nextTick(() => {
     editorRef.value?.focus()
@@ -109,6 +116,7 @@ function focusEditor(): void {
 onMounted(() => {
   renderEditor()
   focusEditor()
+  modelStore.fetchModels()
 })
 
 watch(() => uiStore.focusInputCounter, focusEditor)
@@ -376,6 +384,7 @@ function handleDragOver(e: DragEvent): void {
     contextUsage,
     sessionTokens,
     workingDir,
+    activeModelName,
     focusEditor,
     handleInput,
     handlePaste,

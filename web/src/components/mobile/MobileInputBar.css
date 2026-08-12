@@ -159,6 +159,11 @@
   flex-shrink: 0;
 }
 
+.footer-model {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
 .footer-sep {
   opacity: 0.4;
   flex-shrink: 0;

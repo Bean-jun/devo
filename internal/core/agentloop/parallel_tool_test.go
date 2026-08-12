@@ -57,6 +57,8 @@ func (m *parallelToolMockClient) CompleteStream(ctx context.Context, messages []
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (m *parallelToolMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestParallelToolExecution_Basic(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -204,6 +206,8 @@ func (m *approvalParallelMockClient) CompleteStream(ctx context.Context, message
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (m *approvalParallelMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestParallelToolExecution_WithApproval(t *testing.T) {
 	store := session.NewInMemoryStore()

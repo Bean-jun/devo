@@ -61,6 +61,8 @@ func (m *toolCallingMockClient) CompleteStream(ctx context.Context, messages []s
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (m *toolCallingMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestAgentLoopWithToolCalling(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -173,6 +175,8 @@ func (m *multiToolMockClient) CompleteStream(ctx context.Context, messages []ses
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (m *multiToolMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestAgentLoopWithMultipleToolCalls(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -317,6 +321,8 @@ func (m *limitedToolMockClient) CompleteStream(ctx context.Context, messages []s
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (m *limitedToolMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestToolCallLimitReached(t *testing.T) {
 	tmpDir := t.TempDir()

@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
+import { useModelStore } from '@/stores/model'
 import { API_BASE } from '@/utils/constants'
 import { useCommand } from '@/composables/useCommand'
 import MessageList from './MessageList.vue'
@@ -10,6 +11,7 @@ export function useChatPanel() {
   const chatStore = useChatStore()
   const sessionStore = useSessionStore()
   const uiStore = useUiStore()
+  const modelStore = useModelStore()
   const { openPalette } = useCommand()
 
   const messageListRef = ref<InstanceType<typeof MessageList> | null>(null)
@@ -68,7 +70,11 @@ function handleClear() {
 
 function handleOpenCommand() {
   openPalette((cmd) => {
-    uiStore.setPendingCommand(cmd.name + ' ')
+    if (cmd.id === 'model') {
+      uiStore.setActiveModal('model-picker')
+    } else {
+      uiStore.setPendingCommand(cmd.name + ' ')
+    }
   })
 }
 
@@ -211,6 +217,29 @@ async function handleExecuteCommand(text: string) {
     }
     case 'help': {
       uiStore.setActiveModal('help')
+      break
+    }
+    case 'model': {
+      if (arg) {
+        if (modelStore.models.length === 0) {
+          await modelStore.fetchModels()
+        }
+        const match = modelStore.models.find(
+          m => m.id === arg || m.name === arg || m.model === arg
+        )
+        if (match) {
+          try {
+            await modelStore.activateModel(match.id)
+            uiStore.showToast('success', `已切换到 ${match.name}`)
+          } catch (e: any) {
+            uiStore.showToast('error', e.message || '切换失败')
+          }
+        } else {
+          uiStore.showToast('error', `未找到模型: ${arg}`)
+        }
+      } else {
+        uiStore.setActiveModal('model-picker')
+      }
       break
     }
     default: {

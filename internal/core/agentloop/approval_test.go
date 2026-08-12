@@ -62,6 +62,8 @@ func (m *approvalMockClient) CompleteStream(ctx context.Context, messages []sess
 	return nil
 }
 
+func (m *approvalMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func TestAgentLoopWithApproval_Approve(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -188,6 +190,8 @@ func (m *rejectionMockClient) CompleteStream(ctx context.Context, messages []ses
 	return nil
 }
 
+func (m *rejectionMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func TestAgentLoopWithApproval_Reject(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -313,6 +317,9 @@ func (m *readOnlyMockClient) CompleteStream(ctx context.Context, messages []sess
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+
+func (m *readOnlyMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestAgentLoop_ReadOnlyToolsNoApproval(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -481,6 +488,9 @@ func (m *policyAutoApprovalMockClient) CompleteStream(ctx context.Context, messa
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+
+func (m *policyAutoApprovalMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestAgentLoop_PolicySessionTrust_AutoApprove(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -753,6 +763,9 @@ func (m *overwriteApprovalMockClient) CompleteStream(ctx context.Context, messag
 	return nil
 }
 
+func (m *overwriteApprovalMockClient) TestConnection(ctx context.Context) error { return nil }
+
+
 func TestApprovalRequest_WriteFileDiff(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "existing.txt"), []byte("old line1\nold line2\n"), 0644)
@@ -885,6 +898,9 @@ func (m *editApprovalMockClient) CompleteStream(ctx context.Context, messages []
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+
+func (m *editApprovalMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestApprovalRequest_EditFileDiff(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -1031,6 +1047,9 @@ func (m *editFailureMockClient) CompleteStream(ctx context.Context, messages []s
 	return nil
 }
 
+func (m *editFailureMockClient) TestConnection(ctx context.Context) error { return nil }
+
+
 func TestApprovalRequest_EditFileDiffFailureNoApproval(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "dup.txt"), []byte("hello\nhello\n"), 0644)
@@ -1154,6 +1173,9 @@ func (m *execCommandApprovalMockClient) CompleteStream(ctx context.Context, mess
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+
+func (m *execCommandApprovalMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestApprovalRequest_ExecPythonContext(t *testing.T) {
 	tmpDir := t.TempDir()
