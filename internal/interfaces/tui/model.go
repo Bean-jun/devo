@@ -49,6 +49,7 @@ type Model struct {
 	sseClient             *api.SSEClient
 	baseURL               string
 	version               string
+	updateInfo            *api.UpdateCheckResult
 	workingDir            string
 	width                 int
 	height                int
@@ -156,6 +157,7 @@ func (m *Model) initFromAPI() tea.Cmd {
 			return apiResponseMsg{kind: "sessions_loaded", data: sessions}
 		},
 		m.fetchGlobalConfigFromAPI(),
+		m.checkUpdateFromAPI(),
 	)
 }
 

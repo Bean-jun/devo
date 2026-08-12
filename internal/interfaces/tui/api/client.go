@@ -526,3 +526,24 @@ func (c *Client) UpdateProjectConfig(body map[string]interface{}) error {
 func (c *Client) UpdateGlobalConfig(body map[string]interface{}) error {
 	return c.put("/api/v1/global/config", body, nil)
 }
+
+// ─── Update Check ───
+
+type UpdateCheckResult struct {
+	HasUpdate      bool   `json:"has_update"`
+	CurrentVersion string `json:"current_version"`
+	LatestVersion  string `json:"latest_version"`
+	ReleaseURL     string `json:"release_url"`
+	ReleaseName    string `json:"release_name"`
+	ReleaseBody    string `json:"release_body"`
+	PublishedAt    string `json:"published_at"`
+	CheckedAt      string `json:"checked_at"`
+}
+
+func (c *Client) CheckUpdate() (*UpdateCheckResult, error) {
+	var result UpdateCheckResult
+	if err := c.get("/api/v1/update/check", &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

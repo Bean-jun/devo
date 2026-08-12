@@ -198,4 +198,11 @@ var (
 			Foreground(CurrentTheme.Accent).
 			Padding(0, 2)
 	}
+
+	ToastUpdate = func() lipgloss.Style {
+		return lipgloss.NewStyle().
+			Foreground(CurrentTheme.Success).
+			Bold(true).
+			Padding(0, 2)
+	}
 )

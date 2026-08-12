@@ -16,6 +16,7 @@ const {
   leftWrapperRef,
   rightWrapperRef,
   startResize,
+  updateInfo,
 } = useBrowserLayout()
 </script>
 

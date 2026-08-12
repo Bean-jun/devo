@@ -129,6 +129,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/global/config", h.GetGlobalConfig)
 	mux.HandleFunc("PUT /api/v1/global/config", h.SetGlobalConfig)
+
+	mux.HandleFunc("GET /api/v1/update/check", h.CheckUpdate)
 }
 
 func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {

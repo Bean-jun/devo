@@ -39,6 +39,9 @@ const {
   quickPanelStyle,
   toggleQuick,
   closeQuick,
+  hasUpdate,
+  latestVersion,
+  showUpdateModal,
 } = useStatusBar(() => props.density)
 
 defineExpose({ startRename })
@@ -100,6 +103,17 @@ useKeyboard([
       <ReasoningEffortToggle v-if="density !== 'compact'" />
       <button class="theme-toggle" :class="{ 'icon-only': density === 'compact' }" :title="themeLabel" @click="toggleTheme">
         <AppIcon :name="themeIconName" :size="16" />
+      </button>
+      <button
+        v-if="hasUpdate"
+        class="update-indicator"
+        :class="{ 'icon-only': density === 'compact' }"
+        :title="'新版本可用: ' + latestVersion"
+        @click="showUpdateModal"
+        data-test="update-indicator"
+      >
+        <AppIcon name="arrow-circle-up" :size="16" color="#34c759" />
+        <span v-if="density !== 'compact'" class="update-label">更新</span>
       </button>
       <span class="connection-status" :title="connectionStatusText">
         <AppIcon name="circle" :size="10" weight="fill" :color="connectionColor" />

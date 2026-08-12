@@ -121,18 +121,17 @@ func TracingMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Trace-ID", traceID)
 
 		ctx := WithTraceID(r.Context(), traceID)
-		Info(ctx, "request start",
-			"method", r.Method,
-			"path", r.URL.Path,
-		)
 
 		start := time.Now()
 		next.ServeHTTP(w, r.WithContext(ctx))
 
-		Info(ctx, "request end",
-			"method", r.Method,
-			"path", r.URL.Path,
-			"duration_ms", time.Since(start).Milliseconds(),
-		)
+		duration := time.Since(start)
+		if duration > 500*time.Millisecond {
+			Warn(ctx, "slow request",
+				"method", r.Method,
+				"path", r.URL.Path,
+				"duration_ms", duration.Milliseconds(),
+			)
+		}
 	})
 }

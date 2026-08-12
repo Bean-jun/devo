@@ -14,3 +14,14 @@ export interface PaginatedResponse<T> {
   offset: number
   limit: number
 }
+
+export interface UpdateCheckResult {
+  has_update: boolean
+  current_version: string
+  latest_version: string
+  release_url: string
+  release_name: string
+  release_body: string
+  published_at: string
+  checked_at: string
+}

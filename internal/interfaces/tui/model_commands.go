@@ -110,6 +110,18 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 		m.overlay.Open(overlays.OverlayStatus)
 	case "/version":
 		m.versionPanel.Version = m.version
+		if m.updateInfo != nil && m.updateInfo.HasUpdate {
+			m.versionPanel.UpdateInfo = &overlays.UpdateInfo{
+				HasUpdate:     m.updateInfo.HasUpdate,
+				LatestVersion: m.updateInfo.LatestVersion,
+				ReleaseName:   m.updateInfo.ReleaseName,
+				ReleaseBody:   m.updateInfo.ReleaseBody,
+				ReleaseURL:    m.updateInfo.ReleaseURL,
+				PublishedAt:   m.updateInfo.PublishedAt,
+			}
+		} else {
+			m.versionPanel.UpdateInfo = nil
+		}
 		m.overlay.Open(overlays.OverlayVersion)
 	default:
 		m.toast.Show("未知命令: "+cmd, true)

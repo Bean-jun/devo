@@ -363,3 +363,13 @@ func (m *Model) saveGlobalConfigFromAPI(body map[string]interface{}) tea.Cmd {
 		return apiResponseMsg{kind: "global_config_saved"}
 	}
 }
+
+func (m *Model) checkUpdateFromAPI() tea.Cmd {
+	return func() tea.Msg {
+		result, err := m.apiClient.CheckUpdate()
+		if err != nil {
+			return apiResponseMsg{kind: "update_check_error", err: err}
+		}
+		return apiResponseMsg{kind: "update_checked", data: result}
+	}
+}

@@ -1,6 +1,7 @@
 import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
+import { useUpdateCheck } from '@/composables/useUpdateCheck'
 import { STATUS_LABELS, STATUS_COLORS } from '@/utils/constants'
 
 export type Density = 'compact' | 'tablet' | 'full'
@@ -8,6 +9,7 @@ export type Density = 'compact' | 'tablet' | 'full'
 export function useStatusBar(getDensity?: () => string) {
   const sessionStore = useSessionStore()
   const uiStore = useUiStore()
+  const { updateInfo } = useUpdateCheck()
 
   const isRenaming = ref(false)
   const renameValue = ref('')
@@ -141,6 +143,13 @@ function closeQuick() {
   showQuick.value = false
 }
 
+const hasUpdate = computed(() => updateInfo.value?.has_update ?? false)
+const latestVersion = computed(() => updateInfo.value?.latest_version ?? '')
+
+function showUpdateModal() {
+  uiStore.setActiveModal('update')
+}
+
   return {
     sessionStore,
     uiStore,
@@ -170,5 +179,8 @@ function closeQuick() {
     quickPanelStyle,
     toggleQuick,
     closeQuick,
+    hasUpdate,
+    latestVersion,
+    showUpdateModal,
   }
 }

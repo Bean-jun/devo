@@ -368,6 +368,18 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 	case "memory_upsert_error":
 		m.toast.Show("保存记忆失败: "+msg.err.Error(), true)
 
+	case "update_checked":
+		if result, ok := msg.data.(*api.UpdateCheckResult); ok {
+			m.updateInfo = result
+			if result.HasUpdate {
+				m.statusBar.HasUpdate = true
+				m.statusBar.LatestVersion = result.LatestVersion
+			}
+		}
+
+	case "update_check_error":
+		// Silently ignore - update check is best-effort
+
 	default:
 		if msg.err != nil {
 			m.toast.Show("API 错误: "+msg.err.Error(), true)
