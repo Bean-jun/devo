@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -40,7 +40,7 @@ func openBrowser(url string) {
 	}
 }
 
-func verifyDevoDir() {
+func VerifyDevoDir() {
 	devoDir := config.DevoDir()
 	if err := os.MkdirAll(devoDir, 0755); err != nil {
 		logging.Error(context.Background(), "failed to create .devo directory",
