@@ -1,158 +1,278 @@
 # Devo
 
-**Devo**（Developer + Evolution）是一个以会话为核心、对话驱动的自主编码 AI 代理。它在你本地运行，直接访问文件系统和 Shell，通过 LLM 驱动完成编码任务。
+English | [中文](README.zh-CN.md)
+
+**Devo** (Developer + Evolution) is a session-centric, conversation-driven autonomous coding AI agent. It runs locally on your machine, with direct access to the file system and Shell, powered by LLMs to complete coding tasks.
 
 ---
 
-## 特性
+## Features
 
-- **对话驱动** — 自然语言描述任务，AI 自主规划、编码、修复
-- **Web 控制中心** — 三栏面板布局，聊天主场不离开，右侧面板承载文件/技能/记忆/仪表盘/设置/终端/MCP/后台进程
-- **三模式运行** — 浏览器完整功能、VSCode Webview 极简聊天、移动端触摸优化，同一份代码
-- **多工作区管理** — 多项目切换，工作区与后端目录同步
-- **审批门控** — 按操作风险分级（高/中/低/无），文件编辑带 diff 对比，支持 YOLO 自动批准
-- **长期记忆 + 技能进化** — 记住偏好和项目经验，从对话中提炼 Skill 指令集，跨会话复用（全局 + 项目两层级）
-- **上下文压缩** — 长对话自动压缩摘要，突破上下文窗口限制
-- **消息回滚** — 回滚到任意历史位置重来，不影响文件系统
-- **MCP 扩展** — 支持 MCP 协议动态接入外部工具
-- **跨平台** — Linux、macOS、Windows 全支持
-
----
-
-## 架构概览
-
-```
-┌──────────────────────────────────────────────────┐
-│                    UI 层                          │
-│  ┌────────────┐ ┌────────┐ ┌─────────────────┐   │
-│  │ Web 前端    │ │  TUI   │ │ VS Code 插件     │   │
-│  │ (Vue 3)    │ │ (终端)  │ │ (Webview 复用)  │   │
-│  └────────────┘ └────────┘ └─────────────────┘   │
-└──────────────────────┬───────────────────────────┘
-                       │ HTTP (REST) + SSE
-┌──────────────────────▼───────────────────────────┐
-│                 接口层 (API)                       │
-│  REST API · SSE 事件流 · 审批桥接                  │
-└──────────────────────┬───────────────────────────┘
-                       │ Go 接口
-┌──────────────────────▼───────────────────────────┐
-│              任务处理层 (Task)                     │
-│  工具集 · Python 统一沙箱 · LLM 客户端 · Token 计量 │
-└──────────────────────┬───────────────────────────┘
-                       │ Go 接口
-┌──────────────────────▼───────────────────────────┐
-│                核心层 (Core)                       │
-│  Agent Loop · 审批门控 · 上下文压缩 · 消息回滚     │
-│  长期记忆 · Skills 管理 · 会话存档 · 工作区管理    │
-│  并发隔离 · 崩溃恢复 · MCP 客户端                  │
-└──────────────────────────────────────────────────┘
-```
-
-**部署模型**：本地核心（必需）运行在开发者电脑上，直接访问本地文件系统。可选团队服务仅做统计上报和远程审批中转，**不上传代码或对话内容**。
+- **Conversation-Driven** — Describe tasks in natural language; the AI autonomously plans, codes, runs, fixes, and iterates until done
+- **Five-Client Operation** — Web Control Center, Terminal TUI, VS Code Extension, Electron Desktop App, Mobile touch-optimized — all from a single codebase
+- **Web Control Center** — Three-panel layout with the chat always in focus; right-side panels host Files / Skills / Memory / Dashboard / Settings / Terminal / MCP / Background Processes
+- **Multi-Workspace Management** — Seamlessly switch between multiple projects, with workspace-directory sync
+- **Approval Gating** — Risk-based operation classification (High / Medium / Low / None), file edits with diff preview, and YOLO auto-approve mode
+- **Long-Term Memory + Skill Evolution** — Remembers preferences and project experience; distills Skill instruction sets from conversations for cross-session reuse (Global + Project tiers)
+- **Context Compression** — Auto-compresses long conversations into summaries, breaking through context window limits
+- **Message Rollback** — Roll back to any point in history and retry without affecting the file system
+- **Chain-of-Thought Reasoning** — Supports LLM Chain-of-Thought (CoT) reasoning mode with configurable reasoning intensity
+- **Image Understanding** — Multimodal support for Base64 image input with image compression preprocessing
+- **MCP Extensions** — Dynamic external tool integration via the MCP protocol, with workspace-level isolation
+- **Background Process Management** — Real-time streaming output in blocking mode, with Prompt Cache monitoring
+- **Structured Logging** — Log levels and trace-based request tracking
+- **Cross-Platform** — Full support for Linux, macOS, and Windows
 
 ---
 
-## 快速开始
+## Architecture Overview
 
-### 前置依赖
+| Tier | Modules | Responsibilities |
+|:----:|---------|------------------|
+| **UI** | Web · TUI · Mobile · VS Code · Desktop | Multi-client user interaction entry points |
+| ↓ | | |
+| **Interface** | REST API · SSE Event Stream · Approval Bridge | HTTP serving, real-time push, approval callbacks |
+| ↓ | | |
+| **Task Execution** | Toolset · Python Sandbox · LLM Client · MCP · Image Compression · Path Security | Tool execution, code sandbox, model invocation |
+| ↓ | | |
+| **Core** | Agent Loop · Approval Gating · Context Compression · Message Rollback · Long-Term Memory · Skills · Session Archive · Concurrency Isolation · Crash Recovery | Agent loop, state management, fault tolerance |
+| ↓ | | |
+| **Storage** | SQLite Persistence | Session / Message / Event storage |
+
+**Deployment Model**: The local core (required) runs on the developer's machine with direct file system access. An optional team service only handles statistics reporting and remote approval relay — **no code or conversation content is ever uploaded**.
+
+---
+
+## Tech Stack
+
+| Tier | Technology |
+|------|------------|
+| Backend Language | Go 1.25+ |
+| CLI Framework | [Cobra](https://github.com/spf13/cobra) |
+| TUI Framework | [Bubble Tea](https://github.com/charmbracelet/bubbletea) + [Lip Gloss](https://github.com/charmbracelet/lipgloss) |
+| Frontend Framework | Vue 3 + TypeScript + Vite |
+| State Management | Pinia |
+| Routing | Vue Router |
+| Markdown Rendering | marked + highlight.js |
+| Icon Library | Phosphor Icons |
+| Database | SQLite (GORM) |
+| LLM Protocol | OpenAI-compatible API |
+| Testing | Vitest + Playwright (Frontend) / Go testing (Backend) |
+| Desktop | Electron |
+
+---
+
+## Quick Start
+
+### Prerequisites
 
 - Go 1.25+
-- Node.js 18+（Web 前端构建）
-- Python 3.8+（命令执行沙箱）
+- Node.js 22+ (for Web frontend builds)
+- Python 3.8+ (for command execution sandbox)
 
-### 配置
+### Configuration
 
-在项目根目录 `.devo/` 或 `~/.devo/` 下创建 `config.json`：
+Devo supports multiple ways to configure LLMs — no manual config file editing required:
 
-```json
-{
-  "llm": {
-    "api_key": "sk-your-key-here",
-    "base_url": "https://api.openai.com/v1",
-    "model": "gpt-4o"
-  }
-}
-```
+**Option 1: Web UI Configuration (Recommended)**
 
-也支持环境变量：`DEVO_LLM_API_KEY`、`DEVO_LLM_BASE_URL`、`DEVO_LLM_MODEL`、`DEVO_DB_PATH`、`DEVO_LOG_PATH`。
+After starting Devo, a configuration onboarding dialog will appear automatically on first use. You can also add and manage models anytime via the **Settings Panel → Global Settings** on the right side.
 
-### 构建
+**Option 2: CLI Configuration**
 
 ```bash
-make build          # 构建后端 + Web 前端 + VS Code 插件
-make build-web      # 仅构建 Web 前端
-make build-go       # 仅构建 Go 后端
+# Interactive configuration wizard (recommended for first-time use)
+devo config onboard
+
+# Add a model directly
+devo config models add --name "GPT-4o" --api-key "sk-xxx" --model "gpt-4o"
+
+# Manage models
+devo config models list                # List all models
+devo config models activate --id gpt-4o  # Activate a model
+devo config models test --id gpt-4o      # Test model connectivity
+devo config models remove --id gpt-4o    # Remove a model
 ```
 
-### 启动
+**Option 3: Environment Variables**
 
 ```bash
-devo -web                              # Web 模式（http://localhost:8080）
-devo -web -port 9090                   # 指定端口
-devo -web -workspace /path/to/project  # 指定工作目录
-devo -tui                              # TUI 模式
+export DEVO_LLM_API_KEY="sk-your-key-here"
+export DEVO_LLM_BASE_URL="https://api.openai.com/v1"
+export DEVO_LLM_MODEL="gpt-4o"
 ```
 
-### 快速试用
+Environment variables such as `DEVO_DB_PATH` and `DEVO_LOG_PATH` are also supported to override default paths.
+
+### Build
 
 ```bash
-# 创建会话
+make build          # Build backend + Web frontend + VS Code extension + Electron desktop
+make build-web      # Build Web frontend only
+make build-go       # Build Go backend only (4 platform binaries)
+make vsix           # Package VS Code extension only
+make desktop        # Package Electron desktop app only
+```
+
+### Run
+
+```bash
+# Web mode (default, auto-opens browser)
+devo
+
+# Specify port and working directory
+devo -web -port 9090 -workspace /path/to/project
+
+# TUI terminal mode
+devo -tui
+
+# View help
+devo --help
+```
+
+### Development Mode
+
+```bash
+make dev            # Start frontend dev server + backend simultaneously (web mode)
+make dev-web        # Start frontend dev server only
+make run-web        # Build and run in Web mode
+make run-tui        # Build and run in TUI mode
+```
+
+### Testing
+
+```bash
+make test           # Run all tests (frontend + backend)
+make test-web       # Frontend unit tests
+make test-e2e       # Frontend E2E tests (Playwright)
+make test-go        # Backend tests
+make lint           # Code linting (frontend ESLint + backend go vet)
+```
+
+### Quick API Tryout
+
+```bash
+# Create a session
 curl -X POST http://localhost:8080/api/v1/sessions \
   -H "Content-Type: application/json" \
   -d '{"working_directory": "/path/to/your/project"}'
 
-# 发送消息
+# Send a message
 curl -X POST http://localhost:8080/api/v1/sessions/{id}/messages \
   -H "Content-Type: application/json" \
-  -d '{"content": "帮我重构这个模块"}'
+  -d '{"content": "Help me refactor this module"}'
 ```
 
-完整 API 文档见 [架构设计](docs/2-architecture.md#41-rest-api)。
+For the full API documentation, see [Architecture Design](docs/2-architecture.md).
 
 ---
 
-## 项目结构
+## Project Structure
 
 ```
 Devo/
-├── cmd/                    ← 入口程序
-├── internal/               ← 内部包
-│   ├── core/               ← 核心层（会话/审批/记忆/技能/Agent Loop）
-│   ├── task/               ← 任务处理层（工具集/沙箱/LLM 客户端）
-│   └── interfaces/         ← 接口层
-│       ├── rest/           ← REST API + SSE
-│       └── tui/            ← TUI 终端界面
-├── web/                    ← Web 前端（Vue 3 + TypeScript）
-│   └── src/
-│       ├── layouts/        ← BrowserLayout / VscodeLayout / MobileLayout
-│       ├── components/     ← 聊天/布局/弹窗/命令/移动端/编辑器
-│       ├── panels/         ← 面板（files/skills/memory/dashboard/settings/terminal/mcp/background）
-│       ├── stores/         ← Pinia 状态管理（9 个 Store）
-│       ├── composables/    ← 可复用逻辑
-│       ├── types/          ← 类型定义
-│       └── styles/         ← CSS 变量/基础样式/动画
-├── docs/                   ← 设计文档
-│   ├── 1-PRD.md            ← 产品需求文档
-│   ├── 2-architecture.md   ← 完整架构设计
-│   ├── 3-frontend-design.md← 前端设计方案
-│   └── 4-web-architecture.md← Web 架构文档
-└── .devo/                  ← 运行时数据
-    ├── config.json         ← 全局配置
-    ├── sessions/           ← 会话存档
-    ├── skills/             ← Skills 指令集（project/ + global/）
-    ├── memory/             ← 长期记忆
-    └── mcp_servers.json    ← MCP 服务器配置
+├── cmd/devo/              ← Program entry point (main.go)
+├── internal/              ← Go internal packages
+│   ├── cli/               ← CLI command definitions & app bootstrap
+│   │   ├── commands/      ← Cobra commands (root / config)
+│   │   ├── app.go         ← Application initialization
+│   │   ├── server.go      ← HTTP server startup
+│   │   └── platform.go    ← Platform detection
+│   ├── config/            ← Configuration management (global/project/paths)
+│   ├── core/              ← Core layer
+│   │   ├── agentloop/     ← Agent loop, state machine, approval handling, crash recovery, rollback
+│   │   ├── approval/      ← Approval gating & risk classification
+│   │   ├── archive/       ← Session Markdown archiving
+│   │   ├── compressor/    ← Context compression
+│   │   ├── concurrency/   ← Concurrency control (path locking)
+│   │   ├── memory/        ← Long-term memory management
+│   │   ├── prompt/        ← System prompt assembly, agents.md loading, directory tree
+│   │   ├── session/       ← Session model, event bus, in-memory store
+│   │   ├── skills/        ← Skills management & experience crystallization
+│   │   └── tokenmeter/    ← Token metering
+│   ├── interfaces/        ← Interface layer
+│   │   ├── rest/          ← REST API + SSE event stream (20+ handlers)
+│   │   └── tui/           ← Bubble Tea TUI interface
+│   │       ├── api/       ← TUI backend API client
+│   │       ├── components/← TUI components (status bar / toast / styles)
+│   │       ├── overlays/  ← TUI overlays (approval / background / commands / dashboard / MCP, etc.)
+│   │       ├── renderer/  ← Markdown renderer
+│   │       └── types/     ← TUI type definitions
+│   ├── pkg/               ← Shared utility packages
+│   │   ├── logging/       ← Structured logging
+│   │   └── process/       ← Process management
+│   ├── storage/           ← Storage layer
+│   │   └── sqlite/        ← SQLite persistence (sessions / messages / events / rollback / SSE / usage)
+│   ├── taskexec/          ← Task execution layer
+│   │   ├── imageproc/     ← Image compression preprocessing
+│   │   ├── llmclient/     ← LLM client (OpenAI-compatible protocol)
+│   │   ├── mcp/           ← MCP protocol client management
+│   │   ├── pathsec/       ← Path security validation, .gitignore parsing
+│   │   └── tools/         ← Toolset (read/write files, execute commands, search, glob, diff, etc.)
+│   └── update/            ← Version update checking
+├── web/                   ← Web frontend (Vue 3 + TypeScript + Vite)
+│   ├── src/
+│   │   ├── layouts/       ← Three layouts: BrowserLayout / VscodeLayout / MobileLayout
+│   │   ├── components/    ← Chat / layout / modals / commands / mobile / editor
+│   │   ├── panels/        ← Right-side panels (files / skills / memory / dashboard / settings / terminal / mcp / background)
+│   │   ├── stores/        ← Pinia state management
+│   │   ├── composables/   ← Reusable logic
+│   │   ├── types/         ← TypeScript type definitions
+│   │   └── styles/        ← CSS variables / base styles / animations
+│   └── e2e/               ← Playwright E2E tests
+├── electron/              ← Electron desktop app
+│   ├── main.js            ← Electron main process
+│   ├── welcome.html       ← Welcome page
+│   └── resources/         ← Platform binaries & icons
+├── vscode-extension/      ← VS Code extension
+│   ├── dist/              ← Compiled extension code
+│   ├── bin/               ← Per-platform backend binaries
+│   └── esbuild.js         ← Extension bundling script
+├── docs/                  ← Design documents
+│   ├── 1-PRD.md           ← Product Requirements Document
+│   ├── 2-architecture.md  ← Full Architecture Design
+│   ├── 3-cli-architecture.md ← CLI Architecture Design
+│   ├── 3-frontend-design.md  ← Frontend Design Specification
+│   ├── 4-web-architecture.md ← Web Frontend Engineering Architecture
+│   ├── 5-web-testing.md   ← Web Testing Strategy
+│   ├── 6-agent-loop-event-driven-refactor.md ← Agent Loop Event-Driven Refactor
+│   ├── 7-electron-desktop-architecture.md ← Electron Desktop Architecture
+│   ├── 8-session-state-robustness-test.md  ← Session State Robustness Testing
+│   ├── 9-performance-optimization.md       ← Performance Optimization
+│   ├── 10-mobile-layout-design.md          ← Mobile Layout Design
+│   ├── 11-llm-reasoning-cot-design.md      ← LLM CoT Reasoning Design
+│   ├── 12-image-input-design.md            ← Image Input Design
+│   └── 13-llm-config-onboarding-design.md  ← LLM Config Onboarding Design
+├── build/                 ← Build output directory
+├── .github/workflows/     ← CI/CD workflows
+│   ├── ci.yml             ← Continuous Integration (lint + test + build)
+│   └── release.yml        ← Release (multi-platform build + packaging)
+├── .devo/                 ← Runtime data
+│   ├── config.json        ← Global configuration
+│   └── sessions/          ← Session archives
+├── Makefile               ← Build scripts
+├── VERSION                ← Version number
+└── go.mod                 ← Go module definition
 ```
 
 ---
 
-## 深入阅读
+## Further Reading
 
-- [PRD 需求文档](docs/1-PRD.md) — 产品需求与典型工作流
-- [完整架构设计](docs/2-architecture.md) — 系统详细设计文档
-- [前端设计方案](docs/3-frontend-design.md) — Web 前端 UI/UX 设计
-- [Web 架构文档](docs/4-web-architecture.md) — Web 前端工程架构
-- [Agent Loop 事件驱动重构](docs/6-agent-loop-event-driven-refactor.md)
+- [PRD](docs/1-PRD.md) — Product requirements & typical workflows
+- [Full Architecture Design](docs/2-architecture.md) — Detailed system design document
+- [CLI Architecture](docs/3-cli-architecture.md) — CLI & TUI architecture
+- [Frontend Design](docs/3-frontend-design.md) — Web frontend UI/UX design
+- [Web Frontend Engineering Architecture](docs/4-web-architecture.md) — Web frontend engineering approach
+- [Web Testing Strategy](docs/5-web-testing.md) — Frontend testing strategy
+- [Agent Loop Event-Driven Refactor](docs/6-agent-loop-event-driven-refactor.md) — Agent loop refactoring design
+- [Electron Desktop Architecture](docs/7-electron-desktop-architecture.md) — Desktop app architecture design
+- [Session State Robustness Testing](docs/8-session-state-robustness-test.md) — State machine testing approach
+- [Performance Optimization](docs/9-performance-optimization.md) — Performance optimization strategies
+- [Mobile Layout Design](docs/10-mobile-layout-design.md) — Mobile adaptation approach
+- [LLM CoT Reasoning Design](docs/11-llm-reasoning-cot-design.md) — LLM Chain-of-Thought reasoning integration
+- [Image Input Design](docs/12-image-input-design.md) — Multimodal image input approach
+- [LLM Config Onboarding Design](docs/13-llm-config-onboarding-design.md) — First-time configuration onboarding
 
 ## License
 
