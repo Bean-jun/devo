@@ -402,13 +402,24 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 		m.toast.Show("获取模型列表失败: "+msg.err.Error(), true)
 
 	case "model_activated":
+		for i := range m.modelPicker.Models {
+			m.modelPicker.Models[i].Active = m.modelPicker.Models[i].ID == msg.modelID
+		}
+		for _, mod := range m.modelPicker.Models {
+			if mod.ID == msg.modelID {
+				m.activeModelName = mod.Name
+				break
+			}
+		}
 		m.toast.Show("模型已切换", false)
 		m.overlay.Close()
 		m.refreshViewport()
-		return m, m.fetchModelsFromAPI()
+		return m, nil
 
 	case "model_activate_error":
 		m.toast.Show("切换模型失败: "+msg.err.Error(), true)
+		m.overlay.Close()
+		m.refreshViewport()
 
 	default:
 		if msg.err != nil {

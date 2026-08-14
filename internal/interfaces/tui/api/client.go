@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -575,5 +576,5 @@ func (c *Client) GetModels() ([]ModelInfo, error) {
 }
 
 func (c *Client) ActivateModel(modelID string) error {
-	return c.put("/api/v1/global/config/models/"+modelID+"/activate", nil, nil)
+	return c.put("/api/v1/global/config/models/"+url.PathEscape(modelID)+"/activate", nil, nil)
 }
