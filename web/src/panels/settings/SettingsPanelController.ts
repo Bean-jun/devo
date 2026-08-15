@@ -3,6 +3,7 @@ import { useUiStore } from '@/stores/ui'
 import { useSkillsStore } from '@/stores/skills'
 import { useMcpStore } from '@/stores/mcp'
 import { useSessionStore } from '@/stores/session'
+import { useModelStore } from '@/stores/model'
 import { API_BASE } from '@/utils/constants'
 import AppIcon from '@/components/common/AppIcon.vue'
 
@@ -50,6 +51,7 @@ export function useSettingsPanel() {
   const skillsStore = useSkillsStore()
   const mcpStore = useMcpStore()
   const sessionStore = useSessionStore()
+  const modelStore = useModelStore()
 
   const activeTab = ref<SubTab>('project')
 
@@ -67,6 +69,10 @@ export function useSettingsPanel() {
 
   const projectApprovalPolicy = ref<Record<string, string>>({})
   const globalApprovalPolicy = ref<Record<string, string>>({})
+
+  const showAddModelForm = ref(false)
+  const testingModelId = ref<string | null>(null)
+  const testResult = ref<{ id: string; success: boolean; error?: string } | null>(null)
 
   function getProjectPolicyLevel(key: string): string {
     return projectApprovalPolicy.value[key] ?? ''
@@ -185,11 +191,52 @@ export function useSettingsPanel() {
     }
   }
 
+  async function handleModelActivate(id: string) {
+    try {
+      await modelStore.activateModel(id)
+      uiStore.showToast('success', '模型已切换')
+    } catch (e: any) {
+      uiStore.showToast('error', e.message || '切换失败')
+    }
+  }
+
+  async function handleModelDelete(id: string) {
+    if (!confirm('确定要删除此模型吗？')) return
+    try {
+      await modelStore.deleteModel(id)
+      uiStore.showToast('success', '模型已删除')
+    } catch (e: any) {
+      uiStore.showToast('error', e.message || '删除失败')
+    }
+  }
+
+  async function handleModelTest(id: string) {
+    testingModelId.value = id
+    testResult.value = null
+    try {
+      const result = await modelStore.testModel(id)
+      testResult.value = { id, success: result.success, error: result.error }
+    } catch (e: any) {
+      testResult.value = { id, success: false, error: e.message || '测试失败' }
+    } finally {
+      testingModelId.value = null
+    }
+  }
+
+  function openAddModelForm() {
+    showAddModelForm.value = true
+  }
+
+  function onModelAdded() {
+    showAddModelForm.value = false
+  }
+
   onMounted(async () => {
     await fetchConfig()
     await fetchGlobalConfig()
     await skillsStore.fetchSkills()
     await mcpStore.fetchServers()
+    await modelStore.fetchModels()
   })
 
   return {
@@ -218,5 +265,14 @@ export function useSettingsPanel() {
     handleGlobalApprovalChange,
     saveProjectParams,
     saveGlobalParams,
+    modelStore,
+    showAddModelForm,
+    testingModelId,
+    testResult,
+    handleModelActivate,
+    handleModelDelete,
+    handleModelTest,
+    openAddModelForm,
+    onModelAdded,
   }
 }

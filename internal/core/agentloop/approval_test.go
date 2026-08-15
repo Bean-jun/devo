@@ -62,6 +62,8 @@ func (m *approvalMockClient) CompleteStream(ctx context.Context, messages []sess
 	return nil
 }
 
+func (m *approvalMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func TestAgentLoopWithApproval_Approve(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -72,7 +74,7 @@ func TestAgentLoopWithApproval_Approve(t *testing.T) {
 	toolRegistry.Register(&tools.ListFilesTool{})
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, &approvalMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &approvalMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -188,6 +190,8 @@ func (m *rejectionMockClient) CompleteStream(ctx context.Context, messages []ses
 	return nil
 }
 
+func (m *rejectionMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func TestAgentLoopWithApproval_Reject(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -196,7 +200,7 @@ func TestAgentLoopWithApproval_Reject(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, &rejectionMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &rejectionMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -314,6 +318,8 @@ func (m *readOnlyMockClient) CompleteStream(ctx context.Context, messages []sess
 	return nil
 }
 
+func (m *readOnlyMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func TestAgentLoop_ReadOnlyToolsNoApproval(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("read-only content"), 0644)
@@ -323,7 +329,7 @@ func TestAgentLoop_ReadOnlyToolsNoApproval(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, &readOnlyMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &readOnlyMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -390,7 +396,7 @@ func TestApprovalRequiredEventFields(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, &approvalMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &approvalMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -482,6 +488,8 @@ func (m *policyAutoApprovalMockClient) CompleteStream(ctx context.Context, messa
 	return nil
 }
 
+func (m *policyAutoApprovalMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func TestAgentLoop_PolicySessionTrust_AutoApprove(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -490,7 +498,7 @@ func TestAgentLoop_PolicySessionTrust_AutoApprove(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, &policyAutoApprovalMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &policyAutoApprovalMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -556,7 +564,7 @@ func TestAgentLoop_PolicyAlwaysAsk_StillRequiresApproval(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, &approvalMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &approvalMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -614,7 +622,7 @@ func TestApprovalTimeout_AutoReject(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, &rejectionMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &rejectionMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -684,7 +692,7 @@ func TestResolveApproval_Expired(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, &approvalMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &approvalMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -753,6 +761,8 @@ func (m *overwriteApprovalMockClient) CompleteStream(ctx context.Context, messag
 	return nil
 }
 
+func (m *overwriteApprovalMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func TestApprovalRequest_WriteFileDiff(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "existing.txt"), []byte("old line1\nold line2\n"), 0644)
@@ -762,7 +772,7 @@ func TestApprovalRequest_WriteFileDiff(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, &overwriteApprovalMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &overwriteApprovalMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -886,6 +896,8 @@ func (m *editApprovalMockClient) CompleteStream(ctx context.Context, messages []
 	return nil
 }
 
+func (m *editApprovalMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func TestApprovalRequest_EditFileDiff(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalContent := "package main\n\nfunc old_func() {\n\treturn\n}\n"
@@ -896,7 +908,7 @@ func TestApprovalRequest_EditFileDiff(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.EditFileTool{})
 
-	loop := NewWithTools(store, &editApprovalMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &editApprovalMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -1031,6 +1043,8 @@ func (m *editFailureMockClient) CompleteStream(ctx context.Context, messages []s
 	return nil
 }
 
+func (m *editFailureMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func TestApprovalRequest_EditFileDiffFailureNoApproval(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "dup.txt"), []byte("hello\nhello\n"), 0644)
@@ -1040,7 +1054,7 @@ func TestApprovalRequest_EditFileDiffFailureNoApproval(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.EditFileTool{})
 
-	loop := NewWithTools(store, &editFailureMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &editFailureMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -1155,6 +1169,8 @@ func (m *execCommandApprovalMockClient) CompleteStream(ctx context.Context, mess
 	return nil
 }
 
+func (m *execCommandApprovalMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func TestApprovalRequest_ExecPythonContext(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -1163,7 +1179,7 @@ func TestApprovalRequest_ExecPythonContext(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(tools.NewExecPythonTool(nil))
 
-	loop := NewWithTools(store, &execCommandApprovalMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &execCommandApprovalMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -1256,7 +1272,7 @@ func TestAwaitingApprovalHandler_CancelWhileWaiting(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, llmclient.NewMockClient(), toolRegistry)
+	loop := newTestLoopWithTools(t, store, llmclient.NewMockClient(), toolRegistry)
 	lc := newTestLoopContext("sess-cancel-approval", store)
 
 	sess, _ := store.Get("sess-cancel-approval")
@@ -1290,7 +1306,7 @@ func TestAwaitingApprovalHandler_Approved(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, llmclient.NewMockClient(), toolRegistry)
+	loop := newTestLoopWithTools(t, store, llmclient.NewMockClient(), toolRegistry)
 	lc := newTestLoopContext("sess-approve", store)
 
 	sess, _ := store.Get("sess-approve")

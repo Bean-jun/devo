@@ -9,12 +9,29 @@ import (
 
 	"devo/internal/core/session"
 	"devo/internal/taskexec/llmclient"
+	"devo/internal/taskexec/tools"
 )
 
 func setupTestLoop() (*Loop, *session.InMemoryStore) {
 	store := session.NewInMemoryStore()
 	loop := New(store, llmclient.NewMockClient())
 	return loop, store
+}
+
+func newTestLoopWithTools(t *testing.T, store *session.InMemoryStore, client llmclient.Client, toolRegistry *tools.Registry) *Loop {
+	loop := NewWithTools(store, client, toolRegistry)
+	t.Cleanup(func() {
+		done := make(chan struct{})
+		go func() {
+			loop.WaitForCompletion()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+		}
+	})
+	return loop
 }
 
 func createTestSession(store *session.InMemoryStore, id string) *session.Session {
@@ -221,6 +238,7 @@ func (s *slowLLMClient) CompleteStream(ctx context.Context, messages []session.M
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (s *slowLLMClient) TestConnection(ctx context.Context) error { return nil }
 
 func TestProcessMessageConflictDuringProcessing(t *testing.T) {
 	store := session.NewInMemoryStore()
@@ -256,6 +274,7 @@ func (e *errorLLMClient) CompleteStream(ctx context.Context, messages []session.
 	callback(llmclient.StreamEvent{Type: "error", Err: context.DeadlineExceeded})
 	return context.DeadlineExceeded
 }
+func (e *errorLLMClient) TestConnection(ctx context.Context) error { return nil }
 
 func TestStateRevertsOnLLMError(t *testing.T) {
 	store := session.NewInMemoryStore()

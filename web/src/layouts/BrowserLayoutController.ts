@@ -1,8 +1,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUiStore } from '@/stores/ui'
+import { useUpdateCheck } from '@/composables/useUpdateCheck'
 
 export function useBrowserLayout() {
   const uiStore = useUiStore()
+  const { updateInfo, checkUpdate } = useUpdateCheck()
 
   const sidebarWidth = ref(240)
   const sidebarCollapsed = computed(() => uiStore.sidebarCollapsed)
@@ -58,6 +60,7 @@ export function useBrowserLayout() {
     } catch {}
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)
+    checkUpdate()
   })
 
   onUnmounted(() => {
@@ -75,5 +78,7 @@ export function useBrowserLayout() {
     leftWrapperRef,
     rightWrapperRef,
     startResize,
+    updateInfo,
+    checkUpdate,
   }
 }

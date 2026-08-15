@@ -146,6 +146,8 @@ func (m *approvalMockClient) CompleteStream(ctx context.Context, messages []sess
 	return nil
 }
 
+func (m *approvalMockClient) TestConnection(ctx context.Context) error { return nil }
+
 func waitForEvent(ch chan session.Event, eventType string, timeout time.Duration) (*session.Event, bool) {
 	timer := time.After(timeout)
 	for {

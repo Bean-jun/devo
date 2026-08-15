@@ -6,6 +6,14 @@ export function useCommand() {
 
   const builtinCommands: Command[] = [
     {
+      id: 'model',
+      name: '/model',
+      description: '切换模型',
+      group: 'session',
+      icon: 'robot',
+      mobileLabel: '切换模型',
+    },
+    {
       id: 'new',
       name: '/new',
       description: '创建新会话',

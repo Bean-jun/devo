@@ -7,7 +7,10 @@ import MobileCommandSheet from '@/components/mobile/MobileCommandSheet.vue'
 import MobilePanelDrawer from '@/components/mobile/MobilePanelDrawer.vue'
 import MobileWorkspacePicker from '@/components/mobile/MobileWorkspacePicker.vue'
 import MobileSessionPicker from '@/components/mobile/MobileSessionPicker.vue'
+import { usePlatform } from '@/composables/usePlatform'
 import { useMobileLayout } from './MobileLayoutController'
+
+const { densityLevel } = usePlatform()
 
 const {
   sessionStore,
@@ -39,7 +42,7 @@ const {
 
 <template>
   <div class="mobile-layout" data-test="mobile-layout">
-    <StatusBar v-if="sessionStore.currentSession" />
+    <StatusBar v-if="sessionStore.currentSession" :density="densityLevel" />
     <div class="mobile-chat">
       <ChatPanel :hide-input="true" />
     </div>

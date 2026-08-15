@@ -1,11 +1,15 @@
 import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useUiStore } from '@/stores/ui'
+import { useUpdateCheck } from '@/composables/useUpdateCheck'
 import { STATUS_LABELS, STATUS_COLORS } from '@/utils/constants'
 
-export function useStatusBar() {
+export type Density = 'compact' | 'tablet' | 'full'
+
+export function useStatusBar(getDensity?: () => string) {
   const sessionStore = useSessionStore()
   const uiStore = useUiStore()
+  const { updateInfo } = useUpdateCheck()
 
   const isRenaming = ref(false)
   const renameValue = ref('')
@@ -112,6 +116,40 @@ const connectionColor = computed(() => {
 
 const serverPort = computed(() => window.location.port)
 
+const density = computed<Density>(() => {
+  const d = getDensity?.() ?? 'full'
+  if (d === 'compact' || d === 'tablet' || d === 'full') return d
+  return 'full'
+})
+
+const showQuick = ref(false)
+const statusbarRef = ref<HTMLElement>()
+
+const quickPanelStyle = computed(() => {
+  if (!statusbarRef.value) return {}
+  const rect = statusbarRef.value.getBoundingClientRect()
+  return {
+    top: rect.bottom + 'px',
+    left: '0px',
+    right: '0px',
+  }
+})
+
+function toggleQuick() {
+  showQuick.value = !showQuick.value
+}
+
+function closeQuick() {
+  showQuick.value = false
+}
+
+const hasUpdate = computed(() => updateInfo.value?.has_update ?? false)
+const latestVersion = computed(() => updateInfo.value?.latest_version ?? '')
+
+function showUpdateModal() {
+  uiStore.setActiveModal('update')
+}
+
   return {
     sessionStore,
     uiStore,
@@ -135,5 +173,14 @@ const serverPort = computed(() => window.location.port)
     connectionStatusText,
     connectionColor,
     serverPort,
+    density,
+    showQuick,
+    statusbarRef,
+    quickPanelStyle,
+    toggleQuick,
+    closeQuick,
+    hasUpdate,
+    latestVersion,
+    showUpdateModal,
   }
 }

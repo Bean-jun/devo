@@ -35,6 +35,11 @@
   white-space: nowrap;
 }
 
+.footer-model {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
 .context-warn {
   color: #ff9500 !important;
 }

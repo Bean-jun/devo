@@ -29,6 +29,8 @@ func (m *reasoningMockClient) CompleteStream(ctx context.Context, messages []ses
 	})
 	return nil
 }
+func (m *reasoningMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestThinkingHandler_PublishesReasoningEvents(t *testing.T) {
 	store := session.NewInMemoryStore()
@@ -200,6 +202,8 @@ func (m *noReasoningErrorMockClient) CompleteStream(ctx context.Context, message
 	callback(llmclient.StreamEvent{Type: "error", Err: errors.New("stream failed")})
 	return errors.New("stream failed")
 }
+func (m *noReasoningErrorMockClient) TestConnection(ctx context.Context) error { return nil }
+
 
 func TestThinkingHandler_NoReasoningCompleteOnEmpty(t *testing.T) {
 	store := session.NewInMemoryStore()

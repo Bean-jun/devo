@@ -142,6 +142,45 @@
   border-color: var(--color-border);
 }
 
+.update-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(52, 199, 89, 0.4);
+  background: rgba(52, 199, 89, 0.08);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  transition: all var(--transition-fast);
+  animation: update-pulse 2s ease-in-out infinite;
+}
+
+.update-indicator:hover {
+  background: rgba(52, 199, 89, 0.15);
+  border-color: rgba(52, 199, 89, 0.6);
+}
+
+.update-indicator.icon-only {
+  padding: 0;
+  width: 26px;
+  justify-content: center;
+}
+
+.update-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #34c759;
+  white-space: nowrap;
+}
+
+@keyframes update-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(52, 199, 89, 0); }
+}
+
 .statusbar.yolo {
   background: linear-gradient(90deg, rgba(255, 149, 0, 0.12), rgba(255, 149, 0, 0.04) 40%, var(--color-bg-secondary) 80%);
 }
@@ -204,4 +243,169 @@
 @keyframes yolo-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 149, 0, 0.4); }
   50% { box-shadow: 0 0 0 4px rgba(255, 149, 0, 0); }
+}
+
+/* ---------- density: compact (< 500px) ---------- */
+.statusbar.compact {
+  padding: 0 8px;
+  gap: 4px;
+}
+
+.statusbar.compact .session-name {
+  max-width: 45%;
+  font-size: 13px;
+}
+
+.statusbar.compact .status-indicator {
+  gap: 0;
+  font-size: 0;
+}
+
+.statusbar.compact .yolo-toggle {
+  padding: 0 4px;
+  gap: 0;
+  height: 28px;
+  width: 28px;
+  border-radius: 50%;
+  justify-content: center;
+}
+
+.statusbar.compact .yolo-toggle .yolo-icon {
+  font-size: 14px;
+}
+
+.statusbar.compact .theme-toggle {
+  width: 28px;
+  height: 28px;
+  border: none;
+}
+
+.statusbar.compact .connection-status {
+  gap: 0;
+  font-size: 0;
+}
+
+/* ---------- density: tablet (500px - 900px) ---------- */
+.statusbar.tablet {
+  padding: 0 12px;
+  gap: 6px;
+}
+
+.statusbar.tablet .session-name {
+  max-width: 160px;
+  font-size: 13px;
+}
+
+.statusbar.tablet .statusbar-left,
+.statusbar.tablet .statusbar-right {
+  gap: 8px;
+}
+
+/* ---------- quick toggle button ---------- */
+.quick-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.quick-toggle:hover,
+.quick-toggle.active {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border);
+}
+
+.quick-toggle-icon {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1;
+}
+
+/* ---------- quick panel (teleported to body) ---------- */
+.quick-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  background: transparent;
+}
+
+.quick-panel {
+  position: fixed;
+  z-index: 4001;
+  background: var(--color-bg-secondary);
+  border-bottom: 2px solid var(--color-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: quickSlideIn 0.15s ease;
+}
+
+.quick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.quick-label {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.quick-info {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.quick-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quick-sep {
+  color: var(--color-text-tertiary);
+  opacity: 0.4;
+}
+
+.activity-spinner-inline {
+  font-size: 13px;
+  color: var(--color-accent);
+  flex-shrink: 0;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.activity-text-inline {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+
+@keyframes quickSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

@@ -5,6 +5,8 @@ import SessionPicker from '@/components/modal/SessionPicker.vue'
 import RollbackPicker from '@/components/modal/RollbackPicker.vue'
 import HelpPanel from '@/components/modal/HelpPanel.vue'
 import ConfigWarningDialog from '@/components/modal/ConfigWarningDialog.vue'
+import UpdateModal from '@/components/modal/UpdateModal.vue'
+import ModelPicker from '@/components/modal/ModelPicker.vue'
 
 export function useGlobalModals() {
   return {
@@ -15,5 +17,7 @@ export function useGlobalModals() {
     RollbackPicker,
     HelpPanel,
     ConfigWarningDialog,
+    UpdateModal,
+    ModelPicker,
   }
 }

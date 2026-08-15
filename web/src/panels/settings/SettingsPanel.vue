@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import AppIcon from '@/components/common/AppIcon.vue'
 import { useSettingsPanel } from './SettingsPanelController'
+import AppIcon from '@/components/common/AppIcon.vue'
+import AddModelForm from '@/components/common/AddModelForm.vue'
 
 const {
   activeTab,
@@ -28,6 +29,15 @@ const {
   handleGlobalApprovalChange,
   saveProjectParams,
   saveGlobalParams,
+  modelStore,
+  showAddModelForm,
+  testingModelId,
+  testResult,
+  handleModelActivate,
+  handleModelDelete,
+  handleModelTest,
+  openAddModelForm,
+  onModelAdded,
 } = useSettingsPanel()
 </script>
 
@@ -190,6 +200,58 @@ const {
           />
         </div>
         <button class="save-btn" @click="saveGlobalParams">保存全局参数</button>
+      </div>
+
+      <div class="setting-section">
+        <div class="section-title">模型管理</div>
+        <div v-if="modelStore.isLoading" class="setting-hint">加载中...</div>
+        <div v-else>
+          <div v-if="modelStore.models.length === 0" class="setting-hint">
+            暂无模型配置，请添加模型
+          </div>
+          <div v-else class="model-list">
+            <div
+              v-for="m in modelStore.models"
+              :key="m.id"
+              class="model-card"
+              :class="{ active: m.id === modelStore.activeModelId }"
+            >
+              <div class="model-card-info">
+                <div class="model-card-name">
+                  {{ m.name }}
+                  <span v-if="m.id === modelStore.activeModelId" class="model-card-badge">当前</span>
+                </div>
+                <div class="model-card-detail">{{ m.model }} @ {{ m.base_url }}</div>
+              </div>
+              <div class="model-card-actions">
+                <button
+                  v-if="m.id !== modelStore.activeModelId"
+                  class="model-action-btn activate"
+                  @click="handleModelActivate(m.id)"
+                >激活</button>
+                <button
+                  class="model-action-btn test"
+                  :disabled="testingModelId === m.id"
+                  @click="handleModelTest(m.id)"
+                >{{ testingModelId === m.id ? '测试中...' : '测试' }}</button>
+                <button
+                  class="model-action-btn delete"
+                  @click="handleModelDelete(m.id)"
+                >删除</button>
+              </div>
+              <div
+                v-if="testResult && testResult.id === m.id"
+                class="model-test-result"
+                :class="{ success: testResult.success, fail: !testResult.success }"
+              >{{ testResult.success ? '连接成功' : '连接失败: ' + testResult.error }}</div>
+            </div>
+          </div>
+          <button class="add-model-btn" @click="openAddModelForm">+ 添加模型</button>
+        </div>
+      </div>
+
+      <div v-if="showAddModelForm" class="model-form-overlay">
+        <AddModelForm mode="modal" @submit="onModelAdded" @cancel="showAddModelForm = false" />
       </div>
 
       <div class="setting-item">

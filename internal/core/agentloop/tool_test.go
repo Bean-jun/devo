@@ -61,6 +61,7 @@ func (m *toolCallingMockClient) CompleteStream(ctx context.Context, messages []s
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (m *toolCallingMockClient) TestConnection(ctx context.Context) error { return nil }
 
 func TestAgentLoopWithToolCalling(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -71,7 +72,7 @@ func TestAgentLoopWithToolCalling(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, &toolCallingMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &toolCallingMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -173,6 +174,7 @@ func (m *multiToolMockClient) CompleteStream(ctx context.Context, messages []ses
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (m *multiToolMockClient) TestConnection(ctx context.Context) error { return nil }
 
 func TestAgentLoopWithMultipleToolCalls(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -185,7 +187,7 @@ func TestAgentLoopWithMultipleToolCalls(t *testing.T) {
 	toolRegistry.Register(&tools.ReadFileTool{})
 	toolRegistry.Register(&tools.ListFilesTool{})
 
-	loop := NewWithTools(store, &multiToolMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &multiToolMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -317,6 +319,7 @@ func (m *limitedToolMockClient) CompleteStream(ctx context.Context, messages []s
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (m *limitedToolMockClient) TestConnection(ctx context.Context) error { return nil }
 
 func TestToolCallLimitReached(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -327,7 +330,7 @@ func TestToolCallLimitReached(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, &limitedToolMockClient{maxCalls: 100}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &limitedToolMockClient{maxCalls: 100}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -393,7 +396,7 @@ func TestContinuationAfterToolLimit(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, &limitedToolMockClient{maxCalls: 100}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &limitedToolMockClient{maxCalls: 100}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -524,7 +527,7 @@ func TestToolCallCountResetsOnNewLoop(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, &limitedToolMockClient{maxCalls: 2}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &limitedToolMockClient{maxCalls: 2}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -573,7 +576,7 @@ func TestContinuationWithNewTask(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, &limitedToolMockClient{maxCalls: 100}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &limitedToolMockClient{maxCalls: 100}, toolRegistry)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")

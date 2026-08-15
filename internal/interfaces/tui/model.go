@@ -45,20 +45,25 @@ type Model struct {
 	dashboardPanel        overlays.DashboardPanel
 	settingsPanel         overlays.SettingsPanel
 	reasoningPicker       overlays.ReasoningPicker
+	modelPicker           overlays.ModelPicker
 	apiClient             *api.Client
 	sseClient             *api.SSEClient
 	baseURL               string
 	version               string
+	updateInfo            *api.UpdateCheckResult
 	workingDir            string
 	width                 int
 	height                int
 	ready                 bool
 	initialized           bool
 	activeSessionID       string
+	models                []api.ModelInfo
+	activeModelName       string
 	loading               map[overlays.OverlayType]bool
 	enableReasoning       bool
 	reasoningEffort       string
 	rollbackTargetContent string
+	rollbackTargetIndex   int
 
 	keyboardEnhancements int
 	pasteBuffer          string
@@ -155,6 +160,8 @@ func (m *Model) initFromAPI() tea.Cmd {
 			return apiResponseMsg{kind: "sessions_loaded", data: sessions}
 		},
 		m.fetchGlobalConfigFromAPI(),
+		m.checkUpdateFromAPI(),
+		m.fetchModelsFromAPI(),
 	)
 }
 
@@ -212,6 +219,15 @@ func (m *Model) appendEditChar(s string) {
 func (m *Model) applySessionsData(sessions []types.SessionInfo) {
 	m.sessions = sessions
 	m.sessPicker.Sessions = sessions
+}
+
+func (m *Model) syncYoloFromSession(sessionID string) {
+	for _, s := range m.sessions {
+		if s.ID == sessionID {
+			m.statusBar.Yolo = s.TrustLevel == types.TrustLevelElevated
+			return
+		}
+	}
 }
 
 func (m *Model) applyMessagesData(msgs []types.Message) {
@@ -287,6 +303,7 @@ type apiResponseMsg struct {
 	path      string
 	key       string
 	id        string
+	modelID   string
 }
 
 func (m *Model) overlayPanelWidth() int {
@@ -294,8 +311,8 @@ func (m *Model) overlayPanelWidth() int {
 		return m.width - 4
 	}
 	maxW := m.width - 8
-	if maxW > 80 {
-		maxW = 80
+	if maxW > 100 {
+		maxW = 100
 	}
 	return maxW
 }
@@ -337,8 +354,12 @@ func (m *Model) buildFooterText() string {
 	total := tokenUsage.Input + tokenUsage.Output
 	ti := formatTokenCount(tokenUsage.Input)
 	to := formatTokenCount(tokenUsage.Output)
-	return fmt.Sprintf("Context %s  ·  Tokens %s (↑%s ↓%s)  ·  %s",
-		c, formatTokenCount(total), ti, to, wd) + m.buildImageHint()
+	modelPart := ""
+	if m.activeModelName != "" {
+		modelPart = "  ·  " + m.activeModelName
+	}
+	return fmt.Sprintf("Context %s  ·  Tokens %s (↑%s ↓%s)%s  ·  %s",
+		c, formatTokenCount(total), ti, to, modelPart, wd) + m.buildImageHint()
 }
 
 func (m *Model) buildImageHint() string {

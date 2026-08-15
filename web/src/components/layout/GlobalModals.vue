@@ -9,6 +9,8 @@ const {
   RollbackPicker,
   HelpPanel,
   ConfigWarningDialog,
+  UpdateModal,
+  ModelPicker,
 } = useGlobalModals()
 </script>
 
@@ -21,5 +23,7 @@ const {
     <RollbackPicker />
     <HelpPanel />
     <ConfigWarningDialog />
+    <UpdateModal />
+    <ModelPicker />
   </Teleport>
 </template>

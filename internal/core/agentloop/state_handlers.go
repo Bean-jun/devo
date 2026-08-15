@@ -109,11 +109,6 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 				ToolCalls:  evt.ToolCalls,
 				TokenUsage: evt.TokenUsage,
 			}
-			logging.Debug(ctx, "thinking handler completed",
-				"session_id", lc.SessionID,
-				"tool_calls", len(evt.ToolCalls),
-				"reasoning_len", len(evt.FullReasoning),
-			)
 			lc.StepSeq++
 
 			if evt.TokenUsage != nil {
@@ -121,11 +116,7 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 				lc.TotalStepTokens += evt.TokenUsage.TotalTokens
 
 				sess, err := l.store.Get(lc.SessionID)
-				if err != nil {
-					logging.Debug(ctx, "thinking handler: get session for token_usage failed",
-						"error", err,
-					)
-				} else {
+				if err == nil {
 					usageData := map[string]any{
 						"step":                   lc.StepSeq,
 						"input_tokens":           evt.TokenUsage.InputTokens,
@@ -149,7 +140,7 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 				if inputTokens > 0 {
 					hitRate = float64(cachedTokens) / float64(inputTokens) * 100
 				}
-				logging.Info(ctx, "llm cache stats",
+				logging.Debug(ctx, "llm cache stats",
 					"session_id", lc.SessionID,
 					"step", lc.StepSeq,
 					"system_hash", hashStr,
@@ -192,35 +183,18 @@ func (l *Loop) thinkingHandler(ctx context.Context, lc *LoopContext) (LoopState,
 }
 
 func (l *Loop) evaluatingResultHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
-	logging.Debug(ctx, "evaluating result handler called",
-		"session_id", lc.SessionID,
-		"tool_calls", len(lc.LLMResult.ToolCalls),
-	)
 	if len(lc.LLMResult.ToolCalls) > 0 {
 		lc.ExecutedToolCallIDs = make(map[string]bool)
 		lc.EventBus.Publish("loop.result_evaluated", map[string]string{"type": "tool_calls"})
 
 		sess, err := l.store.Get(lc.SessionID)
-		if err != nil {
-			logging.Debug(ctx, "evaluating result handler: failed to get session",
-				"error", err,
-			)
-		} else {
+		if err == nil {
 			oldState := string(sess.State)
-			logging.Debug(ctx, "evaluating result handler: setting state to ToolExecuting",
-				"session_id", lc.SessionID,
-				"old_state", oldState,
-			)
 			sess.State = session.StateToolExecuting
 			sess.LastActiveAt = time.Now()
 			if err := l.store.Update(sess); err != nil {
-				logging.Error(ctx, "evaluating result handler: failed to update state to ToolExecuting",
+				logging.Error(ctx, "evaluating result handler: failed to update session state",
 					"error", err,
-				)
-			} else {
-				logging.Debug(ctx, "evaluating result handler: updated state",
-					"old_state", oldState,
-					"new_state", "ToolExecuting",
 				)
 			}
 			lc.EventBus.Publish("session_state_change", map[string]any{
@@ -238,10 +212,6 @@ func (l *Loop) evaluatingResultHandler(ctx context.Context, lc *LoopContext) (Lo
 }
 
 func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopState, error) {
-	logging.Debug(ctx, "tool executing handler called",
-		"session_id", lc.SessionID,
-		"tool_calls", len(lc.LLMResult.ToolCalls),
-	)
 	if lc.ExecutedToolCallIDs == nil {
 		lc.ExecutedToolCallIDs = make(map[string]bool)
 	}
@@ -267,20 +237,11 @@ func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopS
 		)
 	} else {
 		oldState := string(sess.State)
-		logging.Debug(ctx, "tool executing handler: setting state to ToolExecuting",
-			"session_id", lc.SessionID,
-			"old_state", oldState,
-		)
 		sess.State = session.StateToolExecuting
 		sess.LastActiveAt = time.Now()
 		if err := l.store.Update(sess); err != nil {
-			logging.Error(ctx, "tool executing handler: failed to update state to ToolExecuting",
+			logging.Error(ctx, "tool executing handler: failed to update session state",
 				"error", err,
-			)
-		} else {
-			logging.Debug(ctx, "tool executing handler: updated state",
-				"old_state", oldState,
-				"new_state", "ToolExecuting",
 			)
 		}
 		lc.EventBus.Publish("session_state_change", map[string]any{
@@ -349,6 +310,13 @@ func (l *Loop) textResponseHandler(ctx context.Context, lc *LoopContext) (LoopSt
 	lc.EventBus.Publish("loop.loop_completed", nil)
 
 	lc.TerminationReason = "completed"
+
+	logging.Info(ctx, "loop completed",
+		"session_id", lc.SessionID,
+		"steps", lc.StepSeq,
+		"total_tokens", lc.TotalStepTokens,
+		"response_len", len(lc.LLMResult.Text),
+	)
 
 	return LoopStateIdle, nil
 }

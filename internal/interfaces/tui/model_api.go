@@ -175,6 +175,16 @@ func (m *Model) approveFromAPI(sessionID string, approvalID string) tea.Cmd {
 	}
 }
 
+func (m *Model) setTrustLevelFromAPI(sessionID string, level string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.apiClient.SetTrustLevel(sessionID, level)
+		if err != nil {
+			return apiResponseMsg{kind: "trust_level_error", err: err}
+		}
+		return apiResponseMsg{kind: "trust_level_updated", data: level}
+	}
+}
+
 func (m *Model) upsertMemoryFromAPI(sessionID string, memoryType string, key, content string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.apiClient.UpsertMemory(sessionID, memoryType, key, content)
@@ -351,5 +361,35 @@ func (m *Model) saveGlobalConfigFromAPI(body map[string]interface{}) tea.Cmd {
 			return apiResponseMsg{kind: "global_config_save_error", err: err}
 		}
 		return apiResponseMsg{kind: "global_config_saved"}
+	}
+}
+
+func (m *Model) checkUpdateFromAPI() tea.Cmd {
+	return func() tea.Msg {
+		result, err := m.apiClient.CheckUpdate()
+		if err != nil {
+			return apiResponseMsg{kind: "update_check_error", err: err}
+		}
+		return apiResponseMsg{kind: "update_checked", data: result}
+	}
+}
+
+func (m *Model) fetchModelsFromAPI() tea.Cmd {
+	return func() tea.Msg {
+		models, err := m.apiClient.GetModels()
+		if err != nil {
+			return apiResponseMsg{kind: "models_error", err: err}
+		}
+		return apiResponseMsg{kind: "models_loaded", data: models}
+	}
+}
+
+func (m *Model) activateModelFromAPI(modelID string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.apiClient.ActivateModel(modelID)
+		if err != nil {
+			return apiResponseMsg{kind: "model_activate_error", err: err}
+		}
+		return apiResponseMsg{kind: "model_activated", modelID: modelID}
 	}
 }

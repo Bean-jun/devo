@@ -19,6 +19,8 @@ type StatusBar struct {
 	ReasoningEffort  string
 	Activity         string
 	ActivityActive   bool
+	HasUpdate        bool
+	LatestVersion    string
 }
 
 func NewStatusBar() StatusBar {
@@ -92,7 +94,15 @@ func (s *StatusBar) Render() string {
 		port = lipgloss.NewStyle().Foreground(ColorMuted()).Render(":" + s.ServerPort + " ")
 	}
 
-	right := reasoning + port + conn
+	update := ""
+	if s.HasUpdate && s.LatestVersion != "" {
+		update = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#34c759")).
+			Bold(true).
+			Render("\u2B06 "+s.LatestVersion) + "  "
+	}
+
+	right := update + reasoning + port + conn
 
 	leftW := lipgloss.Width(left)
 	centerW := lipgloss.Width(center)

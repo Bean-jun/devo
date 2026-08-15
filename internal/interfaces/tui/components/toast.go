@@ -44,6 +44,8 @@ func (t *Toast) Render() string {
 		styleFn = ToastError
 	case "success":
 		styleFn = ToastSuccess
+	case "update":
+		styleFn = ToastUpdate
 	default:
 		styleFn = ToastInfo
 	}

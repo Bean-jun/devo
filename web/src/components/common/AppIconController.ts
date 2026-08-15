@@ -78,6 +78,9 @@ import {
   PhFileRs,
   PhFilePy,
   PhCube,
+  PhArrowCircleUp,
+  PhArrowSquareOut,
+  PhArrowRight,
 } from '@phosphor-icons/vue'
 
 export interface AppIconProps {
@@ -165,6 +168,9 @@ const iconMap: Record<IconName, Component> = {
   'file-rs': PhFileRs,
   'file-py': PhFilePy,
   cube: PhCube,
+  'arrow-circle-up': PhArrowCircleUp,
+  'arrow-square-out': PhArrowSquareOut,
+  'arrow-right': PhArrowRight,
 }
 
 export type IconName =
@@ -245,6 +251,9 @@ export type IconName =
   | 'file-rs'
   | 'file-py'
   | 'cube'
+  | 'arrow-circle-up'
+  | 'arrow-square-out'
+  | 'arrow-right'
 
 export function useAppIcon(props: AppIconProps) {
   const resolvedIcon = computed(() => iconMap[props.name])

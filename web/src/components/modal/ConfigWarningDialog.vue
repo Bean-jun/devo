@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { useConfigWarningDialog } from './ConfigWarningDialogController'
+import AddModelForm from '@/components/common/AddModelForm.vue'
 
-const { isOpen, close } = useConfigWarningDialog()
+const { isOpen, close, showAddForm } = useConfigWarningDialog()
+
+function onModelAdded() {
+  showAddForm.value = false
+  close()
+}
 </script>
 
 <template>
@@ -14,24 +20,40 @@ const { isOpen, close } = useConfigWarningDialog()
 
       <div class="dialog-body">
         <p class="dialog-desc">
-          Devo 需要 LLM API 密钥才能驱动 AI 编码。请在以下任一位置创建配置文件：
+          Devo 需要 LLM API 密钥才能驱动 AI 编码。可通过下方表单快速添加，或手动创建配置文件：
         </p>
 
-        <div class="config-locations">
-          <div class="location-item">
-            <div class="location-label">项目配置</div>
-            <code class="location-path">.devo/config.json</code>
-            <span class="location-hint">仅当前项目生效</span>
-          </div>
-          <div class="location-item">
-            <div class="location-label">全局配置</div>
-            <code class="location-path">~/.devo/config.json</code>
-            <span class="location-hint">所有项目生效</span>
-          </div>
+        <div v-if="!showAddForm" class="quick-add-section">
+          <button class="quick-add-btn" @click="showAddForm = true">+ 快速添加模型</button>
         </div>
 
-        <p class="dialog-example-title">配置文件示例：</p>
-        <pre class="config-example"><code>{
+        <AddModelForm
+          v-else
+          mode="inline"
+          @submit="onModelAdded"
+          @cancel="showAddForm = false"
+        />
+
+        <template v-if="!showAddForm">
+          <div class="divider">
+            <span>或手动配置</span>
+          </div>
+
+          <div class="config-locations">
+            <div class="location-item">
+              <div class="location-label">项目配置</div>
+              <code class="location-path">.devo/config.json</code>
+              <span class="location-hint">仅当前项目生效</span>
+            </div>
+            <div class="location-item">
+              <div class="location-label">全局配置</div>
+              <code class="location-path">~/.devo/config.json</code>
+              <span class="location-hint">所有项目生效</span>
+            </div>
+          </div>
+
+          <p class="dialog-example-title">配置文件示例：</p>
+          <pre class="config-example"><code>{
   "llm": {
     "api_key": "sk-your-key-here",
     "base_url": "https://api.openai.com/v1",
@@ -39,12 +61,13 @@ const { isOpen, close } = useConfigWarningDialog()
   }
 }</code></pre>
 
-        <p class="dialog-env-hint">
-          也可以通过环境变量 <code>DEVO_LLM_API_KEY</code> 设置。
-        </p>
+          <p class="dialog-env-hint">
+            也可以通过环境变量 <code>DEVO_LLM_API_KEY</code> 设置。
+          </p>
+        </template>
       </div>
 
-      <div class="dialog-footer">
+      <div v-if="!showAddForm" class="dialog-footer">
         <button class="btn-close" @click="close">我知道了</button>
       </div>
     </div>

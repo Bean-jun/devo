@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -525,4 +526,55 @@ func (c *Client) UpdateProjectConfig(body map[string]interface{}) error {
 
 func (c *Client) UpdateGlobalConfig(body map[string]interface{}) error {
 	return c.put("/api/v1/global/config", body, nil)
+}
+
+// ─── Update Check ───
+
+type UpdateCheckResult struct {
+	HasUpdate      bool   `json:"has_update"`
+	CurrentVersion string `json:"current_version"`
+	LatestVersion  string `json:"latest_version"`
+	ReleaseURL     string `json:"release_url"`
+	ReleaseName    string `json:"release_name"`
+	ReleaseBody    string `json:"release_body"`
+	PublishedAt    string `json:"published_at"`
+	CheckedAt      string `json:"checked_at"`
+}
+
+func (c *Client) CheckUpdate() (*UpdateCheckResult, error) {
+	var result UpdateCheckResult
+	if err := c.get("/api/v1/update/check", &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ─── Models ───
+
+type ModelInfo struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Model    string `json:"model"`
+	Active   bool   `json:"active"`
+	Provider string `json:"provider"`
+}
+
+type ModelsResponse struct {
+	Models        []ModelInfo `json:"models"`
+	ActiveModelID string      `json:"active_model_id"`
+}
+
+func (c *Client) GetModels() ([]ModelInfo, error) {
+	var resp ModelsResponse
+	if err := c.get("/api/v1/global/config/models", &resp); err != nil {
+		return nil, err
+	}
+	for i := range resp.Models {
+		resp.Models[i].Active = resp.Models[i].ID == resp.ActiveModelID
+	}
+	return resp.Models, nil
+}
+
+func (c *Client) ActivateModel(modelID string) error {
+	return c.put("/api/v1/global/config/models/"+url.PathEscape(modelID)+"/activate", nil, nil)
 }

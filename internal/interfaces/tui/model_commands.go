@@ -62,6 +62,10 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 	case "/reasoning":
 		m.reasoningPicker = overlays.NewReasoningPicker(m.enableReasoning, m.reasoningEffort)
 		m.overlay.Open(overlays.OverlayReasoning)
+	case "/model":
+		m.modelPicker = overlays.NewModelPicker()
+		m.overlay.Open(overlays.OverlayModelPicker)
+		return m.fetchModelsFromAPI()
 	case "/pause":
 		if m.activeSessionID != "" {
 			return m.pauseSessionFromAPI(m.activeSessionID)
@@ -88,7 +92,6 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 		}
 		m.toast.Show("没有活动会话可压缩", true)
 	case "/background":
-		m.backgroundPanel = overlays.NewBackgroundPanel()
 		m.overlay.Open(overlays.OverlayBackground)
 		if m.activeSessionID != "" {
 			return m.fetchBackgroundProcessesFromAPI(m.activeSessionID)
@@ -111,6 +114,18 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 		m.overlay.Open(overlays.OverlayStatus)
 	case "/version":
 		m.versionPanel.Version = m.version
+		if m.updateInfo != nil && m.updateInfo.HasUpdate {
+			m.versionPanel.UpdateInfo = &overlays.UpdateInfo{
+				HasUpdate:     m.updateInfo.HasUpdate,
+				LatestVersion: m.updateInfo.LatestVersion,
+				ReleaseName:   m.updateInfo.ReleaseName,
+				ReleaseBody:   m.updateInfo.ReleaseBody,
+				ReleaseURL:    m.updateInfo.ReleaseURL,
+				PublishedAt:   m.updateInfo.PublishedAt,
+			}
+		} else {
+			m.versionPanel.UpdateInfo = nil
+		}
 		m.overlay.Open(overlays.OverlayVersion)
 	default:
 		m.toast.Show("未知命令: "+cmd, true)

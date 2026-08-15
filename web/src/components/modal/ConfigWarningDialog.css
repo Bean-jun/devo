@@ -157,3 +157,46 @@
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
+
+.quick-add-section {
+  margin-bottom: 16px;
+}
+
+.quick-add-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px dashed var(--color-accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.quick-add-btn:hover {
+  background: var(--color-accent);
+  color: white;
+  border-style: solid;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 16px 0;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.divider span {
+  padding: 0 12px;
+}

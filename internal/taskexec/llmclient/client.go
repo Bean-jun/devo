@@ -34,6 +34,7 @@ type StreamCallback func(event StreamEvent)
 type Client interface {
 	Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*CompleteResult, error)
 	CompleteStream(ctx context.Context, messages []session.Message, systemPrompt string, callback StreamCallback) error
+	TestConnection(ctx context.Context) error
 }
 
 type MockClient struct {
@@ -144,5 +145,9 @@ func (m *MockClient) CompleteStream(ctx context.Context, messages []session.Mess
 		TokenUsage:   result.TokenUsage,
 	})
 
+	return nil
+}
+
+func (m *MockClient) TestConnection(ctx context.Context) error {
 	return nil
 }

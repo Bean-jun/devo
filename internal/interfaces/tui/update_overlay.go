@@ -4,6 +4,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"devo/internal/interfaces/tui/overlays"
+	"devo/internal/interfaces/tui/types"
 )
 
 func (m *Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -319,7 +320,9 @@ func (m *Model) handleOverlayEnter() (tea.Model, tea.Cmd) {
 			sess := m.sessPicker.Sessions[m.sessPicker.Selected]
 			m.activeSessionID = sess.ID
 			m.statusBar.Session = sess.Title
+			m.statusBar.Yolo = sess.TrustLevel == types.TrustLevelElevated
 			m.messages = nil
+			m.backgroundPanel = overlays.NewBackgroundPanel()
 			m.renderer.Invalidate(0)
 			m.toast.Show("已切换到会话: "+sess.Title, false)
 			m.overlay.Close()
@@ -375,6 +378,7 @@ func (m *Model) handleOverlayEnter() (tea.Model, tea.Cmd) {
 			selectedItem := m.rollback.Messages[m.rollback.Selected]
 			targetMsgID := m.messages[selectedItem.MsgIndex].ID
 			m.rollbackTargetContent = selectedItem.Content
+			m.rollbackTargetIndex = selectedItem.MsgIndex
 			return m, m.rollbackFromAPI(m.activeSessionID, targetMsgID)
 		}
 		return m, nil
@@ -392,6 +396,15 @@ func (m *Model) handleOverlayEnter() (tea.Model, tea.Cmd) {
 		m.overlay.Close()
 		m.refreshViewport()
 		return m, m.updateReasoningConfig()
+
+	case overlays.OverlayModelPicker:
+		selected := m.modelPicker.SelectedModel()
+		if selected.ID != "" && !selected.Active {
+			return m, m.activateModelFromAPI(selected.ID)
+		}
+		m.overlay.Close()
+		m.refreshViewport()
+		return m, nil
 	}
 
 	return m, nil
@@ -421,6 +434,8 @@ func (m *Model) handleOverlayCursorUp() {
 		}
 	case overlays.OverlayReasoning:
 		m.reasoningPicker.CursorUp()
+	case overlays.OverlayModelPicker:
+		m.modelPicker.CursorUp()
 	}
 }
 
@@ -448,5 +463,7 @@ func (m *Model) handleOverlayCursorDown() {
 		}
 	case overlays.OverlayReasoning:
 		m.reasoningPicker.CursorDown()
+	case overlays.OverlayModelPicker:
+		m.modelPicker.CursorDown()
 	}
 }

@@ -1,4 +1,4 @@
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useChatStore } from '@/stores/chat'
@@ -8,6 +8,7 @@ import { API_BASE } from '@/utils/constants'
 import { formatTokenCount } from '@/utils/formatters'
 import type { Command } from '@/stores/command'
 import { useKeyboard } from '@/composables/useKeyboard'
+import { useUpdateCheck } from '@/composables/useUpdateCheck'
 
 export function useMobileLayout() {
   const router = useRouter()
@@ -15,6 +16,7 @@ export function useMobileLayout() {
   const chatStore = useChatStore()
   const uiStore = useUiStore()
   const approvalStore = useApprovalStore()
+  const { checkUpdate } = useUpdateCheck()
 
   const showCommandSheet = ref(false)
   const showPanelDrawer = ref(false)
@@ -31,6 +33,10 @@ export function useMobileLayout() {
   const isProcessing = computed(() => sessionStore.isProcessing)
 
   const appVersion = import.meta.env.VITE_APP_VERSION || 'dev'
+
+  onMounted(() => {
+    checkUpdate()
+  })
 
 function openCommandSheet() {
   showCommandSheet.value = true
@@ -157,6 +163,9 @@ function handleCommandSelect(cmd: Command) {
       break
     case 'help':
       uiStore.setActiveModal('help')
+      break
+    case 'model':
+      uiStore.setActiveModal('model-picker')
       break
     case 'export':
       handleExport()

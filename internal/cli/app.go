@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -45,12 +45,14 @@ type App struct {
 	devoDir       string
 	tuiMode       bool
 	webMode       bool
+	version       string
 }
 
-func NewApp(tuiMode, webMode bool, portFlag int) (*App, error) {
+func NewApp(tuiMode, webMode bool, portFlag int, version string) (*App, error) {
 	app := &App{
 		tuiMode: tuiMode,
 		webMode: webMode,
+		version: version,
 	}
 
 	wd, err := os.Getwd()
@@ -103,13 +105,13 @@ func (a *App) initDB() error {
 	}
 
 	newLogger := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		logger.Config{
-			SlowThreshold:             time.Second,  // Slow SQL threshold
-			LogLevel:                  logger.Error, // Log level
-			IgnoreRecordNotFoundError: true,         // Ignore ErrRecordNotFound error for logger
-			ParameterizedQueries:      false,        // Don't include params in the SQL log
-			Colorful:                  false,        // Disable color
+			SlowThreshold:             time.Second,
+			LogLevel:                  logger.Error,
+			IgnoreRecordNotFoundError: true,
+			ParameterizedQueries:      false,
+			Colorful:                  false,
 		},
 	)
 	db, err := gorm.Open(gormsqlite.Open(dbPath), &gorm.Config{
@@ -136,9 +138,6 @@ func (a *App) initRegistry() {
 func (a *App) initTools() {
 	bgProcManager := tools.NewBackgroundProcessManager()
 	a.bgProcManager = bgProcManager
-	// Wire bidirectional: loop needs the manager to stop processes on
-	// cancel/complete; manager needs the loop to forward background output
-	// to the session EventBus via ForwardBackgroundOutput.
 	a.loop.SetBackgroundProcessManager(bgProcManager)
 	bgProcManager.SetOutputForwarder(a.loop)
 	a.toolRegistry.Register(&tools.GlobTool{})
@@ -200,9 +199,9 @@ func (a *App) initMCP() {
 }
 
 func (a *App) initHandler() {
-	a.handler = rest.NewHandler(a.store, a.loop, a.memoryMgr, Version)
+	a.handler = rest.NewHandler(a.store, a.loop, a.memoryMgr, a.version)
 	a.handler.SetSkillsManager(a.skillsMgr)
-	a.handler.SetLLMConfigured(a.cfg.LLM.APIKey != "")
+	a.handler.SetLLMConfigured(a.cfg.IsLLMConfigured())
 	a.handler.SetAppConfig(a.cfg)
 	a.handler.SetBgProcManager(a.bgProcManager)
 
@@ -263,7 +262,7 @@ func (a *App) Run() {
 	if a.tuiMode {
 		logging.Info(ctx, "launching TUI")
 		tui.RedirectStdLog()
-		tui.Launch(a.baseURL, Version)
+		tui.Launch(a.baseURL, a.version)
 		logging.Info(ctx, "TUI exited, shutting down server")
 		server.Close()
 		return
@@ -277,9 +276,6 @@ func (a *App) Run() {
 
 func (a *App) Shutdown() {
 	if a.bgProcManager != nil {
-		// Kill every background process spawned by exec_python so devo exit
-		// doesn't leave orphan children. Each Stop() kills the process group
-		// and waits for the pipe-reader goroutine to exit.
 		a.bgProcManager.Shutdown()
 	}
 	if a.store != nil {

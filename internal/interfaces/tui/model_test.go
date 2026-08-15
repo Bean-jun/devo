@@ -42,8 +42,14 @@ func TestModel_OverlayPanelWidth(t *testing.T) {
 	m := NewModel("http://localhost:8080", "1.0.0")
 	m.width = 100
 	w := m.overlayPanelWidth()
-	if w != 80 {
-		t.Errorf("宽度 100 时面板宽度应为 80, got %d", w)
+	if w != 92 {
+		t.Errorf("宽度 100 时面板宽度应为 92, got %d", w)
+	}
+
+	m.width = 120
+	w = m.overlayPanelWidth()
+	if w != 100 {
+		t.Errorf("宽度 120 时面板宽度应被上限截断为 100, got %d", w)
 	}
 
 	m.width = 50

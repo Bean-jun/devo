@@ -49,7 +49,7 @@ func TestIntegration_ToolCallLoop(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ListFilesTool{})
 
-	loop := NewWithTools(store, &toolLoopMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &toolLoopMockClient{}, toolRegistry)
 
 	sess, _ := store.Get("sess-tool-loop")
 	sess.WorkingDirectory = tmpDir
@@ -104,7 +104,7 @@ func TestIntegration_ApprovalRequired(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, &approvalMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &approvalMockClient{}, toolRegistry)
 
 	sess, _ := store.Get("sess-approval")
 	sess.WorkingDirectory = tmpDir
@@ -295,7 +295,7 @@ func TestIntegration_ToolCallLimit(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ListFilesTool{})
 
-	loop := NewWithTools(store, &toolLoopMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &toolLoopMockClient{}, toolRegistry)
 
 	sess, _ := store.Get("sess-tool-limit")
 	sess.WorkingDirectory = tmpDir
@@ -407,6 +407,7 @@ func (m *toolLoopMockClient) CompleteStream(ctx context.Context, messages []sess
 	callback(llmclient.StreamEvent{Type: "done", FullText: result.Text, ToolCalls: result.ToolCalls, TokenUsage: result.TokenUsage})
 	return nil
 }
+func (m *toolLoopMockClient) TestConnection(ctx context.Context) error { return nil }
 
 func indexOf(slice []string, item string) int {
 	for i, s := range slice {

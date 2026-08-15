@@ -20,6 +20,7 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 		}
 		m.setLoading(overlays.OverlaySession, false)
 		if m.activeSessionID != "" {
+			m.syncYoloFromSession(m.activeSessionID)
 			return m, tea.Batch(
 				m.fetchMessagesFromAPI(m.activeSessionID),
 				m.connectSSE(m.activeSessionID),
@@ -29,6 +30,7 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 			first := m.sessions[0]
 			m.activeSessionID = first.ID
 			m.statusBar.Session = first.Title
+			m.statusBar.Yolo = first.TrustLevel == types.TrustLevelElevated
 			return m, tea.Batch(
 				m.fetchMessagesFromAPI(first.ID),
 				m.connectSSE(first.ID),
@@ -108,6 +110,7 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 			m.sessions = append(m.sessions, *sess)
 			m.sessPicker.Sessions = m.sessions
 			m.messages = nil
+			m.backgroundPanel = overlays.NewBackgroundPanel()
 			m.renderer.Invalidate(0)
 			m.refreshViewportToBottom()
 			m.toast.Show("会话已创建: "+sess.Title, false)
@@ -128,6 +131,12 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 
 	case "rename_error":
 		m.toast.Show("重命名失败: "+msg.err.Error(), true)
+
+	case "trust_level_updated":
+		m.toast.Show("信任级别已更新", false)
+
+	case "trust_level_error":
+		m.toast.Show("更新信任级别失败: "+msg.err.Error(), true)
 
 	case "session_deleted":
 		var filtered []types.SessionInfo
@@ -170,18 +179,17 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 		m.toast.Show("发送消息失败: "+msg.err.Error(), true)
 
 	case "rollback_done":
-		if resp, ok := msg.data.(*types.GetMessagesResponse); ok {
-			m.messages = resp.Messages
-			m.refreshViewportToBottom()
-			if m.rollbackTargetContent != "" {
-				m.textarea.SetValue(m.rollbackTargetContent)
-				m.textarea.CursorEnd()
-				m.rollbackTargetContent = ""
-			}
-			m.toast.Show("已回滚到选定消息", false)
-		} else {
-			m.toast.Show("回滚数据格式错误", true)
+		if m.rollbackTargetIndex >= 0 && m.rollbackTargetIndex < len(m.messages) {
+			m.messages = m.messages[:m.rollbackTargetIndex]
 		}
+		m.refreshViewportToBottom()
+		m.renderer.Invalidate(m.rollbackTargetIndex)
+		if m.rollbackTargetContent != "" {
+			m.textarea.SetValue(m.rollbackTargetContent)
+			m.textarea.CursorEnd()
+			m.rollbackTargetContent = ""
+		}
+		m.toast.Show("已回滚到选定消息", false)
 
 	case "rollback_error":
 		m.toast.Show("回滚失败: "+msg.err.Error(), true)
@@ -359,6 +367,59 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 
 	case "memory_upsert_error":
 		m.toast.Show("保存记忆失败: "+msg.err.Error(), true)
+
+	case "update_checked":
+		if result, ok := msg.data.(*api.UpdateCheckResult); ok {
+			m.updateInfo = result
+			if result.HasUpdate {
+				m.statusBar.HasUpdate = true
+				m.statusBar.LatestVersion = result.LatestVersion
+			}
+		}
+
+	case "update_check_error":
+		// Silently ignore - update check is best-effort
+
+	case "models_loaded":
+		if models, ok := msg.data.([]api.ModelInfo); ok {
+			m.models = models
+			m.modelPicker.Models = make([]overlays.ModelInfo, 0, len(models))
+			for _, mod := range models {
+				m.modelPicker.Models = append(m.modelPicker.Models, overlays.ModelInfo{
+					ID:     mod.ID,
+					Name:   mod.Name,
+					Model:  mod.Model,
+					Active: mod.Active,
+				})
+				if mod.Active {
+					m.activeModelName = mod.Name
+					m.modelPicker.Selected = len(m.modelPicker.Models) - 1
+				}
+			}
+		}
+
+	case "models_error":
+		m.toast.Show("获取模型列表失败: "+msg.err.Error(), true)
+
+	case "model_activated":
+		for i := range m.modelPicker.Models {
+			m.modelPicker.Models[i].Active = m.modelPicker.Models[i].ID == msg.modelID
+		}
+		for _, mod := range m.modelPicker.Models {
+			if mod.ID == msg.modelID {
+				m.activeModelName = mod.Name
+				break
+			}
+		}
+		m.toast.Show("模型已切换", false)
+		m.overlay.Close()
+		m.refreshViewport()
+		return m, nil
+
+	case "model_activate_error":
+		m.toast.Show("切换模型失败: "+msg.err.Error(), true)
+		m.overlay.Close()
+		m.refreshViewport()
 
 	default:
 		if msg.err != nil {
@@ -702,11 +763,10 @@ func (m *Model) handleSSEEvent(msg sseEventMsg) (tea.Model, tea.Cmd) {
 			if stream == "stderr" {
 				prefix = fmt.Sprintf("[bg:%d:err]", pid)
 			}
-			m.messages = append(m.messages, types.Message{
-				Role:    "system",
-				Content: prefix + " " + chunk,
-			})
-			m.refreshViewportToBottom()
+			m.backgroundPanel.AppendOutput(pid, prefix+" "+chunk+"\n")
+			if m.overlay.Current == overlays.OverlayBackground {
+				m.refreshViewport()
+			}
 		}
 
 	case "error":
@@ -790,6 +850,9 @@ func (m *Model) handleSSEEvent(msg sseEventMsg) (tea.Model, tea.Cmd) {
 		}
 		if d, ok := evt.Data["diff"].(string); ok {
 			diff = d
+		}
+		if m.statusBar.Yolo {
+			return m, m.approveFromAPI(m.activeSessionID, approvalID)
 		}
 		m.approval.ApprovalID = approvalID
 		m.approval.Operation = operation

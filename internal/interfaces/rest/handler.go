@@ -127,8 +127,18 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/config/status", h.GetConfigStatus)
 
+	mux.HandleFunc("POST /api/v1/global/config/onboard", h.OnboardLLM)
+	mux.HandleFunc("GET /api/v1/global/config/models", h.GetModels)
+	mux.HandleFunc("POST /api/v1/global/config/models", h.AddModel)
+	mux.HandleFunc("PUT /api/v1/global/config/models/{id}", h.UpdateModel)
+	mux.HandleFunc("DELETE /api/v1/global/config/models/{id}", h.DeleteModel)
+	mux.HandleFunc("PUT /api/v1/global/config/models/{id}/activate", h.ActivateModel)
+	mux.HandleFunc("POST /api/v1/global/config/models/{id}/test", h.TestModelConnection)
+
 	mux.HandleFunc("GET /api/v1/global/config", h.GetGlobalConfig)
 	mux.HandleFunc("PUT /api/v1/global/config", h.SetGlobalConfig)
+
+	mux.HandleFunc("GET /api/v1/update/check", h.CheckUpdate)
 }
 
 func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
@@ -145,8 +155,31 @@ func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetConfigStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]bool{
-		"llm_configured": h.llmConfigured,
+	cfg, err := config.LoadGlobal()
+	if err != nil || cfg == nil {
+		cfg = &config.Config{}
+	}
+
+	models := make([]map[string]interface{}, 0, len(cfg.LLM.Models))
+	for _, m := range cfg.LLM.Models {
+		maskedKey := maskAPIKey(m.APIKey)
+		models = append(models, map[string]interface{}{
+			"id":               m.ID,
+			"name":             m.Name,
+			"provider":         m.Provider,
+			"api_key":          maskedKey,
+			"base_url":         m.BaseURL,
+			"model":            m.Model,
+			"enable_reasoning": m.EnableReasoning,
+			"reasoning_effort": m.ReasoningEffort,
+			"max_tokens":       m.MaxTokens,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"llm_configured":  cfg.IsLLMConfigured(),
+		"active_model_id": cfg.LLM.ActiveModelID,
+		"models":          models,
 	})
 }
 
