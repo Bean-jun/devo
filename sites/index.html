@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="color-scheme" content="dark light">
+
+    <title data-i18n="meta.title">Devo - Conversation-Driven Autonomous Coding Agent | AI Writes Code for You</title>
+    <meta name="description" data-i18n="meta.description" content="Devo is a conversation-driven autonomous coding agent. Describe your needs in natural language, AI writes files, runs commands, reads errors, and fixes them autonomously until done. You just nod.">
+    <meta name="keywords" data-i18n="meta.keywords" content="AI coding,autonomous coding agent,AI code generator,AI programmer,coding assistant,AI dev tool,auto coding,Devo,LLM coding agent,AI software engineer">
+    <meta name="author" content="Devo Team">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="renderer" content="webkit">
+    <meta name="applicable-device" content="pc,mobile">
+    <meta name="format-detection" content="telephone=no,email=no,address=no">
+    <meta name="generator" content="Devo">
+
+    <link rel="canonical" href="https://bean-jun.github.io/devo/">
+    <link rel="alternate" hreflang="zh-CN" href="https://bean-jun.github.io/devo/?lang=zh-CN">
+    <link rel="alternate" hreflang="en-US" href="https://bean-jun.github.io/devo/?lang=en-US">
+    <link rel="alternate" hreflang="x-default" href="https://bean-jun.github.io/devo/">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Devo">
+    <meta property="og:url" content="https://bean-jun.github.io/devo">
+    <meta property="og:title" data-i18n="og.title" content="Devo - Conversation-Driven Autonomous Coding Agent">
+    <meta property="og:description" data-i18n="og.description" content="Describe your needs in natural language. AI writes code, runs commands, reads errors and fixes bugs autonomously. You only need to approve.">
+    <meta property="og:image" content="https://bean-jun.github.io/devo/og-image.svg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Devo - AI writes code for you">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:locale:alternate" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@devo_ai">
+    <meta name="twitter:creator" content="@devo_ai">
+    <meta name="twitter:url" content="https://bean-jun.github.io/devo">
+    <meta name="twitter:title" data-i18n="og.title" content="Devo - Conversation-Driven Autonomous Coding Agent">
+    <meta name="twitter:description" data-i18n="og.description" content="Describe your needs in natural language. AI writes code, runs commands, reads errors and fixes bugs autonomously.">
+    <meta name="twitter:image" content="https://bean-jun.github.io/devo/og-image.svg">
+    <meta name="twitter:image:alt" content="Devo - AI writes code for you">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta name="msapplication-TileColor" content="#0a0a0f">
+
+    <!-- DNS Prefetch -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Structured Data: SoftwareApplication -->
+    <script type="application/ld+json" id="ld-json-app">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Devo",
+        "alternateName": "Devo AI Coding Agent",
+        "description": "A conversation-driven autonomous coding agent. Describe requirements in natural language, and AI writes code, runs commands, and fixes bugs until it's done.",
+        "url": "https://bean-jun.github.io/devo",
+        "logo": "https://bean-jun.github.io/devo/logo.svg",
+        "applicationCategory": "DeveloperApplication",
+        "applicationSubCategory": "CodeGeneration, IntegratedDevelopmentEnvironment, SourceCodeEditor",
+        "operatingSystem": "Windows 10+, macOS 12+, Linux (Kernel 5.x+)",
+        "downloadUrl": "https://github.com/Bean-jun/devo/releases",
+        "softwareHelp": "https://github.com/Bean-jun/devo#readme",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "availability": "https://schema.org/InStock"
+        },
+        "softwareVersion": "0.1.1",
+        "license": "https://opensource.org/licenses/MIT",
+        "programmingLanguage": ["Go", "TypeScript", "Python"],
+        "featureList": "Autonomous coding loop, Five clients (Web/TUI/VSCode/Desktop/Mobile), Multi-workspace management, Approval gating & YOLO mode, Long-term memory & Skill evolution, Context compression, Message rollback, MCP extensions, Local-first privacy"
+    }
+    </script>
+
+    <!-- Structured Data: Organization -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Devo Team",
+        "url": "https://bean-jun.github.io/devo",
+        "logo": "https://bean-jun.github.io/devo/logo.svg",
+        "email": "17371438227@163.com",
+        "sameAs": [
+            "https://github.com/Bean-jun/devo"
+        ]
+    }
+    </script>
+
+    <!-- Structured Data: FAQ -->
+    <script type="application/ld+json" id="ld-json-faq">
+    {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "What's the difference between Devo and Cursor / GitHub Copilot?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Copilot/Cursor are code completion/inline editing tools that require step-by-step guidance. Devo is an autonomous coding agent: you describe a requirement, it plans, writes files, runs commands, reads errors, and loop-fixes — zero line-by-line involvement needed."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Will code and chat data be uploaded to the cloud?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Absolutely not. Devo's core runs 100% on your local dev machine, accessing your local filesystem and shell. All sessions, code, and memory data are stored in the ~/.devo/ directory."
+                }
+            }
+        ]
+    }
+    </script>
+
+    <!-- BreadcrumbList -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://bean-jun.github.io/devo/"
+            }
+        ]
+    }
+    </script>
+
+    <script src="js/i18n.js"></script>
+</head>
+<body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-gradients" aria-hidden="true">
+        <div class="bg-gradient bg-gradient-1"></div>
+        <div class="bg-gradient bg-gradient-2"></div>
+        <div class="bg-gradient bg-gradient-3"></div>
+    </div>
+
+    <header class="nav" id="nav">
+        <div class="nav-container">
+            <a href="#" class="nav-logo" aria-label="Devo Home">
+                <svg class="nav-logo-icon" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#6366f1"/>
+                            <stop offset="100%" style="stop-color:#06b6d4"/>
+                        </linearGradient>
+                    </defs>
+                    <rect width="32" height="32" rx="8" fill="url(#logoGrad)"/>
+                    <text x="16" y="22" text-anchor="middle" fill="white" font-size="18" font-weight="700" font-family="'SF Mono', Menlo, monospace">D</text>
+                </svg>
+                <span class="nav-logo-text">Devo</span>
+                <span class="nav-version">v0.1.1</span>
+            </a>
+            <nav class="nav-links" aria-label="Main navigation">
+                <a href="#features" data-i18n="nav.features">Features</a>
+                <a href="#modes" data-i18n="nav.modes">Clients</a>
+                <a href="#workflow" data-i18n="nav.workflow">Workflow</a>
+                <a href="#techstack" data-i18n="nav.techstack">Tech Stack</a>
+                <a href="#quickstart" data-i18n="nav.quickstart">Quick Start</a>
+                <a href="#faq" data-i18n="nav.faq">FAQ</a>
+            </nav>
+            <div class="nav-actions">
+                <button class="lang-toggle" id="langToggle" aria-label="Switch language" title="Switch language">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <span>中文</span>
+                </button>
+                <a href="https://github.com/Bean-jun/devo" target="_blank" rel="noopener" class="nav-github-btn" aria-label="View on GitHub">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                    </svg>
+                    <span data-i18n="nav.github">GitHub</span>
+                </a>
+                <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark theme">
+                    <span class="theme-toggle-track">
+                        <span class="theme-toggle-thumb">
+                            <svg class="theme-toggle-icon theme-toggle-icon-sun" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="8" cy="8" r="3"/>
+                                <line x1="8" y1="1" x2="8" y2="2.5"/><line x1="8" y1="13.5" x2="8" y2="15"/>
+                                <line x1="2.8" y1="2.8" x2="3.8" y2="3.8"/><line x1="12.2" y1="12.2" x2="13.2" y2="13.2"/>
+                                <line x1="1" y1="8" x2="2.5" y2="8"/><line x1="13.5" y1="8" x2="15" y2="8"/>
+                                <line x1="2.8" y1="13.2" x2="3.8" y2="12.2"/><line x1="12.2" y1="3.8" x2="13.2" y2="2.8"/>
+                            </svg>
+                            <svg class="theme-toggle-icon theme-toggle-icon-moon" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 8.5A6.5 6.5 0 1 1 7.5 2 5 5 0 0 0 14 8.5z"/>
+                            </svg>
+                        </span>
+                    </span>
+                </button>
+                <button class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+                    <span class="nav-toggle-bar"></span>
+                    <span class="nav-toggle-bar"></span>
+                    <span class="nav-toggle-bar"></span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- ========== Hero ========== -->
+        <section class="hero" id="hero">
+            <div class="hero-stats" aria-hidden="true">
+                <div class="hero-stat">
+                    <span class="hero-stat-num">5</span>
+                    <span class="hero-stat-label" data-i18n="hero.stats1">Client UIs</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="hero-stat-num">20+</span>
+                    <span class="hero-stat-label" data-i18n="hero.stats2">API Endpoints</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="hero-stat-num">100%</span>
+                    <span class="hero-stat-label" data-i18n="hero.stats3">Runs Locally</span>
+                </div>
+            </div>
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" class="hero-badge-icon">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span data-i18n="hero.badge">Open Source · MIT · Local-First</span>
+                </div>
+                <h1 class="hero-title">
+                    <span class="hero-title-line" data-i18n="hero.title1">You describe the task,</span>
+                    <span class="hero-title-line">
+                        <span class="hero-title-accent" data-i18n="hero.title2">AI delivers it</span>
+                        <span class="hero-title-dot" data-i18n="hero.title2Dot">.</span>
+                    </span>
+                </h1>
+                <p class="hero-subtitle" data-i18n="hero.subtitle">
+                    Talk to Devo like you'd talk to a junior engineer—<strong>in plain words</strong>.<br>
+                    It reads your codebase, writes files, runs commands, inspects errors and <span>keeps iterating until you say yes.</span>
+                </p>
+                <div class="hero-actions">
+                    <a href="#quickstart" class="btn btn-primary">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:8px">
+                            <polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/>
+                        </svg>
+                        <span data-i18n="hero.ctaPrimary">Get Started</span>
+                    </a>
+                    <a href="https://github.com/Bean-jun/devo" target="_blank" rel="noopener" class="btn btn-secondary">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="margin-right:8px">
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                        </svg>
+                        <span data-i18n="hero.ctaSecondary">View Source</span>
+                    </a>
+                </div>
+                <div class="hero-feature-list">
+                    <div class="hero-feature-item">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <span data-i18n="hero.hl1">Runs locally · your code never leaves</span>
+                    </div>
+                    <div class="hero-feature-item">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <span data-i18n="hero.hl2">5 clients share one Go core</span>
+                    </div>
+                    <div class="hero-feature-item">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <span data-i18n="hero.hl3">Approval-gated · safe by default</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-terminal" aria-hidden="true">
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-dot terminal-dot-red"></span>
+                        <span class="terminal-dot terminal-dot-yellow"></span>
+                        <span class="terminal-dot terminal-dot-green"></span>
+                        <span class="terminal-title" data-i18n="hero.terminalTitle">devo — ~/projects/my-app</span>
+                        <span class="terminal-status" data-i18n="hero.statusReady">● Ready</span>
+                    </div>
+                    <div class="terminal-body" id="terminalBody">
+                        <p class="terminal-line"><span class="terminal-prompt" data-i18n="hero.tlYou">❯ You:</span> <span data-i18n="hero.tl1">Help me write a script to scrape Juejin hot articles</span></p>
+                        <p class="terminal-line terminal-line-thinking">
+                            <span class="thinking-dot">●</span> <span data-i18n="hero.tl2">Analyzing project structure...</span>
+                        </p>
+                        <p class="terminal-line terminal-line-tool">
+                            <span class="tool-tag">search</span> <span data-i18n="hero.tl3">Found 5 related files</span>
+                        </p>
+                        <p class="terminal-line terminal-line-tool">
+                            <span class="tool-tag">read</span> <span data-i18n="hero.tl4">Reading requirements.txt ✓</span>
+                        </p>
+                        <p class="terminal-line terminal-line-approval">
+                            <span class="approval-tag" data-i18n="hero.tlApproval">Pending</span> <span data-i18n="hero.tl5">Will create juejin_scraper.py (48 lines)</span>
+                            <span class="approval-btns" data-i18n="hero.tlApprovalBtns">[ Approve ] [ Reject ]</span>
+                        </p>
+                        <p class="terminal-line terminal-line-dim" data-i18n="hero.tl6">✓ File written to juejin_scraper.py</p>
+                        <p class="terminal-line terminal-line-tool">
+                            <span class="tool-tag">exec</span> python juejin_scraper.py
+                        </p>
+                        <p class="terminal-line terminal-line-dim" data-i18n="hero.tl7">  ↳ Fetched 30 hot articles</p>
+                        <p class="terminal-line terminal-line-dim" data-i18n="hero.tl8">  ↳ Saved to output/juejin_hot.json</p>
+                        <p class="terminal-line terminal-line-success" data-i18n="hero.tl9">✓ Done! 30 articles saved, 128KB total. Export to Markdown?</p>
+                        <p class="terminal-line"><span class="terminal-prompt">❯</span> <span class="cursor-blink">|</span></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== Trust Bar ========== -->
+        <section class="trust-bar">
+            <div class="container">
+                <div class="trust-items">
+                    <div class="trust-item">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                        <div>
+                            <h5 data-i18n="trust.t1Title">Privacy First</h5>
+                            <p data-i18n="trust.t1Desc">All data stored locally. Your code and conversations never leave your machine.</p>
+                        </div>
+                    </div>
+                    <div class="trust-item">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                        </svg>
+                        <div>
+                            <h5 data-i18n="trust.t2Title">Open Source</h5>
+                            <p data-i18n="trust.t2Desc">MIT licensed. All code is fully auditable.</p>
+                        </div>
+                    </div>
+                    <div class="trust-item">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+                        </svg>
+                        <div>
+                            <h5 data-i18n="trust.t3Title">Cross-Platform</h5>
+                            <p data-i18n="trust.t3Desc">Windows · macOS · Linux — full platform support</p>
+                        </div>
+                    </div>
+                    <div class="trust-item">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        </svg>
+                        <div>
+                            <h5 data-i18n="trust.t4Title">Autonomous Loop</h5>
+                            <p data-i18n="trust.t4Desc">Write code → run tests → fix bugs — fully automated cycle</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== Features ========== -->
+        <section class="features" id="features">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-eyebrow" data-i18n="features.eyebrow">Core Features</span>
+                    <h2 class="section-title" data-i18n="features.title">Not code completion — it actually gets things done</h2>
+                    <p class="section-subtitle" data-i18n="features.subtitle">Devo understands your project context, plans and executes autonomously — like a junior engineer handling the whole task.</p>
+                </div>
+                <div class="features-grid">
+                    <article class="feature-card">
+                        <div class="feature-icon-wrap">
+                            <div class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 data-i18n="features.f1Title">Natural Language Driven</h3>
+                        <p data-i18n="features.f1Desc">No prompt engineering needed — just tell it what you need in plain words. AI makes autonomous decisions, not rigid templates.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon-wrap">
+                            <div class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 data-i18n="features.f2Title">Autonomous Iteration</h3>
+                        <p data-i18n="features.f2Desc">Writes code, runs it, reads errors, fixes them — repeats until it works, without manual intervention at every step.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon-wrap">
+                            <div class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 data-i18n="features.f3Title">Risk-Graded Approval</h3>
+                        <p data-i18n="features.f3Desc">High/Medium/Low/No risk levels. Shows diffs before file changes, command content before execution. You approve first. YOLO auto-mode available.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon-wrap">
+                            <div class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 data-i18n="features.f4Title">Real-Time Transparency</h3>
+                        <p data-i18n="features.f4Desc">SSE real-time push for what AI is doing and where it is. Thought process, tool calls, execution results — all visible at a glance.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon-wrap">
+                            <div class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 data-i18n="features.f5Title">Persistent Sessions</h3>
+                        <p data-i18n="features.f5Desc">Close it and pick up right where you left off tomorrow. Sessions can be archived as Markdown for permanent records.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon-wrap">
+                            <div class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 data-i18n="features.f6Title">Message Rollback</h3>
+                        <p data-i18n="features.f6Desc">Roll back to any historical message point. Rollback only removes chat history — files remain unaffected. Leave version management to Git.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon-wrap">
+                            <div class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 data-i18n="features.f7Title">Long-Term Memory + Skills</h3>
+                        <p data-i18n="features.f7Desc">Remembers your preferences and project experience. Distill Skill instruction sets from conversations — global + project levels, gets smarter over time.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon-wrap">
+                            <div class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 data-i18n="features.f8Title">MCP Extension Ecosystem</h3>
+                        <p data-i18n="features.f8Desc">Supports MCP protocol for dynamic external tool integration. One config, AI auto-discovers and calls — unlimited capability expansion.</p>
+                    </article>
+                    <article class="feature-card">
+                        <div class="feature-icon-wrap">
+                            <div class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 data-i18n="features.f9Title">Context Compression</h3>
+                        <p data-i18n="features.f9Desc">Long conversations auto-compressed into summaries, breaking past context window limits. Compression state is transparent and visible, continuous chat never interrupted.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== Modes ========== -->
+        <section class="modes" id="modes">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-eyebrow" data-i18n="modes.eyebrow">Multi-Platform</span>
+                    <h2 class="section-title" data-i18n="modes.title">One Core · Five Interfaces</h2>
+                    <p class="section-subtitle" data-i18n="modes.subtitle">One Go backend core, every platform you want is covered.</p>
+                </div>
+                <div class="modes-grid">
+                    <article class="mode-card">
+                        <div class="mode-card-accent"></div>
+                        <div class="mode-icon">
+                            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                                <line x1="8" y1="21" x2="16" y2="21"/>
+                                <line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                        </div>
+                        <h3 data-i18n="mode.browser">Browser</h3>
+                        <p class="mode-desc" data-i18n="mode.browserDesc">Full Control Center</p>
+                        <p class="mode-detail" data-i18n="mode.browserDetail">Three-panel layout, chat home + 7 function panels on the right, all capabilities at your fingertips</p>
+                        <code class="mode-cmd">devo --web</code>
+                    </article>
+                    <article class="mode-card">
+                        <div class="mode-card-accent"></div>
+                        <div class="mode-icon">
+                            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <polyline points="4 17 10 11 4 5"/>
+                                <line x1="12" y1="19" x2="20" y2="19"/>
+                            </svg>
+                        </div>
+                        <h3>TUI</h3>
+                        <p class="mode-desc" data-i18n="mode.tuiDesc">Terminal Native</p>
+                        <p class="mode-detail" data-i18n="mode.tuiDetail">Full keyboard navigation with Go Bubbletea, works over SSH, geek's first choice</p>
+                        <code class="mode-cmd">devo --tui</code>
+                    </article>
+                    <article class="mode-card">
+                        <div class="mode-card-accent"></div>
+                        <div class="mode-icon">
+                            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <polyline points="16 18 22 12 16 6"/>
+                                <polyline points="8 6 2 12 8 18"/>
+                            </svg>
+                        </div>
+                        <h3>VS Code</h3>
+                        <p class="mode-desc" data-i18n="mode.vscodeDesc">Editor Embedded</p>
+                        <p class="mode-detail" data-i18n="mode.vscodeDetail">Webview minimal chat window, never leave your editor, always on call</p>
+                        <code class="mode-cmd">Ctrl+Shift+P → Devo</code>
+                    </article>
+                    <article class="mode-card">
+                        <div class="mode-card-accent"></div>
+                        <div class="mode-icon">
+                            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="1" y="1" width="22" height="18" rx="2"/>
+                                <rect x="3" y="2" width="18" height="14" rx="1"/>
+                                <line x1="12" y1="18" x2="12" y2="22"/>
+                                <line x1="8" y1="22" x2="16" y2="22"/>
+                            </svg>
+                        </div>
+                        <h3 data-i18n="mode.desktop">Desktop</h3>
+                        <p class="mode-desc" data-i18n="mode.desktopDesc">Standalone Desktop App</p>
+                        <p class="mode-detail" data-i18n="mode.desktopDetail">Electron wrapped, welcome page picks directory, double-click to use, fullscreen immersive</p>
+                        <code class="mode-cmd">Double-click Devo</code>
+                    </article>
+                    <article class="mode-card">
+                        <div class="mode-card-accent"></div>
+                        <div class="mode-icon">
+                            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                                <line x1="12" y1="18" x2="12.01" y2="18"/>
+                            </svg>
+                        </div>
+                        <h3 data-i18n="mode.mobile">Mobile</h3>
+                        <p class="mode-desc" data-i18n="mode.mobileDesc">Mobile Touch Optimized</p>
+                        <p class="mode-detail" data-i18n="mode.mobileDetail">Touch gestures, command driven, right-side slide-in panel, no features cut</p>
+                        <code class="mode-cmd">Open in mobile browser</code>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== Interface / Mockup ========== -->
+        <section class="interface" id="interface">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-eyebrow" data-i18n="interface.eyebrow">Interface Preview</span>
+                    <h2 class="section-title" data-i18n="interface.title">Three-Panel Layout · Chat-Centric</h2>
+                    <p class="section-subtitle" data-i18n="interface.subtitle">Session list on the left, chat main area in the middle, tool panels on the right — all info at your fingertips.</p>
+                </div>
+                <div class="interface-mockup">
+                    <div class="mockup-window">
+                        <div class="mockup-titlebar">
+                            <span class="mockup-dot mockup-dot-red"></span>
+                            <span class="mockup-dot mockup-dot-yellow"></span>
+                            <span class="mockup-dot mockup-dot-green"></span>
+                            <span class="mockup-title">Devo — Web Control Center</span>
+                            <span class="mockup-toolbar">
+                                <span class="mockup-toolbar-btn">● Idle</span>
+                                <span class="mockup-toolbar-btn">Tokens 15.5K</span>
+                            </span>
+                        </div>
+                        <div class="mockup-body">
+                            <div class="mockup-sidebar-left">
+                                <div class="mockup-sidebar-section">
+                                    <div class="mockup-sidebar-title">Workspaces</div>
+                                    <div class="mockup-sidebar-item mockup-active">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                                        my-awesome-app
+                                    </div>
+                                    <div class="mockup-sidebar-item">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                                        web-frontend
+                                    </div>
+                                    <div class="mockup-sidebar-item">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                                        api-server
+                                    </div>
+                                </div>
+                                <div class="mockup-sidebar-divider"></div>
+                                <div class="mockup-sidebar-section">
+                                    <div class="mockup-sidebar-title">Sessions</div>
+                                    <div class="mockup-sidebar-item mockup-active">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                        Juejin Scraper Script
+                                    </div>
+                                    <div class="mockup-sidebar-item">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                        Fix Payment Bug
+                                    </div>
+                                    <div class="mockup-sidebar-item">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                        Add JWT Auth
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mockup-chat">
+                                <div class="mockup-chat-header">
+                                    <span class="mockup-chat-title">Juejin Scraper Script</span>
+                                    <div class="mockup-chat-actions">
+                                        <span class="mockup-chip">● Idle</span>
+                                    </div>
+                                </div>
+                                <div class="mockup-messages">
+                                    <div class="mockup-msg mockup-msg-user">
+                                        <div class="mockup-msg-content">Help me write a script to scrape Juejin hot articles, output as JSON</div>
+                                    </div>
+                                    <div class="mockup-msg mockup-msg-thinking">
+                                        <div class="mockup-msg-avatar">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                <rect x="3" y="11" width="18" height="10" rx="2"/>
+                                                <circle cx="12" cy="5" r="2"/>
+                                                <path d="M12 7v4"/>
+                                            </svg>
+                                        </div>
+                                        <div class="mockup-msg-content">
+                                            <div class="mockup-thinking-text">
+                                                <span class="thinking-spinner"></span>
+                                                Analyzing project structure and existing dependencies...
+                                            </div>
+                                            <div class="mockup-tool-call">
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                                                <span class="mockup-tool-name">list_files</span>
+                                                <span class="mockup-tool-status mockup-tool-done">✓ Done</span>
+                                            </div>
+                                            <div class="mockup-tool-call">
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                                <span class="mockup-tool-name">read_file</span>
+                                                <span class="mockup-tool-status mockup-tool-done">✓ requirements.txt</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mockup-msg mockup-msg-assistant">
+                                        <div class="mockup-msg-avatar">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                <rect x="3" y="11" width="18" height="10" rx="2"/>
+                                                <circle cx="12" cy="5" r="2"/>
+                                                <path d="M12 7v4"/>
+                                            </svg>
+                                        </div>
+                                        <div class="mockup-msg-content">
+                                            Generated <code class="mockup-code-inline">juejin_scraper.py</code>, please approve:
+                                            <div class="mockup-diff-preview">
+                                                <div class="mockup-diff-line mockup-diff-add">+ import requests</div>
+                                                <div class="mockup-diff-line mockup-diff-add">+ from bs4 import BeautifulSoup</div>
+                                                <div class="mockup-diff-line mockup-diff-add">+ import json, time</div>
+                                                <div class="mockup-diff-line mockup-diff-add">+</div>
+                                                <div class="mockup-diff-line mockup-diff-add">+ def fetch_juejin_hot(output_path):</div>
+                                                <div class="mockup-diff-line mockup-diff-add">+ &nbsp;&nbsp;&nbsp;&nbsp;url = "https://api.juejin.cn/..."</div>
+                                                <div class="mockup-diff-line mockup-diff-add">+ &nbsp;&nbsp;&nbsp;&nbsp;...</div>
+                                            </div>
+                                            <div class="mockup-approval-btns">
+                                                <span class="mockup-btn mockup-btn-approve">✓ Approve</span>
+                                                <span class="mockup-btn mockup-btn-reject">✗ Reject</span>
+                                                <span class="mockup-btn mockup-btn-edit">Edit</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mockup-msg mockup-msg-assistant">
+                                        <div class="mockup-msg-avatar">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                <rect x="3" y="11" width="18" height="10" rx="2"/>
+                                                <circle cx="12" cy="5" r="2"/>
+                                                <path d="M12 7v4"/>
+                                            </svg>
+                                        </div>
+                                        <div class="mockup-msg-content">
+                                            <span class="mockup-success-badge">✓ File written</span>
+                                            <span class="mockup-success-badge mockup-success-badge-secondary">✓ Script executed successfully</span>
+                                            <div class="mockup-tool-call mockup-tool-call-highlight">
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                                                <span class="mockup-tool-name">python juejin_scraper.py</span>
+                                                <span class="mockup-tool-status mockup-tool-done">✓ 30 articles · 128KB</span>
+                                            </div>
+                                            <div class="mockup-final-text">Done! 30 hot articles saved to <code class="mockup-code-inline">output/juejin_hot.json</code>. Export to Markdown or CSV?</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mockup-input">
+                                    <div class="mockup-input-inner">
+                                        <span class="mockup-input-placeholder">Type something, or press / for command palette...</span>
+                                        <div class="mockup-input-tools">
+                                            <span class="mockup-input-tool" title="Add image">🖼</span>
+                                            <span class="mockup-input-tool" title="Attach file">📎</span>
+                                            <span class="mockup-input-send-btn">➤</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mockup-sidebar-right">
+                                <div class="mockup-panel-tabs">
+                                    <span class="mockup-panel-tab">Files</span>
+                                    <span class="mockup-panel-tab mockup-panel-tab-active">Skills</span>
+                                    <span class="mockup-panel-tab">Mem</span>
+                                    <span class="mockup-panel-tab">Dash</span>
+                                    <span class="mockup-panel-tab">Set</span>
+                                    <span class="mockup-panel-tab">Term</span>
+                                    <span class="mockup-panel-tab">MCP</span>
+                                    <span class="mockup-panel-tab">Bg</span>
+                                </div>
+                                <div class="mockup-panel-content">
+                                    <div class="mockup-panel-section-title">Active Skills</div>
+                                    <div class="mockup-skill-item">
+                                        <span class="mockup-skill-name">python-web-scraper</span>
+                                        <span class="mockup-skill-badge mockup-skill-active">Active</span>
+                                    </div>
+                                    <div class="mockup-panel-section-title">Available Skills</div>
+                                    <div class="mockup-skill-item">
+                                        <span class="mockup-skill-name">react-component-gen</span>
+                                        <span class="mockup-skill-badge">Available</span>
+                                    </div>
+                                    <div class="mockup-skill-item">
+                                        <span class="mockup-skill-name">api-test-suite</span>
+                                        <span class="mockup-skill-badge">Available</span>
+                                    </div>
+                                    <div class="mockup-skill-item">
+                                        <span class="mockup-skill-name">db-migration-helper</span>
+                                        <span class="mockup-skill-badge">Available</span>
+                                    </div>
+                                    <div class="mockup-skill-item">
+                                        <span class="mockup-skill-name">sql-query-builder</span>
+                                        <span class="mockup-skill-badge">Available</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="interface-features">
+                    <div class="interface-feature">
+                        <div class="interface-feature-icon">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        </div>
+                        <h4 data-i18n="interface.i1Title">Session List</h4>
+                        <p data-i18n="interface.i1Desc">History sessions at a glance, with search, archive, favorite, and workspace switching.</p>
+                    </div>
+                    <div class="interface-feature">
+                        <div class="interface-feature-icon">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </div>
+                        <h4 data-i18n="interface.i2Title">Chat Main Area</h4>
+                        <p data-i18n="interface.i2Desc">Chat + thinking process + tool calls + diff previews + approval buttons — all here.</p>
+                    </div>
+                    <div class="interface-feature">
+                        <div class="interface-feature-icon">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                        </div>
+                        <h4 data-i18n="interface.i3Title">Tool Panels</h4>
+                        <p data-i18n="interface.i3Desc">Files / Skills / Memory / Settings / Terminal / MCP / Process — switch anytime.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== Workflow ========== -->
+        <section class="workflow" id="workflow">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-eyebrow" data-i18n="workflow.eyebrow">Workflow</span>
+                    <h2 class="section-title" data-i18n="workflow.title">From One Sentence to Delivery</h2>
+                    <p class="section-subtitle" data-i18n="workflow.subtitle">Just describe the requirement — Devo handles the entire workflow end to end.</p>
+                </div>
+                <div class="workflow-steps">
+                    <div class="workflow-step">
+                        <div class="workflow-step-num">1</div>
+                        <div class="workflow-step-connector"></div>
+                        <div class="workflow-step-card">
+                            <div class="workflow-step-icon">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            </div>
+                            <h4 data-i18n="workflow.w1Title">Describe in One Sentence</h4>
+                            <p data-i18n="workflow.w1Desc">Just explain in natural language — no structured prompt needed, no need to think about which tool to call.</p>
+                            <div class="workflow-example">"Help me write a user registration API with parameter validation + password hashing"</div>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="workflow-step-num">2</div>
+                        <div class="workflow-step-connector"></div>
+                        <div class="workflow-step-card">
+                            <div class="workflow-step-icon">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            </div>
+                            <h4 data-i18n="workflow.w2Title">AI Autonomous Planning</h4>
+                            <p data-i18n="workflow.w2Desc">Reads code, checks files, lists steps, picks tools — you can see the reasoning behind every choice.</p>
+                            <div class="workflow-example">Read directory → Read related files → Output execution plan</div>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="workflow-step-num">3</div>
+                        <div class="workflow-step-connector"></div>
+                        <div class="workflow-step-card">
+                            <div class="workflow-step-icon">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            </div>
+                            <h4 data-i18n="workflow.w3Title">Approve Then Execute</h4>
+                            <p data-i18n="workflow.w3Desc">All file writes and shell ops have diff previews and risk grading. Nothing happens until you approve.</p>
+                            <div class="workflow-example">Diff preview → [Approve] [Reject] [Edit then Approve]</div>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="workflow-step-num">4</div>
+                        <div class="workflow-step-card">
+                            <div class="workflow-step-icon">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                            </div>
+                            <h4 data-i18n="workflow.w4Title">Autonomous Iteration</h4>
+                            <p data-i18n="workflow.w4Desc">Runs into bugs, reads logs, fixes them, loops verification until delivery.</p>
+                            <div class="workflow-example">Run tests → Fix bugs → Run again → All pass ✓</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== Tech Stack ========== -->
+        <section class="techstack" id="techstack">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-eyebrow" data-i18n="tech.eyebrow">Tech Stack</span>
+                    <h2 class="section-title" data-i18n="tech.title">Full-Stack Engineering, Layer by Layer</h2>
+                    <p class="section-subtitle" data-i18n="tech.subtitle">Every layer picks mature, stable, well-supported solutions — no betting on bleeding-edge tech.</p>
+                </div>
+                <div class="techstack-grid">
+                    <div class="tech-layer">
+                        <div class="tech-layer-header">
+                            <div class="tech-layer-dot" style="background: linear-gradient(135deg,#6366f1,#8b5cf6)"></div>
+                            <h3>Frontend Layer</h3>
+                        </div>
+                        <div class="tech-items">
+                            <span class="tech-item"><span class="tech-dot" style="background:#42b883"></span>Vue 3</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#3178c6"></span>TypeScript</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#646cff"></span>Vite</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#f0db4f"></span>Pinia</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#4fc08d"></span>Vue Router</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#a020f0"></span>Phosphor Icons</span>
+                        </div>
+                    </div>
+                    <div class="tech-layer">
+                        <div class="tech-layer-header">
+                            <div class="tech-layer-dot" style="background: linear-gradient(135deg,#06b6d4,#0891b2)"></div>
+                            <h3 data-i18n="tech.t2Title">Backend Layer</h3>
+                        </div>
+                        <div class="tech-items">
+                            <span class="tech-item"><span class="tech-dot" style="background:#00add8"></span>Go 1.25+</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#f59e0b"></span>Cobra</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#ef4444"></span>Bubble Tea</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#10b981"></span>GORM</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#6366f1"></span>SQLite</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#8b5cf6"></span>SSE</span>
+                        </div>
+                    </div>
+                    <div class="tech-layer">
+                        <div class="tech-layer-header">
+                            <div class="tech-layer-dot" style="background: linear-gradient(135deg,#f59e0b,#d97706)"></div>
+                            <h3 data-i18n="tech.t3Title">Build &amp; Test</h3>
+                        </div>
+                        <div class="tech-items">
+                            <span class="tech-item"><span class="tech-dot" style="background:#47848f"></span>Electron</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#007acc"></span>VS Code API</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#6e9f13"></span>Vitest</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#2e7ad3"></span>Playwright</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#3776ab"></span>Python Sandbox</span>
+                            <span class="tech-item"><span class="tech-dot" style="background:#2088ff"></span>GitHub Actions</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== Architecture ========== -->
+        <section class="architecture" id="architecture">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-eyebrow" data-i18n="arch.eyebrow">System Architecture</span>
+                    <h2 class="section-title" data-i18n="arch.title">Five Layers · Five Endpoints Shared</h2>
+                    <p class="section-subtitle" data-i18n="arch.subtitle">Layered decoupling, clear interfaces, each layer can be independently replaced or extended.</p>
+                </div>
+                <div class="arch-diagram">
+                    <div class="arch-row arch-ui">
+                        <div class="arch-label-wrap">
+                            <div class="arch-layer-num">05</div>
+                            <div class="arch-label" data-i18n="arch.l5Label">UI Layer</div>
+                        </div>
+                        <div class="arch-items">
+                            <span class="arch-item">Browser</span>
+                            <span class="arch-item">TUI</span>
+                            <span class="arch-item">VS Code</span>
+                            <span class="arch-item">Desktop</span>
+                            <span class="arch-item">Mobile</span>
+                        </div>
+                    </div>
+                    <div class="arch-arrow-row"><span>HTTP REST + SSE Event Stream</span></div>
+                    <div class="arch-row arch-api">
+                        <div class="arch-label-wrap">
+                            <div class="arch-layer-num">04</div>
+                            <div class="arch-label" data-i18n="arch.l2Label">API Layer</div>
+                        </div>
+                        <div class="arch-items">
+                            <span class="arch-item">REST API (20+)</span>
+                            <span class="arch-item">SSE Real-Time Push</span>
+                            <span class="arch-item">Approval Bridge Callback</span>
+                        </div>
+                    </div>
+                    <div class="arch-arrow-row"><span>Go Internal Interface</span></div>
+                    <div class="arch-row arch-core">
+                        <div class="arch-label-wrap">
+                            <div class="arch-layer-num">03</div>
+                            <div class="arch-label">Core Layer</div>
+                        </div>
+                        <div class="arch-items">
+                            <span class="arch-item">Agent Loop</span>
+                            <span class="arch-item">Approval Gate</span>
+                            <span class="arch-item">Context Compression</span>
+                            <span class="arch-item">Message Rollback</span>
+                            <span class="arch-item">Long-Term Memory</span>
+                            <span class="arch-item">Skills</span>
+                            <span class="arch-item">Crash Recovery</span>
+                        </div>
+                    </div>
+                    <div class="arch-arrow-row"><span>Go Internal Interface</span></div>
+                    <div class="arch-row arch-task">
+                        <div class="arch-label-wrap">
+                            <div class="arch-layer-num">02</div>
+                            <div class="arch-label">Task Layer</div>
+                        </div>
+                        <div class="arch-items">
+                            <span class="arch-item">Tool Set (10+)</span>
+                            <span class="arch-item">LLM Client</span>
+                            <span class="arch-item">MCP Protocol</span>
+                            <span class="arch-item">Python Sandbox</span>
+                            <span class="arch-item">Image Compression</span>
+                            <span class="arch-item">Path Safety</span>
+                        </div>
+                    </div>
+                    <div class="arch-arrow-row"><span>GORM ORM</span></div>
+                    <div class="arch-row arch-storage">
+                        <div class="arch-label-wrap">
+                            <div class="arch-layer-num">01</div>
+                            <div class="arch-label" data-i18n="arch.l1Label">Storage Layer</div>
+                        </div>
+                        <div class="arch-items">
+                            <span class="arch-item">SQLite Persistence</span>
+                            <span class="arch-item">Session Archive</span>
+                            <span class="arch-item">Rollback Snapshots</span>
+                            <span class="arch-item">Usage Stats</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="architecture-highlights">
+                    <div class="architecture-highlight">
+                        <h4 data-i18n="arch.h1Title">Local-First · Privacy Controlled</h4>
+                        <p data-i18n="arch.h1Desc">Core runs on your local dev machine, direct file read/write; cloud only does optional sync, no source code upload.</p>
+                    </div>
+                    <div class="architecture-highlight">
+                        <h4 data-i18n="arch.h2Title">Cross-Platform Native Binary</h4>
+                        <p data-i18n="arch.h2Desc">Go cross-compiles Linux / macOS / Windows native executables, millisecond cold start.</p>
+                    </div>
+                    <div class="architecture-highlight">
+                        <h4 data-i18n="arch.h3Title">Layered Decoupling · Pluggable</h4>
+                        <p data-i18n="arch.h3Desc">Each layer is a Go Interface — LLM Provider, storage, tool sets can all be independently replaced or extended.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== Quick Start ========== -->
+        <section class="quickstart" id="quickstart">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-eyebrow" data-i18n="quickstart.eyebrow">Quick Start</span>
+                    <h2 class="section-title" data-i18n="quickstart.title">Up and Running in 3 Minutes</h2>
+                    <p class="section-subtitle" data-i18n="quickstart.subtitle">Download, configure, and start — that's it.</p>
+                </div>
+                <div class="quickstart-steps">
+                    <div class="quickstart-step">
+                        <div class="quickstart-step-num">1</div>
+                        <div class="quickstart-step-body">
+                            <h4 data-i18n="qs.step1Title">Download</h4>
+                            <p data-i18n="qs.step1Desc">Download the latest version from GitHub Releases</p>
+                            <div class="quickstart-platforms">
+                                <a href="https://github.com/Bean-jun/devo/releases" target="_blank" rel="noopener" class="platform-badge platform-badge-clickable">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                    Windows
+                                </a>
+                                <a href="https://github.com/Bean-jun/devo/releases" target="_blank" rel="noopener" class="platform-badge platform-badge-clickable">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83zM13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                                    macOS
+                                </a>
+                                <a href="https://github.com/Bean-jun/devo/releases" target="_blank" rel="noopener" class="platform-badge platform-badge-clickable">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                                    Linux
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="quickstart-step">
+                        <div class="quickstart-step-num">2</div>
+                        <div class="quickstart-step-body">
+                            <h4 data-i18n="qs.step2Title">Configure LLM</h4>
+                            <p data-i18n="qs.step2Desc">On first launch, the Web UI will automatically pop up a configuration wizard. You can also use the CLI:</p>
+                            <div class="quickstart-code">
+                                <pre><code>devo config onboard</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="quickstart-step">
+                        <div class="quickstart-step-num">3</div>
+                        <div class="quickstart-step-body">
+                            <h4 data-i18n="qs.step3Title">Launch</h4>
+                            <p data-i18n="qs.step3Desc">One command to start the Web Control Center, browser opens automatically:</p>
+                            <div class="quickstart-code">
+                                <pre><code>devo -web -port 8080 -workspace ~/my-project</code></pre>
+                            </div>
+                            <p class="quickstart-hint" data-i18n="qs.hint">Or use <code>devo --tui</code> for terminal mode, or double-click the desktop app.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="quickstart-more">
+                    <p data-i18n="qs.more">Want to build from source or run in development mode? Check out the <a href="https://github.com/Bean-jun/devo" target="_blank" rel="noopener">GitHub repository</a> for more details.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== FAQ ========== -->
+        <section class="faq" id="faq">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-eyebrow" data-i18n="faq.eyebrow">FAQ</span>
+                    <h2 class="section-title" data-i18n="faq.title">Questions You Might Have</h2>
+                    <p class="section-subtitle" data-i18n="faq.subtitle">Here are answers to the most common questions about Devo.</p>
+                </div>
+                <div class="faq-list">
+                    <details class="faq-item">
+                        <summary class="faq-question">
+                            <span data-i18n="faq.q1">What's the difference between Devo and Cursor / GitHub Copilot?</span>
+                            <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                        </summary>
+                        <div class="faq-answer">
+                            <p data-i18n="faq.a1">Copilot/Cursor are <strong>code completion/inline editing</strong> tools that require you to guide step by step. Devo is an <strong>autonomous coding agent</strong>: you say one requirement, it plans, writes files, runs commands, reads errors, and loop-fixes — the entire process needs zero line-by-line involvement from you. Simply put: Copilot is a co-pilot, Devo is the driver who drives for you (you hold the brake).</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">
+                            <span data-i18n="faq.q2">Will code and chat data be uploaded to the cloud?</span>
+                            <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                        </summary>
+                        <div class="faq-answer">
+                            <p data-i18n="faq.a2"><strong>Absolutely not</strong>. Devo's core runs 100% on your local dev machine, directly accessing your local filesystem and shell. All sessions, code, and memory data are stored in the <code>~/.devo/</code> directory. The only external communication is your own configured LLM API calls (sending prompts, receiving completions), and optional team services (only stats reporting, zero content upload).</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">
+                            <span>Which LLMs are supported?</span>
+                            <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                        </summary>
+                        <div class="faq-answer">
+                            <p>Any API compatible with the <strong>OpenAI Chat Completions format</strong> works. Including but not limited to: GPT-4o / GPT-4o-mini, Claude series (via compatible gateway), DeepSeek, Qwen series, GLM series, Ollama local models, etc. You can configure multiple models and switch anytime.</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">
+                            <span data-i18n="faq.q4">What is the approval gate? Will it be cumbersome?</span>
+                            <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                        </summary>
+                        <div class="faq-answer">
+                            <p data-i18n="faq.a4">Devo categorizes operations into <strong>High/Medium/Low/No</strong> risk levels. By default, file writes and command execution require your approval (with diff previews). Once you're comfortable, you can:</p>
+                            <ul>
+                                <li data-i18n="faq.a4i1">Relax approvals by risk level (e.g., auto-approve low risk)</li>
+                                <li data-i18n="faq.a4i2">Auto-approve via directory whitelist</li>
+                                <li data-i18n="faq.a4i3">Enable YOLO mode for full automation (<strong>recommended when Git state is committed</strong>)</li>
+                            </ul>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">
+                            <span data-i18n="faq.q5">Is it free? Can I use it commercially?</span>
+                            <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                        </summary>
+                        <div class="faq-answer">
+                            <p data-i18n="faq.a5">Devo uses the <strong>MIT open-source license</strong>, completely free to use, including for commercial purposes. You only need to cover your own LLM API costs. In the future there will be optional paid team services (instance management, auditing, quotas, etc.), but the local core will remain permanently open-source and free.</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">
+                            <span data-i18n="faq.q6">What is MCP extension? How to integrate it?</span>
+                            <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                        </summary>
+                        <div class="faq-answer">
+                            <p data-i18n="faq.a6">MCP (Model Context Protocol) is an open protocol that enables AI to dynamically discover and call external tools. Devo natively supports MCP — just configure an MCP Server startup command in the settings panel, and AI can automatically call all tools it exposes. Integrate Feishu docs, databases, internal API gateways, etc. — unlimited capability expansion.</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== Contact / CTA ========== -->
+        <section class="contact" id="contact">
+            <div class="container">
+                <div class="contact-card">
+                    <div class="contact-icon">
+                        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <h2 class="contact-title" data-i18n="contact.title">Ready to Evolve Your Coding?</h2>
+                    <p class="contact-subtitle" data-i18n="contact.subtitle">Devo is still in rapid iteration. Star / Issue / PR — let's make it better together.</p>
+                    <div class="contact-actions">
+                        <a href="#quickstart" class="btn btn-primary btn-large">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:8px"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+                            <span data-i18n="contact.cta1">Get Started</span>
+                        </a>
+                        <a href="https://github.com/Bean-jun/devo" target="_blank" rel="noopener" class="btn btn-secondary btn-large">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="margin-right:8px"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                            <span data-i18n="contact.cta2">GitHub Repo</span>
+                        </a>
+                    </div>
+                    <div class="contact-links">
+                        <a href="mailto:17371438227@163.com">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                            17371438227@163.com
+                        </a>
+                        <span class="contact-links-sep">·</span>
+                        <span data-i18n="contact.license">MIT License</span>
+                        <span class="contact-links-sep">·</span>
+                        <span>v0.1.1</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="footer-logo">
+                        <svg class="footer-logo-icon" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="logoGradFooter" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#6366f1"/>
+                                    <stop offset="100%" style="stop-color:#06b6d4"/>
+                                </linearGradient>
+                            </defs>
+                            <rect width="32" height="32" rx="8" fill="url(#logoGradFooter)"/>
+                            <text x="16" y="22" text-anchor="middle" fill="white" font-size="18" font-weight="700" font-family="'SF Mono', Menlo, monospace">D</text>
+                        </svg>
+                        <span>Devo</span>
+                        <span class="footer-version">v0.1.1</span>
+                    </div>
+                    <p data-i18n="footer.brandDesc">Conversation-driven autonomous coding agent.<br>Developer + Evolution = Devo.</p>
+                </div>
+                <div class="footer-links">
+                    <h4 data-i18n="footer.productTitle">Product</h4>
+                    <ul>
+                        <li><a href="#features" data-i18n="footer.product1">Core Features</a></li>
+                        <li><a href="#modes" data-i18n="footer.product2">Clients</a></li>
+                        <li><a href="#workflow" data-i18n="footer.product3">Workflow</a></li>
+                        <li><a href="#techstack" data-i18n="footer.product4">Tech Stack</a></li>
+                        <li><a href="#architecture" data-i18n="footer.product5">Architecture</a></li>
+                        <li><a href="#faq" data-i18n="footer.product6">FAQ</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links">
+                    <h4 data-i18n="footer.resourceTitle">Resources</h4>
+                    <ul>
+                        <li><a href="#quickstart" data-i18n="footer.resource1">Quick Start</a></li>
+                        <li><a href="https://github.com/Bean-jun/devo" target="_blank" rel="noopener" data-i18n="footer.resource2">GitHub Repo</a></li>
+                        <li><a href="https://github.com/Bean-jun/devo/releases" target="_blank" rel="noopener">Releases</a></li>
+                        <li><a href="https://github.com/Bean-jun/devo/issues" target="_blank" rel="noopener">Issues</a></li>
+                        <li><a href="https://github.com/Bean-jun/devo/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links">
+                    <h4 data-i18n="footer.contactTitle">Contact</h4>
+                    <ul>
+                        <li><a href="mailto:17371438227@163.com" data-i18n="footer.contact1">📧 Email</a></li>
+                        <li><a href="https://github.com/Bean-jun/devo" target="_blank" rel="noopener">🐙 GitHub</a></li>
+                        <li><span class="footer-tech" data-i18n="footer.license">MIT License</span></li>
+                        <li><span class="footer-tech">© 2026 Devo Team</span></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p data-i18n="footer.credit">Made with ❤️ by Devo Team · AI writing AI · <a href="https://github.com/Bean-jun/devo" target="_blank" rel="noopener">Source Code</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/main.js" defer></script>
+</body>
+</html>
