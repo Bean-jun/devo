@@ -59,7 +59,6 @@ func (m *parallelToolMockClient) CompleteStream(ctx context.Context, messages []
 }
 func (m *parallelToolMockClient) TestConnection(ctx context.Context) error { return nil }
 
-
 func TestParallelToolExecution_Basic(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("parallel test"), 0644)
@@ -70,7 +69,7 @@ func TestParallelToolExecution_Basic(t *testing.T) {
 	toolRegistry.Register(&tools.ListFilesTool{})
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, &parallelToolMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &parallelToolMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-parallel")
 	sess, _ := store.Get("sess-parallel")
@@ -138,7 +137,7 @@ func TestParallelToolExecution_SerialFallback(t *testing.T) {
 	toolRegistry.Register(&tools.ListFilesTool{})
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, &parallelToolMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &parallelToolMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-serial")
 	sess, _ := store.Get("sess-serial")
@@ -181,6 +180,9 @@ type approvalParallelMockClient struct {
 
 func (m *approvalParallelMockClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
 	m.callCount++
+	if m.callCount > 1 {
+		return &llmclient.CompleteResult{Text: "Operation rejected by user."}, nil
+	}
 	return &llmclient.CompleteResult{
 		ToolCalls: []session.ToolCall{
 			{
@@ -208,7 +210,6 @@ func (m *approvalParallelMockClient) CompleteStream(ctx context.Context, message
 }
 func (m *approvalParallelMockClient) TestConnection(ctx context.Context) error { return nil }
 
-
 func TestParallelToolExecution_WithApproval(t *testing.T) {
 	store := session.NewInMemoryStore()
 
@@ -216,7 +217,7 @@ func TestParallelToolExecution_WithApproval(t *testing.T) {
 	toolRegistry.Register(&tools.ListFilesTool{})
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, &approvalParallelMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &approvalParallelMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-approval-parallel")
 	sess, _ := store.Get("sess-approval-parallel")
@@ -269,7 +270,7 @@ func TestParallelToolExecution_ToolCallLimit(t *testing.T) {
 	toolRegistry.Register(&tools.ListFilesTool{})
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, &parallelToolMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &parallelToolMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-parallel-limit")
 	sess, _ := store.Get("sess-parallel-limit")
@@ -313,7 +314,7 @@ func TestParallelToolExecution_FileChange(t *testing.T) {
 	toolRegistry.Register(&tools.ListFilesTool{})
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, &parallelToolMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &parallelToolMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-file-change")
 	sess, _ := store.Get("sess-file-change")
@@ -338,7 +339,7 @@ func TestParallelToolExecution_SingleTool(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ListFilesTool{})
 
-	loop := NewWithTools(store, &parallelToolMockClient{}, toolRegistry)
+	loop := newTestLoopWithTools(t, store, &parallelToolMockClient{}, toolRegistry)
 
 	createTestSession(store, "sess-single-parallel")
 	sess, _ := store.Get("sess-single-parallel")

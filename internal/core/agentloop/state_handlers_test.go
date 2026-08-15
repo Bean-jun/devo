@@ -234,7 +234,7 @@ func TestToolExecutingHandler_SingleTool(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ListFilesTool{})
 
-	loop := NewWithTools(store, llmclient.NewMockClient(), toolRegistry)
+	loop := newTestLoopWithTools(t, store, llmclient.NewMockClient(), toolRegistry)
 	lc := newTestLoopContext("sess-tool-single", store)
 
 	sess, _ := store.Get("sess-tool-single")
@@ -265,7 +265,7 @@ func TestToolExecutingHandler_UnknownTool(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := NewWithTools(store, llmclient.NewMockClient(), toolRegistry)
+	loop := newTestLoopWithTools(t, store, llmclient.NewMockClient(), toolRegistry)
 	lc := newTestLoopContext("sess-unknown-tool", store)
 
 	lc.LLMResult = &llmclient.CompleteResult{
@@ -310,7 +310,7 @@ func TestToolExecutingHandler_CancelDuringExecution(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
-	loop := NewWithTools(store, llmclient.NewMockClient(), toolRegistry)
+	loop := newTestLoopWithTools(t, store, llmclient.NewMockClient(), toolRegistry)
 	lc := newTestLoopContext("sess-cancel-tool", store)
 
 	sendCancelSignal(lc)
@@ -339,7 +339,7 @@ func TestToolExecutingHandler_ToolCallLimitReached(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ListFilesTool{})
 
-	loop := NewWithTools(store, llmclient.NewMockClient(), toolRegistry)
+	loop := newTestLoopWithTools(t, store, llmclient.NewMockClient(), toolRegistry)
 	lc := newTestLoopContext("sess-limit", store)
 
 	sess, _ := store.Get("sess-limit")
@@ -494,7 +494,6 @@ func (m *toolCallMockClient) CompleteStream(ctx context.Context, messages []sess
 }
 func (m *toolCallMockClient) TestConnection(ctx context.Context) error { return nil }
 
-
 type errorMockClient struct{}
 
 func (m *errorMockClient) Complete(ctx context.Context, messages []session.Message, systemPrompt string) (*llmclient.CompleteResult, error) {
@@ -506,7 +505,6 @@ func (m *errorMockClient) CompleteStream(ctx context.Context, messages []session
 	return errors.New("stream error")
 }
 func (m *errorMockClient) TestConnection(ctx context.Context) error { return nil }
-
 
 func TestPrepareHandler_AssemblesPrompt(t *testing.T) {
 	loop, store := setupTestLoop()

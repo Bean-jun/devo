@@ -49,6 +49,7 @@ type Loop struct {
 	bgManager        *tools.BackgroundProcessManager
 	stateMachine     *StateMachine
 	activeLoops      sync.Map
+	loopWG           sync.WaitGroup
 	mu               sync.Mutex
 }
 
@@ -214,7 +215,9 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID string, msg session
 	}
 
 	l.activeLoops.Store(sessionID, lc)
+	l.loopWG.Add(1)
 	go func() {
+		defer l.loopWG.Done()
 		defer l.activeLoops.Delete(sessionID)
 		defer loopCancel()
 		l.stateMachine.Run(loopCtx, lc)
@@ -233,6 +236,10 @@ func (l *Loop) ProcessMessage(ctx context.Context, sessionID string, msg session
 	}()
 
 	return nil
+}
+
+func (l *Loop) WaitForCompletion() {
+	l.loopWG.Wait()
 }
 
 func (l *Loop) GetArchiveContent(sessionID string) ([]byte, error) {
