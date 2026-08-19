@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"devo/internal/config"
 	"devo/internal/core/approval"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/tools"
@@ -75,17 +74,14 @@ func (l *Loop) resolveEffectivePolicy(sess *session.Session, opType approval.Ope
 		sessionPolicy[approval.OperationType(k)] = approval.PolicyLevel(v)
 	}
 
-	var projectPolicy map[approval.OperationType]approval.PolicyLevel
-	if sess.WorkingDirectory != "" {
-		if cfg, err := config.LoadProjectConfig(sess.WorkingDirectory); err == nil && cfg != nil && cfg.ApprovalPolicy != nil {
-			projectPolicy = make(map[approval.OperationType]approval.PolicyLevel)
-			for k, v := range cfg.ApprovalPolicy {
-				projectPolicy[approval.OperationType(k)] = approval.PolicyLevel(v)
-			}
+	cfgPolicy := make(map[approval.OperationType]approval.PolicyLevel)
+	if l.cfg.ApprovalPolicy != nil {
+		for k, v := range l.cfg.ApprovalPolicy {
+			cfgPolicy[approval.OperationType(k)] = approval.PolicyLevel(v)
 		}
 	}
 
-	return l.approvalManager.ResolveEffectivePolicy(sessionPolicy, projectPolicy, opType)
+	return l.approvalManager.ResolveEffectivePolicy(sessionPolicy, cfgPolicy, opType)
 }
 
 func (l *Loop) determineOperationType(tool tools.Tool, workingDir string, params map[string]interface{}) string {

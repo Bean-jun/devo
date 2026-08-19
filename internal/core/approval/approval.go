@@ -39,7 +39,6 @@ type PolicyLevel string
 const (
 	PolicyAlwaysAsk    PolicyLevel = "always_ask"
 	PolicySessionTrust PolicyLevel = "session_trust"
-	PolicyFullTrust    PolicyLevel = "full_trust"
 	PolicyAutoApprove  PolicyLevel = "auto_approve"
 )
 
@@ -79,7 +78,7 @@ func IsValidOperationType(opType string) bool {
 
 func IsValidPolicyLevel(level string) bool {
 	switch PolicyLevel(level) {
-	case PolicyAlwaysAsk, PolicySessionTrust, PolicyFullTrust, PolicyAutoApprove:
+	case PolicyAlwaysAsk, PolicySessionTrust, PolicyAutoApprove:
 		return true
 	}
 	return false
@@ -107,52 +106,15 @@ type ApprovalRequest struct {
 	Source        ApprovalSource `json:"source,omitempty"`
 }
 
-type UserPolicyStore interface {
-	GetFullTrust(operationType OperationType) (bool, error)
-	SetFullTrust(operationType OperationType, enabled bool) error
-	GetAllFullTrust() (map[OperationType]bool, error)
-}
-
 type Manager struct {
-	mu               sync.RWMutex
-	requests         map[string]*ApprovalRequest
-	userPolicyStore  UserPolicyStore
-	userGlobalPolicy map[OperationType]PolicyLevel
+	mu       sync.RWMutex
+	requests map[string]*ApprovalRequest
 }
 
 func NewManager() *Manager {
 	return &Manager{
 		requests: make(map[string]*ApprovalRequest),
 	}
-}
-
-func NewManagerWithUserStore(userPolicyStore UserPolicyStore) *Manager {
-	return &Manager{
-		requests:        make(map[string]*ApprovalRequest),
-		userPolicyStore: userPolicyStore,
-	}
-}
-
-func (m *Manager) SetUserPolicyStore(store UserPolicyStore) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.userPolicyStore = store
-}
-
-func (m *Manager) SetUserGlobalPolicy(policy map[OperationType]PolicyLevel) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.userGlobalPolicy = policy
-}
-
-func (m *Manager) GetUserGlobalPolicy() map[OperationType]PolicyLevel {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	result := make(map[OperationType]PolicyLevel, len(m.userGlobalPolicy))
-	for k, v := range m.userGlobalPolicy {
-		result[k] = v
-	}
-	return result
 }
 
 func (m *Manager) CreateRequest(sessionID, toolCallID string, opType OperationType, riskLevel RiskLevel, details map[string]any) *ApprovalRequest {
@@ -276,32 +238,16 @@ func (m *Manager) GetPendingRequest(sessionID string) *ApprovalRequest {
 	return nil
 }
 
-func (m *Manager) ResolveEffectivePolicy(sessionPolicy map[OperationType]PolicyLevel, projectPolicy map[OperationType]PolicyLevel, operationType OperationType) PolicyLevel {
+func (m *Manager) ResolveEffectivePolicy(sessionPolicy map[OperationType]PolicyLevel, cfgPolicy map[OperationType]PolicyLevel, operationType OperationType) PolicyLevel {
 	if sessionPolicy != nil {
 		if policy, ok := sessionPolicy[operationType]; ok {
 			return policy
 		}
 	}
 
-	if projectPolicy != nil {
-		if policy, ok := projectPolicy[operationType]; ok {
+	if cfgPolicy != nil {
+		if policy, ok := cfgPolicy[operationType]; ok {
 			return policy
-		}
-	}
-
-	m.mu.RLock()
-	globalPolicy := m.userGlobalPolicy
-	m.mu.RUnlock()
-
-	if globalPolicy != nil {
-		if policy, ok := globalPolicy[operationType]; ok {
-			return policy
-		}
-	}
-
-	if m.userPolicyStore != nil {
-		if fullTrust, err := m.userPolicyStore.GetFullTrust(operationType); err == nil && fullTrust {
-			return PolicyFullTrust
 		}
 	}
 
@@ -314,5 +260,5 @@ func (m *Manager) ResolveEffectivePolicy(sessionPolicy map[OperationType]PolicyL
 }
 
 func (m *Manager) IsAutoApproved(policy PolicyLevel) bool {
-	return policy == PolicySessionTrust || policy == PolicyFullTrust || policy == PolicyAutoApprove
+	return policy == PolicySessionTrust || policy == PolicyAutoApprove
 }

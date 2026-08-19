@@ -14,7 +14,7 @@ func (h *Handler) GetArchive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := h.loop.GetArchiveContent(sessionID)
+	content, err := h.getAgent(sess).GetArchiveContent(sessionID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to read archive: "+err.Error())
 		return
@@ -40,7 +40,7 @@ func (h *Handler) GetArchive(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) SyncArchive(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.PathValue("id")
 
-	lastMessageID, err := h.loop.SyncArchive(sessionID)
+	lastMessageID, err := h.getDefaultAgent().SyncArchive(sessionID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to sync archive: "+err.Error())
 		return

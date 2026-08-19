@@ -16,7 +16,8 @@ type ApproveRequest struct {
 }
 
 type UpdateConfigRequest struct {
-	ToolCallLimit int `json:"tool_call_limit,omitempty"`
+	MaxConcurrentToolCalls    *int `json:"max_concurrent_tool_calls,omitempty"`
+	MaxConcurrentSubprocesses *int `json:"max_concurrent_subprocesses,omitempty"`
 }
 
 type FileInfo struct {

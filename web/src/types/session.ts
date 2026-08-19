@@ -24,15 +24,13 @@ export interface Session {
   title: string
   state: SessionState
   workingDirectory: string
+  agentId: string
   createdAt: string
   lastActiveAt: string
   messageCount: number
   tokenUsage: TokenUsage
   trustLevel: TrustLevel
   approvalPolicy: ApprovalPolicy
-  toolCallLimit?: number
-  keepRecent?: number
-  maxContextTokens?: number
   currentContextTokens?: number
   lastMessageContent?: string
   lastMessageTime?: string
@@ -41,6 +39,7 @@ export interface Session {
 export interface CreateSessionRequest {
   title?: string
   workingDirectory?: string
+  agent_id?: string
 }
 
 export interface CreateSessionResponse {

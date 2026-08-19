@@ -87,6 +87,7 @@ type Session struct {
 	ID                        string                `json:"id"`
 	Title                     string                `json:"title"`
 	WorkingDirectory          string                `json:"working_directory"`
+	AgentID                   string                `json:"agent_id"`
 	State                     State                 `json:"state"`
 	CreatedAt                 time.Time             `json:"created_at"`
 	LastActiveAt              time.Time             `json:"last_active_at"`
@@ -100,18 +101,14 @@ type Session struct {
 	ApprovalTimeoutSeconds    int                   `json:"approval_timeout_seconds"`
 	CancelRequested           bool                  `json:"cancel_requested"`
 	PauseRequested            bool                  `json:"pause_requested"`
-	ToolCallLimit             int                   `json:"tool_call_limit"`
 	ToolCallCount             int                   `json:"tool_call_count"`
 	MessageCount              int                   `json:"message_count"`
 	LastLoopTerminationReason LoopTerminationReason `json:"last_loop_termination_reason,omitempty"`
 	TokenUsage                TokenUsage            `json:"token_usage"`
 	CompressionCount          int                   `json:"compression_count"`
-	KeepRecent                int                   `json:"keep_recent"`
-	MaxContextTokens          int                   `json:"max_context_tokens"`
 	MaxConcurrentToolCalls    int                   `json:"max_concurrent_tool_calls"`
 	MaxConcurrentSubprocesses int                   `json:"max_concurrent_subprocesses"`
 	ArchivePath               string                `json:"archive_path,omitempty"`
-	SystemPromptOverride      string                `json:"system_prompt_override,omitempty"`
 	CurrentContextTokens      int                   `json:"current_context_tokens"`
 	ActiveSkills              []string              `json:"active_skills,omitempty"`
 	CachedDirectorySummary    *DirectorySummary     `json:"-"`

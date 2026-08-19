@@ -75,15 +75,15 @@ type CompressResult struct {
 	SummaryText     string
 }
 
-func (c *Compressor) ForceCompress(ctx context.Context, sessionID string, eventBus *session.EventBus, systemPromptTokens int) (*CompressResult, error) {
-	return c.compress(ctx, sessionID, eventBus, systemPromptTokens, true)
+func (c *Compressor) ForceCompress(ctx context.Context, sessionID string, eventBus *session.EventBus, systemPromptTokens int, maxContextTokens int, keepRecent int) (*CompressResult, error) {
+	return c.compress(ctx, sessionID, eventBus, systemPromptTokens, maxContextTokens, keepRecent, true)
 }
 
-func (c *Compressor) Compress(ctx context.Context, sessionID string, eventBus *session.EventBus, systemPromptTokens int) (*CompressResult, error) {
-	return c.compress(ctx, sessionID, eventBus, systemPromptTokens, false)
+func (c *Compressor) Compress(ctx context.Context, sessionID string, eventBus *session.EventBus, systemPromptTokens int, maxContextTokens int, keepRecent int) (*CompressResult, error) {
+	return c.compress(ctx, sessionID, eventBus, systemPromptTokens, maxContextTokens, keepRecent, false)
 }
 
-func (c *Compressor) compress(ctx context.Context, sessionID string, eventBus *session.EventBus, systemPromptTokens int, force bool) (*CompressResult, error) {
+func (c *Compressor) compress(ctx context.Context, sessionID string, eventBus *session.EventBus, systemPromptTokens int, maxContextTokens int, keepRecent int, force bool) (*CompressResult, error) {
 	msgs, _, err := c.store.GetMessages(sessionID, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("get messages: %w", err)
@@ -94,21 +94,11 @@ func (c *Compressor) compress(ctx context.Context, sessionID string, eventBus *s
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
-	maxContext := sess.MaxContextTokens
-	if maxContext <= 0 {
-		maxContext = 128000
-	}
-
 	estimatedTokens := EstimateContextTokens(msgs) + systemPromptTokens
-	compressThreshold := int(float64(maxContext) * 0.8)
+	compressThreshold := int(float64(maxContextTokens) * 0.8)
 
 	if !force && estimatedTokens <= compressThreshold {
 		return nil, nil
-	}
-
-	keepRecent := sess.KeepRecent
-	if keepRecent <= 0 {
-		keepRecent = 30
 	}
 
 	remaining, toCompress := selectMessagesToCompress(msgs, keepRecent)

@@ -277,7 +277,7 @@ func TestSetApprovalPolicy_NotFound(t *testing.T) {
 }
 
 func TestApprove_ApproveDecision(t *testing.T) {
-	server, store, loop := setupTestServerWithTools()
+	server, store, ag := setupTestServerWithTools()
 	defer server.Close()
 
 	tmpDir := t.TempDir()
@@ -293,7 +293,7 @@ func TestApprove_ApproveDecision(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	loop.ProcessMessage(context.Background(), "sess-test-1", session.Message{Content: "Write test_approve.txt"})
+	ag.ProcessMessage(context.Background(), "sess-test-1", session.Message{Content: "Write test_approve.txt"})
 
 	var approvalID string
 	timeout := time.After(2 * time.Second)
@@ -341,7 +341,7 @@ loop:
 }
 
 func TestApprove_RejectDecision(t *testing.T) {
-	server, store, loop := setupTestServerWithTools()
+	server, store, ag := setupTestServerWithTools()
 	defer server.Close()
 
 	tmpDir := t.TempDir()
@@ -357,7 +357,7 @@ func TestApprove_RejectDecision(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	loop.ProcessMessage(context.Background(), "sess-test-1", session.Message{Content: "Write test_approve.txt"})
+	ag.ProcessMessage(context.Background(), "sess-test-1", session.Message{Content: "Write test_approve.txt"})
 
 	var approvalID string
 	timeout := time.After(2 * time.Second)
@@ -433,7 +433,7 @@ func TestApprove_InvalidDecision(t *testing.T) {
 }
 
 func TestApprove_TimeoutReturns409(t *testing.T) {
-	server, store, loop := setupTestServerWithTools()
+	server, store, ag := setupTestServerWithTools()
 	defer server.Close()
 
 	tmpDir := t.TempDir()
@@ -449,7 +449,7 @@ func TestApprove_TimeoutReturns409(t *testing.T) {
 	ch, unsubscribe := eventBus.Subscribe()
 	defer unsubscribe()
 
-	loop.ProcessMessage(context.Background(), "sess-test-1", session.Message{Content: "Write test_approve.txt"})
+	ag.ProcessMessage(context.Background(), "sess-test-1", session.Message{Content: "Write test_approve.txt"})
 
 	var approvalID string
 	timeout := time.After(2 * time.Second)
@@ -476,7 +476,7 @@ loop:
 	}
 
 	// Make the approval request expired by setting timeout to past
-	loop.GetApprovalManager().SetTimeout(approvalID, time.Now().Add(-1*time.Second))
+	ag.GetApprovalManager().SetTimeout(approvalID, time.Now().Add(-1*time.Second))
 
 	body := map[string]string{"decision": "approve"}
 	jsonBody, _ := json.Marshal(body)

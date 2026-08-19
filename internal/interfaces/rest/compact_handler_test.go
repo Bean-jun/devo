@@ -18,8 +18,6 @@ func TestCompact_FromIdle(t *testing.T) {
 		Title:            "Test",
 		WorkingDirectory: tmpDir,
 		State:            session.StateIdle,
-		MaxContextTokens: 128000,
-		KeepRecent:       30,
 	}
 	store.Create(sess)
 
@@ -58,8 +56,6 @@ func TestCompact_FromProcessing(t *testing.T) {
 		Title:            "Test",
 		WorkingDirectory: tmpDir,
 		State:            session.StateThinking,
-		MaxContextTokens: 128000,
-		KeepRecent:       30,
 	}
 	store.Create(sess)
 

@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"devo/internal/core/agentloop"
+	"devo/internal/config"
+	"devo/internal/core/agent"
 	"devo/internal/core/approval"
 	"devo/internal/core/concurrency"
 	"devo/internal/core/memory"
@@ -19,7 +20,7 @@ import (
 func setupMemoryTestServer(t *testing.T) (*httptest.Server, *session.InMemoryStore) {
 	t.Helper()
 	store := session.NewInMemoryStore()
-	loop := agentloop.New(store, llmclient.NewMockClient())
+	llm := llmclient.NewMockClient()
 	pathLock := concurrency.NewPathLockManager()
 	approvalMgr := approval.NewManager()
 	memStore, err := memory.NewFileStore(t.TempDir())
@@ -27,8 +28,15 @@ func setupMemoryTestServer(t *testing.T) (*httptest.Server, *session.InMemorySto
 		t.Fatalf("create file store: %v", err)
 	}
 	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
-	loop.SetMemoryManager(memManager)
-	handler := NewHandler(store, loop, memManager, "0.0.1")
+
+	ag := agent.New(
+		agent.Config{ID: "test", Name: "Test", Description: "Test agent", SystemPrompt: "", Tools: nil},
+		store, llm, nil, config.DefaultConfig(),
+		approvalMgr, memManager, nil, nil, nil, nil,
+	)
+	registry := agent.NewRegistry(ag)
+
+	handler := NewHandler(HandlerDeps{Store: store, AgentRegistry: registry, Version: "0.0.1", MemoryManager: memManager})
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)

@@ -171,7 +171,7 @@ func TestIsValidOperationType(t *testing.T) {
 }
 
 func TestIsValidPolicyLevel(t *testing.T) {
-	validLevels := []string{"always_ask", "session_trust", "full_trust", "auto_approve"}
+	validLevels := []string{"always_ask", "session_trust", "auto_approve"}
 	for _, level := range validLevels {
 		if !IsValidPolicyLevel(level) {
 			t.Errorf("expected %s to be valid", level)
@@ -329,70 +329,7 @@ func TestIsAutoApproved(t *testing.T) {
 	if !mgr.IsAutoApproved(PolicySessionTrust) {
 		t.Error("session_trust should be auto-approved")
 	}
-	if !mgr.IsAutoApproved(PolicyFullTrust) {
-		t.Error("full_trust should be auto-approved")
-	}
 	if !mgr.IsAutoApproved(PolicyAutoApprove) {
 		t.Error("auto_approve should be auto-approved")
 	}
-}
-
-func TestResolveEffectivePolicy_FullTrustViaUserStore(t *testing.T) {
-	mgr := NewManager()
-	mgr.SetUserPolicyStore(&mockUserPolicyStore{
-		fullTrust: map[OperationType]bool{
-			OpFileWriteNew: true,
-		},
-	})
-
-	policy := mgr.ResolveEffectivePolicy(nil, nil, OpFileWriteNew)
-	if policy != PolicyFullTrust {
-		t.Errorf("expected full_trust from user store, got %s", policy)
-	}
-
-	policy = mgr.ResolveEffectivePolicy(nil, nil, OpExecPython)
-	if policy != PolicyAlwaysAsk {
-		t.Errorf("expected always_ask for non-full-trust type, got %s", policy)
-	}
-}
-
-func TestResolveEffectivePolicy_SessionPolicyOverridesUserStore(t *testing.T) {
-	mgr := NewManager()
-	mgr.SetUserPolicyStore(&mockUserPolicyStore{
-		fullTrust: map[OperationType]bool{
-			OpFileWriteNew: true,
-		},
-	})
-
-	sessionPolicy := map[OperationType]PolicyLevel{
-		OpFileWriteNew: PolicyAlwaysAsk,
-	}
-
-	policy := mgr.ResolveEffectivePolicy(sessionPolicy, nil, OpFileWriteNew)
-	if policy != PolicyAlwaysAsk {
-		t.Errorf("session policy should override user store, expected always_ask, got %s", policy)
-	}
-}
-
-type mockUserPolicyStore struct {
-	fullTrust map[OperationType]bool
-}
-
-func (m *mockUserPolicyStore) GetFullTrust(operationType OperationType) (bool, error) {
-	if m.fullTrust == nil {
-		return false, nil
-	}
-	return m.fullTrust[operationType], nil
-}
-
-func (m *mockUserPolicyStore) SetFullTrust(operationType OperationType, enabled bool) error {
-	if m.fullTrust == nil {
-		m.fullTrust = make(map[OperationType]bool)
-	}
-	m.fullTrust[operationType] = enabled
-	return nil
-}
-
-func (m *mockUserPolicyStore) GetAllFullTrust() (map[OperationType]bool, error) {
-	return m.fullTrust, nil
 }

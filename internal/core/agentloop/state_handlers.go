@@ -38,7 +38,7 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 	dynamicPrompt := l.promptAssembler.Assemble(sess)
 	systemPromptTokens := tokenmeter.EstimateTokens(dynamicPrompt)
 
-	if result, err := l.compressor.Compress(ctx, lc.SessionID, lc.EventBus, systemPromptTokens); err != nil {
+	if result, err := l.compressor.Compress(ctx, lc.SessionID, lc.EventBus, systemPromptTokens, l.cfg.MaxContextTokens, l.cfg.KeepRecent); err != nil {
 		return LoopStateError, fmt.Errorf("compress: %w", err)
 	} else if result != nil && result.CompressedCount > 0 {
 		l.archiveManager.AppendSystemMessage(lc.SessionID, fmt.Sprintf("[上下文压缩摘要] %s", result.SummaryText))
@@ -56,7 +56,10 @@ func (l *Loop) preparingHandler(ctx context.Context, lc *LoopContext) (LoopState
 
 	currentContextTokens := compressor.EstimateContextTokens(msgs) + systemPromptTokens
 	if l.toolExecutor != nil {
-		currentContextTokens += tools.EstimateToolTokens(l.toolExecutor.ListTools())
+		toolList := l.toolExecutor.ListTools()
+		if toolList != nil {
+			currentContextTokens += tools.EstimateToolTokens(toolList)
+		}
 	}
 	if currentContextTokens != sess.CurrentContextTokens {
 		sess.CurrentContextTokens = currentContextTokens
@@ -251,8 +254,13 @@ func (l *Loop) toolExecutingHandler(ctx context.Context, lc *LoopContext) (LoopS
 		})
 	}
 
-	if sess.MaxConcurrentToolCalls > 1 && len(lc.LLMResult.ToolCalls) > 1 {
-		return l.executeToolsParallel(ctx, lc, sess.MaxConcurrentToolCalls)
+	maxConcurrent := l.cfg.MaxConcurrentToolCalls
+	if sess != nil && sess.MaxConcurrentToolCalls > 0 {
+		maxConcurrent = sess.MaxConcurrentToolCalls
+	}
+
+	if maxConcurrent > 1 && len(lc.LLMResult.ToolCalls) > 1 {
+		return l.executeToolsParallel(ctx, lc, maxConcurrent)
 	}
 
 	return l.executeToolsSerial(ctx, lc)

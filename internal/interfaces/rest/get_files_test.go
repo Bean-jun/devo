@@ -1,7 +1,8 @@
 package rest
 
 import (
-	"devo/internal/core/agentloop"
+	"devo/internal/config"
+	"devo/internal/core/agent"
 	"devo/internal/core/approval"
 	"devo/internal/core/concurrency"
 	"devo/internal/core/memory"
@@ -18,7 +19,6 @@ import (
 func setupTestServerWithProjectDir(dir string) (*httptest.Server, *session.InMemoryStore) {
 	store := session.NewInMemoryStore()
 	llm := llmclient.NewMockClient()
-	loop := agentloop.New(store, llm)
 	tmpDir, err := os.MkdirTemp("", "devo-test-*")
 	if err != nil {
 		panic(err)
@@ -30,9 +30,15 @@ func setupTestServerWithProjectDir(dir string) (*httptest.Server, *session.InMem
 	pathLock := concurrency.NewPathLockManager()
 	approvalMgr := approval.NewManager()
 	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
-	loop.SetMemoryManager(memManager)
-	handler := NewHandler(store, loop, memManager, "0.0.1")
-	handler.SetProjectDir(dir)
+
+	ag := agent.New(
+		agent.Config{ID: "test", Name: "Test", Description: "Test agent", SystemPrompt: "", Tools: nil},
+		store, llm, nil, config.DefaultConfig(),
+		approvalMgr, memManager, nil, nil, nil, nil,
+	)
+	registry := agent.NewRegistry(ag)
+
+	handler := NewHandler(HandlerDeps{Store: store, AgentRegistry: registry, Version: "0.0.1", ProjectDir: dir})
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)

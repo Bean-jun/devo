@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"devo/internal/core/agentloop"
+	"devo/internal/config"
+	"devo/internal/core/agent"
 	"devo/internal/core/approval"
 	"devo/internal/core/concurrency"
 	"devo/internal/core/memory"
@@ -16,15 +17,27 @@ import (
 	"devo/internal/taskexec/llmclient"
 )
 
-func TestRollbackHandler(t *testing.T) {
-	store := session.NewInMemoryStore()
-	loop := agentloop.New(store, llmclient.NewMockClient())
-	memStore, _ := memory.NewFileStore(t.TempDir())
+func setupRollbackHandler(store *session.InMemoryStore) *Handler {
+	llm := llmclient.NewMockClient()
+	memStore, _ := memory.NewFileStore("")
 	pathLock := concurrency.NewPathLockManager()
 	approvalMgr := approval.NewManager()
 	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
-	loop.SetMemoryManager(memManager)
-	handler := NewHandler(store, loop, memManager, "0.0.1")
+
+	ag := agent.New(
+		agent.Config{ID: "test", Name: "Test", Description: "Test agent", SystemPrompt: "", Tools: nil},
+		store, llm, nil, config.DefaultConfig(),
+		approvalMgr, memManager, nil, nil, nil, nil,
+	)
+	registry := agent.NewRegistry(ag)
+
+	handler := NewHandler(HandlerDeps{Store: store, AgentRegistry: registry, Version: "0.0.1", MemoryManager: memManager})
+	return handler
+}
+
+func TestRollbackHandler(t *testing.T) {
+	store := session.NewInMemoryStore()
+	handler := setupRollbackHandler(store)
 
 	sess := &session.Session{
 		ID:               "sess-1",
@@ -69,13 +82,7 @@ func TestRollbackHandler(t *testing.T) {
 
 func TestRollbackHandlerMissingTarget(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := agentloop.New(store, llmclient.NewMockClient())
-	memStore, _ := memory.NewFileStore(t.TempDir())
-	pathLock := concurrency.NewPathLockManager()
-	approvalMgr := approval.NewManager()
-	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
-	loop.SetMemoryManager(memManager)
-	handler := NewHandler(store, loop, memManager, "0.0.1")
+	handler := setupRollbackHandler(store)
 
 	sess := &session.Session{
 		ID:               "sess-1",
@@ -103,13 +110,7 @@ func TestRollbackHandlerMissingTarget(t *testing.T) {
 
 func TestRollbackHandlerSessionNotFound(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := agentloop.New(store, llmclient.NewMockClient())
-	memStore, _ := memory.NewFileStore(t.TempDir())
-	pathLock := concurrency.NewPathLockManager()
-	approvalMgr := approval.NewManager()
-	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
-	loop.SetMemoryManager(memManager)
-	handler := NewHandler(store, loop, memManager, "0.0.1")
+	handler := setupRollbackHandler(store)
 
 	body := map[string]string{"target_message_id": "msg-1"}
 	bodyBytes, _ := json.Marshal(body)
@@ -127,13 +128,7 @@ func TestRollbackHandlerSessionNotFound(t *testing.T) {
 
 func TestRollbackHandlerArchivedSession(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := agentloop.New(store, llmclient.NewMockClient())
-	memStore, _ := memory.NewFileStore(t.TempDir())
-	pathLock := concurrency.NewPathLockManager()
-	approvalMgr := approval.NewManager()
-	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
-	loop.SetMemoryManager(memManager)
-	handler := NewHandler(store, loop, memManager, "0.0.1")
+	handler := setupRollbackHandler(store)
 
 	sess := &session.Session{
 		ID:               "sess-1",
@@ -161,13 +156,7 @@ func TestRollbackHandlerArchivedSession(t *testing.T) {
 
 func TestRollbackHandlerMessageNotFound(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := agentloop.New(store, llmclient.NewMockClient())
-	memStore, _ := memory.NewFileStore(t.TempDir())
-	pathLock := concurrency.NewPathLockManager()
-	approvalMgr := approval.NewManager()
-	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
-	loop.SetMemoryManager(memManager)
-	handler := NewHandler(store, loop, memManager, "0.0.1")
+	handler := setupRollbackHandler(store)
 
 	sess := &session.Session{
 		ID:               "sess-1",

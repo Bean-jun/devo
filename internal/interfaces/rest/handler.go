@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"devo/internal/config"
-	"devo/internal/core/agentloop"
+	"devo/internal/core/agent"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
 	"devo/internal/core/skills"
@@ -18,7 +18,7 @@ import (
 
 type Handler struct {
 	store         session.SessionStore
-	loop          *agentloop.Loop
+	agentRegistry *agent.Registry
 	memoryManager *memory.Manager
 	skillsManager *skills.Manager
 	mcpManager    *mcp.Manager
@@ -30,36 +30,47 @@ type Handler struct {
 	cfg           *config.GlobalConfig
 }
 
-func NewHandler(store session.SessionStore, loop *agentloop.Loop, memoryManager *memory.Manager, version string) *Handler {
-	return &Handler{store: store, loop: loop, memoryManager: memoryManager, version: version}
+type HandlerDeps struct {
+	Store         session.SessionStore
+	AgentRegistry *agent.Registry
+	Version       string
+	MemoryManager *memory.Manager
+	SkillsManager *skills.Manager
+	McpManager    *mcp.Manager
+	BgProcManager *tools.BackgroundProcessManager
+	ProjectDir    string
+	UserConfigDir string
+	LLMConfigured bool
+	Config        *config.GlobalConfig
 }
 
-func (h *Handler) SetBgProcManager(mgr *tools.BackgroundProcessManager) {
-	h.bgProcManager = mgr
+func NewHandler(deps HandlerDeps) *Handler {
+	return &Handler{
+		store:         deps.Store,
+		agentRegistry: deps.AgentRegistry,
+		memoryManager: deps.MemoryManager,
+		skillsManager: deps.SkillsManager,
+		mcpManager:    deps.McpManager,
+		bgProcManager: deps.BgProcManager,
+		version:       deps.Version,
+		projectDir:    deps.ProjectDir,
+		userConfigDir: deps.UserConfigDir,
+		llmConfigured: deps.LLMConfigured,
+		cfg:           deps.Config,
+	}
 }
 
-func (h *Handler) SetMcpManager(mgr *mcp.Manager) {
-	h.mcpManager = mgr
+func (h *Handler) getAgent(sess *session.Session) *agent.Agent {
+	if sess.AgentID != "" {
+		if ag := h.agentRegistry.Get(sess.AgentID); ag != nil {
+			return ag
+		}
+	}
+	return h.agentRegistry.DefaultAgent()
 }
 
-func (h *Handler) SetSkillsManager(sm *skills.Manager) {
-	h.skillsManager = sm
-}
-
-func (h *Handler) SetUserConfigDir(dir string) {
-	h.userConfigDir = dir
-}
-
-func (h *Handler) SetProjectDir(dir string) {
-	h.projectDir = dir
-}
-
-func (h *Handler) SetLLMConfigured(configured bool) {
-	h.llmConfigured = configured
-}
-
-func (h *Handler) SetAppConfig(cfg *config.GlobalConfig) {
-	h.cfg = cfg
+func (h *Handler) getDefaultAgent() *agent.Agent {
+	return h.agentRegistry.DefaultAgent()
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {

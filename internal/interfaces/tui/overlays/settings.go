@@ -14,21 +14,18 @@ import (
 const (
 	ApprovalLevelAlwaysAsk    = "always_ask"
 	ApprovalLevelSessionTrust = "session_trust"
-	ApprovalLevelFullTrust    = "full_trust"
 	ApprovalLevelAutoApprove  = "auto_approve"
 )
 
 var ApprovalLevels = []string{
 	ApprovalLevelAlwaysAsk,
 	ApprovalLevelSessionTrust,
-	ApprovalLevelFullTrust,
 	ApprovalLevelAutoApprove,
 }
 
 var ApprovalLevelLabels = map[string]string{
 	ApprovalLevelAlwaysAsk:    "始终询问",
 	ApprovalLevelSessionTrust: "会话信任",
-	ApprovalLevelFullTrust:    "永久信任",
 	ApprovalLevelAutoApprove:  "自动批准",
 }
 

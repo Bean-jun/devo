@@ -40,12 +40,9 @@ func (l *Loop) incrementToolCallCount(sessionID string, eventBus *session.EventB
 	}
 
 	sess.ToolCallCount++
-	if sess.ToolCallLimit <= 0 {
-		sess.ToolCallLimit = 50
-	}
 	l.store.Update(sess)
 
-	if sess.ToolCallCount >= sess.ToolCallLimit {
+	if sess.ToolCallCount >= l.cfg.ToolCallLimit {
 		sess, err = l.store.Get(sessionID)
 		if err != nil {
 			return false

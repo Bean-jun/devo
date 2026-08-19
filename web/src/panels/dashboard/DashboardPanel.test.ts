@@ -17,6 +17,7 @@ describe('DashboardPanel', () => {
       title: 'Test Session',
       state: 'idle',
       workingDirectory,
+      agentId: 'devo-default',
       createdAt: '2026-01-01T00:00:00Z',
       lastActiveAt: '2026-01-01T00:00:00Z',
       messageCount: 0,

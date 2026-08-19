@@ -120,7 +120,7 @@ func TestThinkingHandler_CompleteWithToolCalls(t *testing.T) {
 			{ID: "call-1", ToolName: "read_file", Params: map[string]interface{}{"path": "test.txt"}},
 		},
 	}
-	loop := New(store, mockClient)
+	loop := NewWithTools(store, mockClient, nil)
 	lc := newTestLoopContext("sess-toolcalls", store)
 
 	lc.ActiveMsgs = []session.Message{
@@ -170,7 +170,7 @@ func TestThinkingHandler_StreamError(t *testing.T) {
 	createTestSession(store, "sess-streamerr")
 
 	mockClient := &errorMockClient{}
-	loop := New(store, mockClient)
+	loop := NewWithTools(store, mockClient, nil)
 	lc := newTestLoopContext("sess-streamerr", store)
 
 	lc.ActiveMsgs = []session.Message{
@@ -344,7 +344,7 @@ func TestToolExecutingHandler_ToolCallLimitReached(t *testing.T) {
 
 	sess, _ := store.Get("sess-limit")
 	sess.WorkingDirectory = tmpDir
-	sess.ToolCallLimit = 1
+	loop.cfg.ToolCallLimit = 1
 	store.Update(sess)
 
 	lc.LLMResult = &llmclient.CompleteResult{

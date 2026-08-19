@@ -227,7 +227,7 @@ func TestGetSession_NotFound(t *testing.T) {
 	}
 }
 
-func TestGetSession_IncludesToolCallFields(t *testing.T) {
+func TestGetSession_IncludesAgentAndToolCallFields(t *testing.T) {
 	server, store := setupTestServer()
 	defer server.Close()
 
@@ -237,7 +237,7 @@ func TestGetSession_IncludesToolCallFields(t *testing.T) {
 		Title:            "Test",
 		WorkingDirectory: tmpDir,
 		State:            session.StateIdle,
-		ToolCallLimit:    50,
+		AgentID:          "devo-default",
 		ToolCallCount:    3,
 	}
 	store.Create(sess)
@@ -255,8 +255,8 @@ func TestGetSession_IncludesToolCallFields(t *testing.T) {
 	var result getSessionResponse
 	json.NewDecoder(resp.Body).Decode(&result)
 
-	if result.ToolCallLimit != 50 {
-		t.Errorf("expected tool_call_limit 50, got %d", result.ToolCallLimit)
+	if result.AgentID != "devo-default" {
+		t.Errorf("expected agent_id 'devo-default', got %q", result.AgentID)
 	}
 	if result.ToolCallCount != 3 {
 		t.Errorf("expected tool_call_count 3, got %d", result.ToolCallCount)
@@ -410,82 +410,6 @@ func TestListSessionsEmptyResult(t *testing.T) {
 	}
 }
 
-func TestUpdateConfig_ToolCallLimit(t *testing.T) {
-	server, store := setupTestServer()
-	defer server.Close()
-
-	tmpDir := t.TempDir()
-	sess := &session.Session{
-		ID:               "sess-test-1",
-		Title:            "Test",
-		WorkingDirectory: tmpDir,
-		State:            session.StateIdle,
-		ToolCallLimit:    50,
-	}
-	store.Create(sess)
-
-	body := map[string]int{"tool_call_limit": 80}
-	jsonBody, _ := json.Marshal(body)
-
-	resp := doPut(t, server.URL+"/api/v1/sessions/sess-test-1/config", jsonBody)
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected 200, got %d", resp.StatusCode)
-	}
-
-	var result updateConfigResponse
-	json.NewDecoder(resp.Body).Decode(&result)
-	if result.ToolCallLimit != 80 {
-		t.Errorf("expected tool_call_limit 80, got %d", result.ToolCallLimit)
-	}
-
-	sessGot, _ := store.Get("sess-test-1")
-	if sessGot.ToolCallLimit != 80 {
-		t.Errorf("expected tool_call_limit 80 in store, got %d", sessGot.ToolCallLimit)
-	}
-}
-
-func TestUpdateConfig_InvalidValue(t *testing.T) {
-	server, store := setupTestServer()
-	defer server.Close()
-
-	tmpDir := t.TempDir()
-	sess := &session.Session{
-		ID:               "sess-test-1",
-		Title:            "Test",
-		WorkingDirectory: tmpDir,
-		State:            session.StateIdle,
-		ToolCallLimit:    50,
-	}
-	store.Create(sess)
-
-	body := map[string]int{"tool_call_limit": 0}
-	jsonBody, _ := json.Marshal(body)
-
-	resp := doPut(t, server.URL+"/api/v1/sessions/sess-test-1/config", jsonBody)
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("expected 400 for tool_call_limit=0, got %d", resp.StatusCode)
-	}
-}
-
-func TestUpdateConfig_NotFound(t *testing.T) {
-	server, _ := setupTestServer()
-	defer server.Close()
-
-	body := map[string]int{"tool_call_limit": 80}
-	jsonBody, _ := json.Marshal(body)
-
-	resp := doPut(t, server.URL+"/api/v1/sessions/nonexistent/config", jsonBody)
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("expected 404, got %d", resp.StatusCode)
-	}
-}
-
 func TestUpdateConfig_MaxConcurrentToolCalls(t *testing.T) {
 	server, store := setupTestServer()
 	defer server.Close()
@@ -496,7 +420,6 @@ func TestUpdateConfig_MaxConcurrentToolCalls(t *testing.T) {
 		Title:            "Test",
 		WorkingDirectory: tmpDir,
 		State:            session.StateIdle,
-		ToolCallLimit:    50,
 	}
 	store.Create(sess)
 
@@ -522,6 +445,45 @@ func TestUpdateConfig_MaxConcurrentToolCalls(t *testing.T) {
 	}
 }
 
+func TestUpdateConfig_InvalidValue(t *testing.T) {
+	server, store := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	sess := &session.Session{
+		ID:               "sess-test-1",
+		Title:            "Test",
+		WorkingDirectory: tmpDir,
+		State:            session.StateIdle,
+	}
+	store.Create(sess)
+
+	body := map[string]int{"max_concurrent_tool_calls": -1}
+	jsonBody, _ := json.Marshal(body)
+
+	resp := doPut(t, server.URL+"/api/v1/sessions/sess-test-1/config", jsonBody)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected 500 for max_concurrent_tool_calls=-1, got %d", resp.StatusCode)
+	}
+}
+
+func TestUpdateConfig_NotFound(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	body := map[string]int{"max_concurrent_tool_calls": 5}
+	jsonBody, _ := json.Marshal(body)
+
+	resp := doPut(t, server.URL+"/api/v1/sessions/nonexistent/config", jsonBody)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
 func TestUpdateConfig_MaxConcurrentSubprocesses(t *testing.T) {
 	server, store := setupTestServer()
 	defer server.Close()
@@ -532,7 +494,6 @@ func TestUpdateConfig_MaxConcurrentSubprocesses(t *testing.T) {
 		Title:            "Test",
 		WorkingDirectory: tmpDir,
 		State:            session.StateIdle,
-		ToolCallLimit:    50,
 	}
 	store.Create(sess)
 
@@ -568,12 +529,10 @@ func TestUpdateConfig_AllFields(t *testing.T) {
 		Title:            "Test",
 		WorkingDirectory: tmpDir,
 		State:            session.StateIdle,
-		ToolCallLimit:    50,
 	}
 	store.Create(sess)
 
 	body := map[string]int{
-		"tool_call_limit":             100,
 		"max_concurrent_tool_calls":   5,
 		"max_concurrent_subprocesses": 3,
 	}
@@ -588,9 +547,6 @@ func TestUpdateConfig_AllFields(t *testing.T) {
 
 	var result updateConfigResponse
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result.ToolCallLimit != 100 {
-		t.Errorf("expected tool_call_limit 100, got %d", result.ToolCallLimit)
-	}
 	if result.MaxConcurrentToolCalls != 5 {
 		t.Errorf("expected max_concurrent_tool_calls 5, got %d", result.MaxConcurrentToolCalls)
 	}

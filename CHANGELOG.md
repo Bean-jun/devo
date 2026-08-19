@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.1.1] - 2026-08-14
+## [v0.1.1] - 2026-08-14
 
 ### 🚀 新功能
 
@@ -103,5 +103,5 @@ cd web && npm ci && npm run build  # 构建前端
 
 ---
 
-[Unreleased]: https://github.com/your-org/devo/compare/v0.1.0...HEAD
-[v0.1.0]: https://github.com/your-org/devo/releases/tag/v0.1.0
+[v0.1.0]: https://github.com/Bean-jun/devo/releases/tag/v0.1.0
+[v0.1.1]: https://github.com/Bean-jun/devo/releases/tag/v0.1.1

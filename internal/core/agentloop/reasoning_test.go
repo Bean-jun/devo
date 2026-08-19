@@ -31,11 +31,10 @@ func (m *reasoningMockClient) CompleteStream(ctx context.Context, messages []ses
 }
 func (m *reasoningMockClient) TestConnection(ctx context.Context) error { return nil }
 
-
 func TestThinkingHandler_PublishesReasoningEvents(t *testing.T) {
 	store := session.NewInMemoryStore()
 	createTestSession(store, "sess-reasoning")
-	loop := New(store, &reasoningMockClient{})
+	loop := NewWithTools(store, &reasoningMockClient{}, nil)
 	lc := newTestLoopContext("sess-reasoning", store)
 
 	lc.ActiveMsgs = []session.Message{
@@ -93,7 +92,7 @@ func TestThinkingHandler_PublishesReasoningEvents(t *testing.T) {
 func TestThinkingHandler_LLMResultCapturesReasoning(t *testing.T) {
 	store := session.NewInMemoryStore()
 	createTestSession(store, "sess-reasoning-result")
-	loop := New(store, &reasoningMockClient{})
+	loop := NewWithTools(store, &reasoningMockClient{}, nil)
 	lc := newTestLoopContext("sess-reasoning-result", store)
 
 	lc.ActiveMsgs = []session.Message{{ID: "msg-1", Role: session.RoleUser, Content: "Hi"}}
@@ -121,7 +120,7 @@ func TestThinkingHandler_LLMResultCapturesReasoning(t *testing.T) {
 func TestTextResponseHandler_PersistsReasoning(t *testing.T) {
 	store := session.NewInMemoryStore()
 	createTestSession(store, "sess-text-reasoning")
-	loop := New(store, &reasoningMockClient{})
+	loop := NewWithTools(store, &reasoningMockClient{}, nil)
 	lc := newTestLoopContext("sess-text-reasoning", store)
 
 	lc.LLMResult = &llmclient.CompleteResult{
@@ -176,7 +175,7 @@ func TestTextResponseHandler_PersistsReasoning(t *testing.T) {
 func TestReasoningBuilderResetsBetweenTurns(t *testing.T) {
 	store := session.NewInMemoryStore()
 	createTestSession(store, "sess-reset")
-	loop := New(store, &reasoningMockClient{})
+	loop := NewWithTools(store, &reasoningMockClient{}, nil)
 	lc := newTestLoopContext("sess-reset", store)
 
 	lc.ActiveMsgs = []session.Message{{ID: "msg-1", Role: session.RoleUser, Content: "Hi"}}
@@ -204,11 +203,10 @@ func (m *noReasoningErrorMockClient) CompleteStream(ctx context.Context, message
 }
 func (m *noReasoningErrorMockClient) TestConnection(ctx context.Context) error { return nil }
 
-
 func TestThinkingHandler_NoReasoningCompleteOnEmpty(t *testing.T) {
 	store := session.NewInMemoryStore()
 	createTestSession(store, "sess-empty-reasoning")
-	loop := New(store, &noReasoningErrorMockClient{})
+	loop := NewWithTools(store, &noReasoningErrorMockClient{}, nil)
 	lc := newTestLoopContext("sess-empty-reasoning", store)
 
 	lc.ActiveMsgs = []session.Message{{ID: "msg-1", Role: session.RoleUser, Content: "Hi"}}

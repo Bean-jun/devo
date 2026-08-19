@@ -24,7 +24,13 @@ func (h *Handler) Rollback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.loop.Rollback(id, req.TargetMessageID)
+	sess, err := h.store.Get(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+
+	result, err := h.getAgent(sess).Rollback(id, req.TargetMessageID)
 	if err != nil {
 		if errors.Is(err, session.ErrSessionNotFound) {
 			writeError(w, http.StatusNotFound, "session not found")

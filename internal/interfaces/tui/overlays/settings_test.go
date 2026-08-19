@@ -192,11 +192,6 @@ func TestSettingsPanel_CycleEnum(t *testing.T) {
 	}
 
 	f = sp.CycleEnum()
-	if f.EnumValue != ApprovalLevelFullTrust {
-		t.Errorf("枚举值应切换到 full_trust, got %s", f.EnumValue)
-	}
-
-	f = sp.CycleEnum()
 	if f.EnumValue != ApprovalLevelAutoApprove {
 		t.Errorf("枚举值应切换到 auto_approve, got %s", f.EnumValue)
 	}

@@ -35,16 +35,18 @@ type LLMConfig struct {
 }
 
 type Config struct {
-	LLM              LLMConfig         `json:"llm,omitempty"`
-	DBPath           string            `json:"db_path,omitempty"`
-	LogPath          string            `json:"log_path,omitempty"`
-	LogLevel         string            `json:"log_level,omitempty"`
-	ApprovalPolicy   map[string]string `json:"approval_policy,omitempty"`
-	Skills           []string          `json:"skills,omitempty"`
-	MCP              []string          `json:"mcp,omitempty"`
-	ToolCallLimit    int               `json:"tool_call_limit,omitempty"`
-	MaxContextTokens int               `json:"max_context_tokens,omitempty"`
-	KeepRecent       int               `json:"keep_recent,omitempty"`
+	LLM                       LLMConfig         `json:"llm,omitempty"`
+	DBPath                    string            `json:"db_path,omitempty"`
+	LogPath                   string            `json:"log_path,omitempty"`
+	LogLevel                  string            `json:"log_level,omitempty"`
+	ApprovalPolicy            map[string]string `json:"approval_policy,omitempty"`
+	Skills                    []string          `json:"skills,omitempty"`
+	MCP                       []string          `json:"mcp,omitempty"`
+	ToolCallLimit             int               `json:"tool_call_limit,omitempty"`
+	MaxContextTokens          int               `json:"max_context_tokens,omitempty"`
+	KeepRecent                int               `json:"keep_recent,omitempty"`
+	MaxConcurrentToolCalls    int               `json:"max_concurrent_tool_calls,omitempty"`
+	MaxConcurrentSubprocesses int               `json:"max_concurrent_subprocesses,omitempty"`
 }
 
 type GlobalConfig = Config
@@ -170,9 +172,27 @@ func ApplyDefaults(cfg *Config) {
 	if cfg.LLM.EnableReasoning && cfg.LLM.ReasoningEffort == "" {
 		cfg.LLM.ReasoningEffort = DefaultReasoningEffort
 	}
-
 	if cfg.LLM.MaxTokens == 0 {
 		cfg.LLM.MaxTokens = DefaultMaxTokens
+	}
+
+	if cfg.ToolCallLimit == 0 {
+		cfg.ToolCallLimit = DefaultToolCallLimit
+	}
+	if cfg.MaxContextTokens == 0 {
+		cfg.MaxContextTokens = DefaultMaxContextTokens
+	}
+	if cfg.KeepRecent == 0 {
+		cfg.KeepRecent = DefaultKeepRecent
+	}
+	if cfg.MaxConcurrentToolCalls == 0 {
+		cfg.MaxConcurrentToolCalls = DefaultMaxConcurrentToolCalls
+	}
+	if cfg.MaxConcurrentSubprocesses == 0 {
+		cfg.MaxConcurrentSubprocesses = DefaultMaxConcurrentSubprocesses
+	}
+	if cfg.ApprovalPolicy == nil {
+		cfg.ApprovalPolicy = DefaultApprovalPolicyMap()
 	}
 }
 
@@ -237,6 +257,12 @@ func Merge(global, project *Config) *Config {
 	}
 	if project.KeepRecent > 0 {
 		result.KeepRecent = project.KeepRecent
+	}
+	if project.MaxConcurrentToolCalls > 0 {
+		result.MaxConcurrentToolCalls = project.MaxConcurrentToolCalls
+	}
+	if project.MaxConcurrentSubprocesses > 0 {
+		result.MaxConcurrentSubprocesses = project.MaxConcurrentSubprocesses
 	}
 
 	return result

@@ -13,6 +13,7 @@ type SessionModel struct {
 	ID                        string    `gorm:"primaryKey;size:64"`
 	Title                     string    `gorm:"size:256"`
 	WorkingDirectory          string    `gorm:"size:512;index:idx_working_dir"`
+	AgentID                   string    `gorm:"size:64;default:devo-default"`
 	State                     string    `gorm:"size:32;index:idx_state"`
 	CreatedAt                 time.Time `gorm:"autoCreateTime"`
 	LastActiveAt              time.Time
@@ -20,7 +21,6 @@ type SessionModel struct {
 	TrustLevel                string `gorm:"size:32;default:normal"`
 	ApprovalPolicyJSON        string `gorm:"type:text"`
 	ApprovalTimeoutSeconds    int    `gorm:"default:300"`
-	ToolCallLimit             int    `gorm:"default:50"`
 	ToolCallCount             int    `gorm:"default:0"`
 	MessageCount              int    `gorm:"default:0"`
 	LastLoopTerminationReason string `gorm:"size:32"`
@@ -28,10 +28,9 @@ type SessionModel struct {
 	TokenUsageOutput          int    `gorm:"default:0"`
 	TokenUsageTotal           int    `gorm:"default:0"`
 	CompressionCount          int    `gorm:"default:0"`
-	KeepRecent                int    `gorm:"default:0"`
-	MaxContextTokens          int    `gorm:"default:0"`
+	MaxConcurrentToolCalls    int    `gorm:"default:0"`
+	MaxConcurrentSubprocesses int    `gorm:"default:0"`
 	CurrentContextTokens      int    `gorm:"default:0"`
-	SystemPromptOverride      string `gorm:"type:text"`
 	ActiveSkillsJSON          string `gorm:"type:text"`
 }
 
@@ -62,6 +61,7 @@ func (m *SessionModel) ToDomain() *session.Session {
 		ID:                        m.ID,
 		Title:                     m.Title,
 		WorkingDirectory:          m.WorkingDirectory,
+		AgentID:                   m.AgentID,
 		State:                     session.State(m.State),
 		CreatedAt:                 m.CreatedAt,
 		LastActiveAt:              m.LastActiveAt,
@@ -69,7 +69,6 @@ func (m *SessionModel) ToDomain() *session.Session {
 		TrustLevel:                m.TrustLevel,
 		ApprovalPolicy:            make(map[string]string),
 		ApprovalTimeoutSeconds:    m.ApprovalTimeoutSeconds,
-		ToolCallLimit:             m.ToolCallLimit,
 		ToolCallCount:             m.ToolCallCount,
 		MessageCount:              m.MessageCount,
 		LastLoopTerminationReason: session.LoopTerminationReason(m.LastLoopTerminationReason),
@@ -78,11 +77,10 @@ func (m *SessionModel) ToDomain() *session.Session {
 			Output: m.TokenUsageOutput,
 			Total:  m.TokenUsageTotal,
 		},
-		CompressionCount:     m.CompressionCount,
-		KeepRecent:           m.KeepRecent,
-		MaxContextTokens:     m.MaxContextTokens,
-		CurrentContextTokens: m.CurrentContextTokens,
-		SystemPromptOverride: m.SystemPromptOverride,
+		CompressionCount:          m.CompressionCount,
+		MaxConcurrentToolCalls:    m.MaxConcurrentToolCalls,
+		MaxConcurrentSubprocesses: m.MaxConcurrentSubprocesses,
+		CurrentContextTokens:      m.CurrentContextTokens,
 	}
 
 	if m.ApprovalPolicyJSON != "" {
@@ -107,23 +105,22 @@ func fromDomain(s *session.Session) *SessionModel {
 		ID:                        s.ID,
 		Title:                     s.Title,
 		WorkingDirectory:          s.WorkingDirectory,
+		AgentID:                   s.AgentID,
 		State:                     string(s.State),
 		CreatedAt:                 s.CreatedAt,
 		LastActiveAt:              s.LastActiveAt,
 		ActiveSSEConnections:      s.ActiveSSEConnections,
 		TrustLevel:                s.TrustLevel,
 		ApprovalTimeoutSeconds:    s.ApprovalTimeoutSeconds,
-		ToolCallLimit:             s.ToolCallLimit,
 		ToolCallCount:             s.ToolCallCount,
 		LastLoopTerminationReason: string(s.LastLoopTerminationReason),
 		TokenUsageInput:           s.TokenUsage.Input,
 		TokenUsageOutput:          s.TokenUsage.Output,
 		TokenUsageTotal:           s.TokenUsage.Total,
 		CompressionCount:          s.CompressionCount,
-		KeepRecent:                s.KeepRecent,
-		MaxContextTokens:          s.MaxContextTokens,
+		MaxConcurrentToolCalls:    s.MaxConcurrentToolCalls,
+		MaxConcurrentSubprocesses: s.MaxConcurrentSubprocesses,
 		CurrentContextTokens:      s.CurrentContextTokens,
-		SystemPromptOverride:      s.SystemPromptOverride,
 	}
 
 	if s.ApprovalPolicy != nil && len(s.ApprovalPolicy) > 0 {

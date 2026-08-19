@@ -8,7 +8,8 @@ import (
 	"devo/internal/core/session"
 )
 
-const defaultBasePrompt = `You are Devo, a coding agent that helps users with software engineering tasks. Use the tools available to you to assist the user. Follow these instructions strictly.
+func DefaultSystemPrompt() string {
+	return `You are Devo, a coding agent that helps users with software engineering tasks. Use the tools available to you to assist the user. Follow these instructions strictly.
 
 # Output Style
 - Zero fluff. Zero pleasantries. Zero emojis. Zero emotional language.
@@ -48,21 +49,25 @@ const defaultBasePrompt = `You are Devo, a coding agent that helps users with so
 
 # Response Language
 Always respond in the same language as the user's latest message.`
+}
 
 type Assembler struct {
-	basePrompt     string
+	systemPrompt   string
 	skillsProvider SkillsProvider
 	memoryProvider MemoryProvider
 }
 
-func NewAssembler() *Assembler {
+func NewAssembler(systemPrompt string) *Assembler {
+	if systemPrompt == "" {
+		systemPrompt = DefaultSystemPrompt()
+	}
 	return &Assembler{
-		basePrompt: defaultBasePrompt,
+		systemPrompt: systemPrompt,
 	}
 }
 
-func (a *Assembler) SetBasePrompt(prompt string) {
-	a.basePrompt = prompt
+func (a *Assembler) SetSystemPrompt(prompt string) {
+	a.systemPrompt = prompt
 }
 
 func (a *Assembler) SetSkillsProvider(sp SkillsProvider) {
@@ -76,7 +81,7 @@ func (a *Assembler) SetMemoryProvider(mp MemoryProvider) {
 func (a *Assembler) Assemble(sess *session.Session) string {
 	var parts []string
 
-	parts = append(parts, a.buildBasePrompt(sess))
+	parts = append(parts, a.systemPrompt)
 
 	if a.skillsProvider != nil {
 		if skillsPrompt := a.skillsProvider.GetActiveSkillsPrompt(); skillsPrompt != "" {
@@ -97,16 +102,6 @@ func (a *Assembler) Assemble(sess *session.Session) string {
 	parts = append(parts, a.buildDynamicInfo(sess))
 
 	return strings.Join(parts, "\n\n")
-}
-
-func (a *Assembler) buildBasePrompt(sess *session.Session) string {
-	prompt := a.basePrompt
-
-	if sess.SystemPromptOverride != "" {
-		prompt += "\n\n" + sess.SystemPromptOverride
-	}
-
-	return prompt
 }
 
 func (a *Assembler) buildDynamicInfo(sess *session.Session) string {

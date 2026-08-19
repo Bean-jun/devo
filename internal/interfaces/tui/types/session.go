@@ -32,6 +32,7 @@ type SessionInfo struct {
 	Title                string       `json:"title"`
 	State                SessionState `json:"state"`
 	WorkingDirectory     string       `json:"working_directory"`
+	AgentID              string       `json:"agent_id"`
 	CreatedAt            string       `json:"created_at"`
 	LastActiveAt         string       `json:"last_active_at"`
 	MessageCount         int          `json:"message_count"`
@@ -45,6 +46,7 @@ type SessionInfo struct {
 type CreateSessionRequest struct {
 	WorkingDirectory       string `json:"working_directory"`
 	Title                  string `json:"title,omitempty"`
+	AgentID                string `json:"agent_id,omitempty"`
 	ApprovalTimeoutSeconds int    `json:"approval_timeout_seconds,omitempty"`
 }
 

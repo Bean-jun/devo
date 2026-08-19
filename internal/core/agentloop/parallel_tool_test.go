@@ -271,12 +271,12 @@ func TestParallelToolExecution_ToolCallLimit(t *testing.T) {
 	toolRegistry.Register(&tools.ReadFileTool{})
 
 	loop := newTestLoopWithTools(t, store, &parallelToolMockClient{}, toolRegistry)
+	loop.cfg.ToolCallLimit = 1
 
 	createTestSession(store, "sess-parallel-limit")
 	sess, _ := store.Get("sess-parallel-limit")
 	sess.WorkingDirectory = t.TempDir()
 	sess.MaxConcurrentToolCalls = 3
-	sess.ToolCallLimit = 2
 	store.Update(sess)
 
 	eventBus, _ := store.GetEventBus("sess-parallel-limit")

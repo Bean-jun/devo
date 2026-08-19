@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"devo/internal/config"
-	"devo/internal/core/agentloop"
+	"devo/internal/core/agent"
+	"devo/internal/core/approval"
 	"devo/internal/core/concurrency"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
@@ -31,7 +32,7 @@ import (
 type App struct {
 	cfg           *config.GlobalConfig
 	store         session.SessionStore
-	loop          *agentloop.Loop
+	agentRegistry *agent.Registry
 	handler       *rest.Handler
 	skillsMgr     *skills.Manager
 	mcpMgr        *mcp.Manager
@@ -88,12 +89,11 @@ func NewApp(tuiMode, webMode bool, portFlag int, version string) (*App, error) {
 
 	app.initRegistry()
 	app.initLLM()
-	if err := app.initMemory(); err != nil {
-		return nil, err
-	}
-	app.initSkills()
 	app.initMCP()
+	app.initSkills()
 	app.initTools()
+	app.initMemory()
+	app.initAgent()
 	app.initHandler()
 	return app, nil
 }
@@ -135,11 +135,34 @@ func (a *App) initRegistry() {
 	a.toolRegistry = tools.NewRegistry()
 }
 
+func (a *App) initLLM() {
+	a.llm = providers.NewClient(a.cfg, a.toolRegistry)
+}
+
+func (a *App) initMCP() {
+	wd, _ := os.Getwd()
+	a.mcpMgr = mcp.NewManager(wd)
+	if err := a.mcpMgr.ConnectAll(context.Background()); err != nil {
+		logging.Warn(context.Background(), "mcp connect partial failure",
+			"error", err,
+		)
+	}
+}
+
+func (a *App) initSkills() {
+	a.skillsMgr = skills.NewManager(skills.DefaultGlobalSkillsDir())
+
+	wd, _ := os.Getwd()
+	if err := a.skillsMgr.SetProjectDir(wd); err != nil {
+		logging.Warn(context.Background(), "skills scan warning",
+			"error", err,
+		)
+	}
+}
+
 func (a *App) initTools() {
 	bgProcManager := tools.NewBackgroundProcessManager()
 	a.bgProcManager = bgProcManager
-	a.loop.SetBackgroundProcessManager(bgProcManager)
-	bgProcManager.SetOutputForwarder(a.loop)
 	a.toolRegistry.Register(&tools.GlobTool{})
 	a.toolRegistry.Register(&tools.ReadFileTool{})
 	a.toolRegistry.Register(&tools.ListFilesTool{})
@@ -153,72 +176,70 @@ func (a *App) initTools() {
 	a.mcpMgr.RegisterTools(a.toolRegistry)
 }
 
-func (a *App) initLLM() {
-	a.llm = providers.NewClient(a.cfg, a.toolRegistry)
-	a.loop = agentloop.NewWithTools(a.store, a.llm, a.toolRegistry)
-}
-
-func (a *App) initMemory() error {
+func (a *App) initMemory() {
 	pathLockManager := concurrency.NewPathLockManager()
 	memoryFileStore, err := memory.DefaultFileStore()
 	if err != nil {
 		logging.Error(context.Background(), "failed to create memory file store",
 			"error", err,
 		)
-		return fmt.Errorf("failed to create memory file store: %w", err)
 	}
-	a.memoryMgr = memory.NewManager(memoryFileStore, pathLockManager, a.loop.GetApprovalManager())
-	a.loop.SetMemoryManager(a.memoryMgr)
-	return nil
+	a.memoryMgr = memory.NewManager(memoryFileStore, pathLockManager, approval.NewManager())
 }
 
-func (a *App) initSkills() {
-	a.skillsMgr = skills.NewManager(skills.DefaultGlobalSkillsDir())
-
-	wd, _ := os.Getwd()
-	if err := a.skillsMgr.SetProjectDir(wd); err != nil {
-		logging.Warn(context.Background(), "skills scan warning",
-			"error", err,
-		)
-	}
-
-	a.loop.SetSkillsManager(a.skillsMgr)
-
+func (a *App) initAgent() {
+	approvalMgr := approval.NewManager()
 	solidifier := skills.NewSolidifier(a.llm, a.skillsMgr, a.store)
-	a.loop.SetSolidifier(solidifier)
-}
 
-func (a *App) initMCP() {
-	wd, _ := os.Getwd()
-	a.mcpMgr = mcp.NewManager(wd)
-	if err := a.mcpMgr.ConnectAll(context.Background()); err != nil {
-		logging.Warn(context.Background(), "mcp connect partial failure",
-			"error", err,
-		)
+	defaultAgentCfg := agent.Config{
+		ID:           "devo-default",
+		Name:         "Devo",
+		Description:  "Devo - AI Coding Agent",
+		SystemPrompt: "",
+		Tools:        nil,
 	}
+
+	defaultAgent := agent.New(
+		defaultAgentCfg,
+		a.store,
+		a.llm,
+		a.toolRegistry,
+		a.cfg,
+		approvalMgr,
+		a.memoryMgr,
+		a.skillsMgr,
+		a.bgProcManager,
+		a.mcpMgr,
+		solidifier,
+	)
+
+	a.bgProcManager.SetOutputForwarder(defaultAgent)
+	a.agentRegistry = agent.NewRegistry(defaultAgent)
 }
 
 func (a *App) initHandler() {
-	a.handler = rest.NewHandler(a.store, a.loop, a.memoryMgr, a.version)
-	a.handler.SetSkillsManager(a.skillsMgr)
-	a.handler.SetLLMConfigured(a.cfg.IsLLMConfigured())
-	a.handler.SetAppConfig(a.cfg)
-	a.handler.SetBgProcManager(a.bgProcManager)
-
 	wd, _ := os.Getwd()
-	a.handler.SetMcpManager(a.mcpMgr)
+	a.devoDir = config.DevoDir()
+
+	a.handler = rest.NewHandler(rest.HandlerDeps{
+		Store:         a.store,
+		AgentRegistry: a.agentRegistry,
+		Version:       a.version,
+		SkillsManager: a.skillsMgr,
+		MemoryManager: a.memoryMgr,
+		McpManager:    a.mcpMgr,
+		BgProcManager: a.bgProcManager,
+		ProjectDir:    wd,
+		UserConfigDir: a.devoDir,
+		LLMConfigured: a.cfg.IsLLMConfigured(),
+		Config:        a.cfg,
+	})
 
 	if err := ensureProjectConfig(wd, a.skillsMgr, a.mcpMgr); err != nil {
 		logging.Warn(context.Background(), "project config init warning",
 			"error", err,
 		)
 	}
-
-	a.devoDir = config.DevoDir()
-	a.handler.SetProjectDir(wd)
-	a.handler.SetUserConfigDir(a.devoDir)
-
-	a.loadUserApprovalPolicy()
 }
 
 func (a *App) Run() {
@@ -231,7 +252,7 @@ func (a *App) Run() {
 	tracedMux := logging.TracingMiddleware(mux)
 
 	logging.Info(ctx, "running crash recovery check")
-	if err := a.loop.RecoverCrashedSessions(); err != nil {
+	if err := a.agentRegistry.DefaultAgent().RecoverCrashedSessions(); err != nil {
 		logging.Warn(ctx, "crash recovery scan failed (non-fatal)",
 			"error", err,
 		)
@@ -281,10 +302,6 @@ func (a *App) Shutdown() {
 	if a.store != nil {
 		a.store.Close()
 	}
-}
-
-func (a *App) loadUserApprovalPolicy() {
-	a.handler.LoadUserApprovalPolicy()
 }
 
 func ensureProjectConfig(workingDir string, sm *skills.Manager, mcpMgr *mcp.Manager) error {

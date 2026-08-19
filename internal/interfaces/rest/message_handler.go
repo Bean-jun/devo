@@ -63,7 +63,13 @@ func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.loop.ProcessMessage(r.Context(), id, msg); err != nil {
+	sess, err := h.store.Get(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+
+	if err := h.getAgent(sess).ProcessMessage(r.Context(), id, msg); err != nil {
 		if errors.Is(err, session.ErrSessionNotFound) {
 			writeError(w, http.StatusNotFound, "session not found")
 			return

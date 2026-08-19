@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"devo/internal/config"
 	"devo/internal/core/approval"
 	"devo/internal/core/session"
 	"devo/internal/pkg/logging"
@@ -18,24 +17,21 @@ import (
 type createSessionRequest struct {
 	WorkingDirectory       string `json:"working_directory"`
 	Title                  string `json:"title,omitempty"`
+	AgentID                string `json:"agent_id,omitempty"`
 	ApprovalTimeoutSeconds int    `json:"approval_timeout_seconds,omitempty"`
-	SystemPromptOverride   string `json:"system_prompt_override,omitempty"`
-	ToolCallLimit          int    `json:"tool_call_limit,omitempty"`
-	MaxContextTokens       int    `json:"max_context_tokens,omitempty"`
-	KeepRecent             int    `json:"keep_recent,omitempty"`
 }
 
 type createSessionResponse struct {
 	ID                        string             `json:"id"`
 	Title                     string             `json:"title"`
 	WorkingDirectory          string             `json:"working_directory"`
+	AgentID                   string             `json:"agent_id"`
 	State                     string             `json:"state"`
 	CreatedAt                 string             `json:"created_at"`
 	TrustLevel                string             `json:"trust_level"`
 	ApprovalPolicy            map[string]string  `json:"approval_policy,omitempty"`
 	ApprovalTimeoutSeconds    int                `json:"approval_timeout_seconds"`
 	TokenUsage                session.TokenUsage `json:"token_usage"`
-	MaxContextTokens          int                `json:"max_context_tokens"`
 	MaxConcurrentToolCalls    int                `json:"max_concurrent_tool_calls"`
 	MaxConcurrentSubprocesses int                `json:"max_concurrent_subprocesses"`
 	CurrentContextTokens      int                `json:"current_context_tokens"`
@@ -63,54 +59,30 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 
 	title := req.Title
 
+	agentID := req.AgentID
+	if agentID == "" {
+		agentID = "devo-default"
+	}
+
 	now := time.Now()
 	timeoutSeconds := req.ApprovalTimeoutSeconds
 	if timeoutSeconds <= 0 {
 		timeoutSeconds = 300
 	}
 
-	toolCallLimit := req.ToolCallLimit
-	maxContextTokens := req.MaxContextTokens
-	keepRecent := req.KeepRecent
-
-	cfg, _ := config.LoadFullConfig(workingDir)
-	if cfg != nil {
-		if toolCallLimit <= 0 {
-			toolCallLimit = cfg.ToolCallLimit
-		}
-		if maxContextTokens <= 0 {
-			maxContextTokens = cfg.MaxContextTokens
-		}
-		if keepRecent <= 0 {
-			keepRecent = cfg.KeepRecent
-		}
-	}
-	if toolCallLimit <= 0 {
-		toolCallLimit = 50
-	}
-	if maxContextTokens <= 0 {
-		maxContextTokens = 128000
-	}
-	if keepRecent <= 0 {
-		keepRecent = 30
-	}
-
 	sess := &session.Session{
 		ID:                     session.GenerateID("sess"),
 		Title:                  title,
 		WorkingDirectory:       workingDir,
+		AgentID:                agentID,
 		State:                  session.StateIdle,
 		CreatedAt:              now,
 		LastActiveAt:           now,
 		TrustLevel:             string(approval.TrustNormal),
 		ApprovalPolicy:         make(map[string]string),
 		ApprovalTimeoutSeconds: timeoutSeconds,
-		SystemPromptOverride:   req.SystemPromptOverride,
-		ToolCallLimit:          toolCallLimit,
-		MaxContextTokens:       maxContextTokens,
-		KeepRecent:             keepRecent,
 	}
-	sess.CurrentContextTokens = h.loop.EstimateInitialContextTokens(sess)
+	sess.CurrentContextTokens = h.getDefaultAgent().EstimateInitialContextTokens(sess)
 
 	if err := h.store.Create(sess); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
@@ -121,13 +93,13 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 		ID:                        sess.ID,
 		Title:                     sess.Title,
 		WorkingDirectory:          sess.WorkingDirectory,
+		AgentID:                   sess.AgentID,
 		State:                     sess.State.ToSnakeCase(),
 		CreatedAt:                 sess.CreatedAt.Format(time.RFC3339),
 		TrustLevel:                sess.TrustLevel,
 		ApprovalPolicy:            sess.ApprovalPolicy,
 		ApprovalTimeoutSeconds:    sess.ApprovalTimeoutSeconds,
 		TokenUsage:                sess.TokenUsage,
-		MaxContextTokens:          sess.MaxContextTokens,
 		MaxConcurrentToolCalls:    sess.MaxConcurrentToolCalls,
 		MaxConcurrentSubprocesses: sess.MaxConcurrentSubprocesses,
 		CurrentContextTokens:      sess.CurrentContextTokens,
@@ -138,17 +110,15 @@ type getSessionResponse struct {
 	ID                        string             `json:"id"`
 	Title                     string             `json:"title"`
 	WorkingDirectory          string             `json:"working_directory"`
+	AgentID                   string             `json:"agent_id"`
 	State                     string             `json:"state"`
 	CreatedAt                 string             `json:"created_at"`
 	LastActiveAt              string             `json:"last_active_at"`
 	TrustLevel                string             `json:"trust_level"`
 	ApprovalPolicy            map[string]string  `json:"approval_policy,omitempty"`
 	ApprovalTimeoutSeconds    int                `json:"approval_timeout_seconds"`
-	ToolCallLimit             int                `json:"tool_call_limit"`
 	ToolCallCount             int                `json:"tool_call_count"`
 	TokenUsage                session.TokenUsage `json:"token_usage"`
-	MaxContextTokens          int                `json:"max_context_tokens"`
-	KeepRecent                int                `json:"keep_recent"`
 	MaxConcurrentToolCalls    int                `json:"max_concurrent_tool_calls"`
 	MaxConcurrentSubprocesses int                `json:"max_concurrent_subprocesses"`
 	CurrentContextTokens      int                `json:"current_context_tokens"`
@@ -180,17 +150,15 @@ func (h *Handler) GetSession(w http.ResponseWriter, r *http.Request) {
 		ID:                        sess.ID,
 		Title:                     sess.Title,
 		WorkingDirectory:          sess.WorkingDirectory,
+		AgentID:                   sess.AgentID,
 		State:                     sess.State.ToSnakeCase(),
 		CreatedAt:                 sess.CreatedAt.Format(time.RFC3339),
 		LastActiveAt:              sess.LastActiveAt.Format(time.RFC3339),
 		TrustLevel:                sess.TrustLevel,
 		ApprovalPolicy:            sess.ApprovalPolicy,
 		ApprovalTimeoutSeconds:    sess.ApprovalTimeoutSeconds,
-		ToolCallLimit:             sess.ToolCallLimit,
 		ToolCallCount:             sess.ToolCallCount,
 		TokenUsage:                sess.TokenUsage,
-		MaxContextTokens:          sess.MaxContextTokens,
-		KeepRecent:                sess.KeepRecent,
 		MaxConcurrentToolCalls:    sess.MaxConcurrentToolCalls,
 		MaxConcurrentSubprocesses: sess.MaxConcurrentSubprocesses,
 		CurrentContextTokens:      sess.CurrentContextTokens,
@@ -363,17 +331,11 @@ func (h *Handler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateConfigRequest struct {
-	ToolCallLimit             *int `json:"tool_call_limit,omitempty"`
-	MaxContextTokens          *int `json:"max_context_tokens,omitempty"`
-	KeepRecent                *int `json:"keep_recent,omitempty"`
 	MaxConcurrentToolCalls    *int `json:"max_concurrent_tool_calls,omitempty"`
 	MaxConcurrentSubprocesses *int `json:"max_concurrent_subprocesses,omitempty"`
 }
 
 type updateConfigResponse struct {
-	ToolCallLimit             int `json:"tool_call_limit"`
-	MaxContextTokens          int `json:"max_context_tokens"`
-	KeepRecent                int `json:"keep_recent"`
 	MaxConcurrentToolCalls    int `json:"max_concurrent_tool_calls"`
 	MaxConcurrentSubprocesses int `json:"max_concurrent_subprocesses"`
 }
@@ -387,34 +349,15 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.ToolCallLimit != nil {
-		if *req.ToolCallLimit <= 0 {
-			writeError(w, http.StatusBadRequest, "tool_call_limit must be greater than 0")
-			return
-		}
-		if err := h.loop.UpdateConfig(id, *req.ToolCallLimit); err != nil {
-			if errors.Is(err, session.ErrSessionNotFound) {
-				writeError(w, http.StatusNotFound, "session not found")
-				return
-			}
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-	}
-
-	if req.MaxContextTokens != nil || req.KeepRecent != nil {
-		if err := h.loop.UpdateContextConfig(id, req.MaxContextTokens, req.KeepRecent); err != nil {
-			if errors.Is(err, session.ErrSessionNotFound) {
-				writeError(w, http.StatusNotFound, "session not found")
-				return
-			}
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
+	sess, err := h.store.Get(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
 	}
 
 	if req.MaxConcurrentToolCalls != nil || req.MaxConcurrentSubprocesses != nil {
-		if err := h.loop.UpdateConcurrencyConfig(id, req.MaxConcurrentToolCalls, req.MaxConcurrentSubprocesses); err != nil {
+		if err := h.getAgent(sess).UpdateConcurrencyConfig(id,
+			req.MaxConcurrentToolCalls, req.MaxConcurrentSubprocesses); err != nil {
 			if errors.Is(err, session.ErrSessionNotFound) {
 				writeError(w, http.StatusNotFound, "session not found")
 				return
@@ -424,16 +367,13 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sess, err := h.store.Get(id)
+	sess, err = h.store.Get(id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
 	writeJSON(w, http.StatusOK, updateConfigResponse{
-		ToolCallLimit:             sess.ToolCallLimit,
-		MaxContextTokens:          sess.MaxContextTokens,
-		KeepRecent:                sess.KeepRecent,
 		MaxConcurrentToolCalls:    sess.MaxConcurrentToolCalls,
 		MaxConcurrentSubprocesses: sess.MaxConcurrentSubprocesses,
 	})

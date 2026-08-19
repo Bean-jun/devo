@@ -12,7 +12,7 @@ import (
 
 func TestRecoverCrashedSessions_ProcessingToIdle(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	pid := 99999
 	sess := &session.Session{
@@ -47,7 +47,7 @@ func TestRecoverCrashedSessions_ProcessingToIdle(t *testing.T) {
 
 func TestRecoverCrashedSessions_AwaitingApprovalToIdle(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	pid := 88888
 	sess := &session.Session{
@@ -76,7 +76,7 @@ func TestRecoverCrashedSessions_AwaitingApprovalToIdle(t *testing.T) {
 
 func TestRecoverCrashedSessions_SystemMessageInserted(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	sess := &session.Session{
 		ID:               "sess-sysmsg",
@@ -109,7 +109,7 @@ func TestRecoverCrashedSessions_SystemMessageInserted(t *testing.T) {
 
 func TestRecoverCrashedSessions_PausedUnchanged(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	sess := &session.Session{
 		ID:               "sess-paused",
@@ -138,7 +138,7 @@ func TestRecoverCrashedSessions_PausedUnchanged(t *testing.T) {
 
 func TestRecoverCrashedSessions_IdleUnchanged(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	sess := &session.Session{
 		ID:               "sess-idle",
@@ -167,7 +167,7 @@ func TestRecoverCrashedSessions_IdleUnchanged(t *testing.T) {
 
 func TestRecoverCrashedSessions_MixedStates(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	pid := 77777
 	create := []*session.Session{
@@ -246,7 +246,7 @@ func TestRecoverCrashedSessions_MixedStates(t *testing.T) {
 
 func TestRecoverCrashedSessions_SSEEventPublished(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	sess := &session.Session{
 		ID:               "sess-event",
@@ -290,7 +290,7 @@ func TestRecoverCrashedSessions_SSEEventPublished(t *testing.T) {
 
 func TestRecoverCrashedSessions_CanContinueAfterRecovery(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	sess := &session.Session{
 		ID:               "sess-continue",
@@ -343,7 +343,7 @@ func TestRecoverCrashedSessions_CanContinueAfterRecovery(t *testing.T) {
 
 func TestRecoverCrashedSessions_EmptyStore(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	if err := loop.RecoverCrashedSessions(); err != nil {
 		t.Fatalf("RecoverCrashedSessions on empty store failed: %v", err)
@@ -352,7 +352,7 @@ func TestRecoverCrashedSessions_EmptyStore(t *testing.T) {
 
 func TestRecoverCrashedSessions_NoChildPID(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	sess := &session.Session{
 		ID:               "sess-nochild",
@@ -380,7 +380,7 @@ func TestRecoverCrashedSessions_NoChildPID(t *testing.T) {
 
 func TestRecoverCrashedSessions_WithBackgroundPIDs(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	pid := 99999
 	sess := &session.Session{
@@ -413,7 +413,7 @@ func TestRecoverCrashedSessions_WithBackgroundPIDs(t *testing.T) {
 
 func TestRecoverCrashedSessions_InvalidChildPID(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	invalidPID := -1
 	sess := &session.Session{
@@ -442,7 +442,7 @@ func TestRecoverCrashedSessions_InvalidChildPID(t *testing.T) {
 
 func TestRecoverCrashedSessions_Pagination(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	for i := 0; i < 150; i++ {
 		sess := &session.Session{

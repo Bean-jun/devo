@@ -52,7 +52,7 @@ func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	approvalManager := h.loop.GetApprovalManager()
+	approvalManager := h.getAgent(sess).GetApprovalManager()
 	approvalReq, exists := approvalManager.GetRequest(approvalID)
 	if !exists {
 		writeError(w, http.StatusNotFound, "approval request not found")
@@ -91,7 +91,7 @@ func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.loop.ResolveApproval(id, approvalID, req.Decision); err != nil {
+	if err := h.getAgent(sess).ResolveApproval(id, approvalID, req.Decision); err != nil {
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "has expired") {
 			writeError(w, http.StatusConflict, errMsg)

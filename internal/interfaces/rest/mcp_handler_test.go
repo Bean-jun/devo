@@ -7,6 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"devo/internal/config"
+	"devo/internal/core/agent"
+	"devo/internal/core/approval"
+	"devo/internal/core/concurrency"
+	"devo/internal/core/memory"
+	"devo/internal/core/session"
+	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/mcp"
 )
 
@@ -38,14 +45,30 @@ func TestGetMcpTools_NoManager(t *testing.T) {
 	}
 }
 
-func TestGetMcpTools_WithManager(t *testing.T) {
-	ts, store := setupTestServer()
-	defer ts.Close()
+func setupMcpHandler(store *session.InMemoryStore, mcpManager *mcp.Manager) (*Handler, *agent.Registry) {
+	llm := llmclient.NewMockClient()
+	tmpDir := ""
+	approvalMgr := approval.NewManager()
+	memStore, _ := memory.NewFileStore(tmpDir)
+	pathLock := concurrency.NewPathLockManager()
+	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
 
+	ag := agent.New(
+		agent.Config{ID: "test", Name: "Test", Description: "Test agent", SystemPrompt: "", Tools: nil},
+		store, llm, nil, config.DefaultConfig(),
+		approvalMgr, memManager, nil, nil, nil, nil,
+	)
+	registry := agent.NewRegistry(ag)
+
+	handler := NewHandler(HandlerDeps{Store: store, AgentRegistry: registry, Version: "0.0.1", McpManager: mcpManager})
+	return handler, registry
+}
+
+func TestGetMcpTools_WithManager(t *testing.T) {
+	store := session.NewInMemoryStore()
 	wd := t.TempDir()
 	mcpManager := mcp.NewManager(wd)
-	handler := NewHandler(store, nil, nil, "0.0.1")
-	handler.SetMcpManager(mcpManager)
+	handler, _ := setupMcpHandler(store, mcpManager)
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
@@ -73,13 +96,10 @@ func TestGetMcpTools_WithManager(t *testing.T) {
 }
 
 func TestGetMcpTools_TrustNote(t *testing.T) {
-	ts, store := setupTestServer()
-	defer ts.Close()
-
+	store := session.NewInMemoryStore()
 	wd := t.TempDir()
 	mcpManager := mcp.NewManager(wd)
-	handler := NewHandler(store, nil, nil, "0.0.1")
-	handler.SetMcpManager(mcpManager)
+	handler, _ := setupMcpHandler(store, mcpManager)
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)

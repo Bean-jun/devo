@@ -10,7 +10,13 @@ import (
 func (h *Handler) Compact(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	result, err := h.loop.Compact(id)
+	sess, err := h.store.Get(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+
+	result, err := h.getAgent(sess).Compact(id)
 	if err != nil {
 		if errors.Is(err, session.ErrSessionNotFound) {
 			writeError(w, http.StatusNotFound, "session not found")

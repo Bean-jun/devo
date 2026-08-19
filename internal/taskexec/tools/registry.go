@@ -76,19 +76,31 @@ func NewRegistry() *Registry {
 }
 
 func (r *Registry) Register(t Tool) {
+	if r == nil {
+		return
+	}
 	r.tools[t.Name()] = t
 }
 
 func (r *Registry) Unregister(name string) {
+	if r == nil {
+		return
+	}
 	delete(r.tools, name)
 }
 
 func (r *Registry) Get(name string) (Tool, bool) {
+	if r == nil {
+		return nil, false
+	}
 	t, ok := r.tools[name]
 	return t, ok
 }
 
 func (r *Registry) ListTools() []Tool {
+	if r == nil {
+		return nil
+	}
 	result := make([]Tool, 0, len(r.tools))
 	for _, t := range r.tools {
 		result = append(result, t)
@@ -109,6 +121,15 @@ func EstimateToolTokens(toolList []Tool) int {
 }
 
 func (r *Registry) Execute(ctx context.Context, workingDir string, toolName string, params map[string]interface{}) (<-chan StreamEvent, error) {
+	if r == nil {
+		ch := make(chan StreamEvent, 1)
+		ch <- StreamEvent{
+			Type:  StreamEventError,
+			Error: "tool registry is nil",
+		}
+		close(ch)
+		return ch, nil
+	}
 	t, ok := r.Get(toolName)
 	if !ok {
 		ch := make(chan StreamEvent, 1)

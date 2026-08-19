@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"devo/internal/config"
-	"devo/internal/core/approval"
 	"devo/internal/taskexec/llmclient/providers"
 	"devo/internal/taskexec/llmclient/providers/openai"
 	"devo/internal/taskexec/tools"
@@ -122,8 +121,6 @@ func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.LoadUserApprovalPolicy()
-
 	writeJSON(w, http.StatusOK, getGlobalConfigResponse{
 		LLM: llmConfigResponse{
 			BaseURL:         h.cfg.LLM.BaseURL,
@@ -139,26 +136,6 @@ func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 		MaxContextTokens: h.cfg.MaxContextTokens,
 		KeepRecent:       h.cfg.KeepRecent,
 	})
-}
-
-func (h *Handler) LoadUserApprovalPolicy() {
-	raw := h.loadUserApprovalPolicyFromConfig()
-	policy := make(map[approval.OperationType]approval.PolicyLevel)
-	for k, v := range raw {
-		policy[approval.OperationType(k)] = approval.PolicyLevel(v)
-	}
-	h.loop.GetApprovalManager().SetUserGlobalPolicy(policy)
-}
-
-func (h *Handler) loadUserApprovalPolicyFromConfig() map[string]string {
-	cfg, err := config.LoadGlobal()
-	if err != nil || cfg == nil {
-		return map[string]string{}
-	}
-	if cfg.ApprovalPolicy == nil {
-		return map[string]string{}
-	}
-	return cfg.ApprovalPolicy
 }
 
 func maskAPIKey(key string) string {
@@ -224,7 +201,7 @@ func (h *Handler) OnboardLLM(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.cfg = cfg
-	h.SetLLMConfigured(true)
+	h.llmConfigured = true
 
 	h.rebuildLLMClient(cfg)
 
@@ -304,7 +281,7 @@ func (h *Handler) AddModel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.cfg = cfg
-	h.SetLLMConfigured(true)
+	h.llmConfigured = true
 
 	writeJSON(w, http.StatusCreated, req)
 }
@@ -416,7 +393,7 @@ func (h *Handler) DeleteModel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.cfg = cfg
-	h.SetLLMConfigured(llmConfigured)
+	h.llmConfigured = llmConfigured
 
 	if llmConfigured && id == cfg.LLM.ActiveModelID {
 		h.rebuildLLMClient(cfg)
@@ -523,9 +500,9 @@ func (h *Handler) TestModelConnection(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) rebuildLLMClient(cfg *config.Config) {
-	if h.loop == nil {
+	if h.agentRegistry == nil {
 		return
 	}
 	client := providers.NewClient(cfg, nil)
-	h.loop.UpdateLLMClient(client)
+	h.getDefaultAgent().UpdateLLMClient(client)
 }

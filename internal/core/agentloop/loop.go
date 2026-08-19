@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"devo/internal/config"
 	"devo/internal/core/approval"
 	"devo/internal/core/archive"
 	"devo/internal/core/compressor"
@@ -17,6 +18,7 @@ import (
 	"devo/internal/core/tokenmeter"
 	"devo/internal/pkg/logging"
 	"devo/internal/taskexec/llmclient"
+	"devo/internal/taskexec/mcp"
 	"devo/internal/taskexec/tools"
 )
 
@@ -33,6 +35,7 @@ type ApprovalDecision struct {
 }
 
 type Loop struct {
+	cfg              *config.Config
 	store            session.SessionStore
 	llmClient        llmclient.Client
 	promptAssembler  *prompt.Assembler
@@ -47,24 +50,51 @@ type Loop struct {
 	skillsManager    *skills.Manager
 	solidifier       *skills.Solidifier
 	bgManager        *tools.BackgroundProcessManager
+	mcpMgr           *mcp.Manager
 	stateMachine     *StateMachine
 	activeLoops      sync.Map
 	loopWG           sync.WaitGroup
 	mu               sync.Mutex
 }
 
-func New(store session.SessionStore, llmClient llmclient.Client) *Loop {
+func New(
+	store session.SessionStore,
+	llmClient llmclient.Client,
+	toolExecutor ToolExecutor,
+	cfg *config.Config,
+	approvalMgr *approval.Manager,
+	memoryMgr *memory.Manager,
+	skillsMgr *skills.Manager,
+	bgProcManager *tools.BackgroundProcessManager,
+	mcpMgr *mcp.Manager,
+	solidifier *skills.Solidifier,
+) *Loop {
 	pathLockManager := concurrency.NewPathLockManager()
+	systemPrompt := prompt.DefaultSystemPrompt()
+	assembler := prompt.NewAssembler(systemPrompt)
+	if memoryMgr != nil {
+		assembler.SetMemoryProvider(memoryMgr)
+	}
+	if skillsMgr != nil {
+		assembler.SetSkillsProvider(skillsMgr)
+	}
 	l := &Loop{
+		cfg:              cfg,
 		store:            store,
 		llmClient:        llmClient,
-		promptAssembler:  prompt.NewAssembler(),
-		approvalManager:  approval.NewManager(),
+		promptAssembler:  assembler,
+		toolExecutor:     toolExecutor,
+		approvalManager:  approvalMgr,
 		approvalChannels: make(map[string]chan ApprovalDecision),
 		tokenMeter:       tokenmeter.NewMeter(store),
 		compressor:       compressor.New(llmClient, store),
 		pathLockManager:  pathLockManager,
 		archiveManager:   archive.NewArchiveManager(store, pathLockManager),
+		memoryManager:    memoryMgr,
+		skillsManager:    skillsMgr,
+		solidifier:       solidifier,
+		bgManager:        bgProcManager,
+		mcpMgr:           mcpMgr,
 	}
 	l.stateMachine = NewStateMachine()
 	l.registerHandlers(l.stateMachine)
@@ -72,11 +102,13 @@ func New(store session.SessionStore, llmClient llmclient.Client) *Loop {
 }
 
 func NewWithTools(store session.SessionStore, llmClient llmclient.Client, toolExecutor ToolExecutor) *Loop {
+	cfg := config.DefaultConfig()
 	pathLockManager := concurrency.NewPathLockManager()
 	l := &Loop{
+		cfg:              cfg,
 		store:            store,
 		llmClient:        llmClient,
-		promptAssembler:  prompt.NewAssembler(),
+		promptAssembler:  prompt.NewAssembler(prompt.DefaultSystemPrompt()),
 		toolExecutor:     toolExecutor,
 		approvalManager:  approval.NewManager(),
 		approvalChannels: make(map[string]chan ApprovalDecision),
@@ -94,7 +126,10 @@ func (l *Loop) EstimateInitialContextTokens(sess *session.Session) int {
 	systemPrompt := l.promptAssembler.Assemble(sess)
 	tokens := tokenmeter.EstimateTokens(systemPrompt)
 	if l.toolExecutor != nil {
-		tokens += tools.EstimateToolTokens(l.toolExecutor.ListTools())
+		toolList := l.toolExecutor.ListTools()
+		if toolList != nil {
+			tokens += tools.EstimateToolTokens(toolList)
+		}
 	}
 	return tokens
 }
@@ -254,22 +289,8 @@ func (l *Loop) SetPromptAssembler(pa *prompt.Assembler) {
 	l.promptAssembler = pa
 }
 
-func (l *Loop) SetMemoryManager(mm *memory.Manager) {
-	l.memoryManager = mm
-	if l.promptAssembler != nil {
-		l.promptAssembler.SetMemoryProvider(mm)
-	}
-}
-
 func (l *Loop) GetApprovalManager() *approval.Manager {
 	return l.approvalManager
-}
-
-func (l *Loop) SetSkillsManager(sm *skills.Manager) {
-	l.skillsManager = sm
-	if l.promptAssembler != nil {
-		l.promptAssembler.SetSkillsProvider(sm)
-	}
 }
 
 func (l *Loop) GetSkillsManager() *skills.Manager {
@@ -280,9 +301,6 @@ func (l *Loop) SetSolidifier(sol *skills.Solidifier) {
 	l.solidifier = sol
 }
 
-// SetBackgroundProcessManager injects the background process manager. Required
-// for exec_python background mode to register/stream processes and for
-// Cancel/Complete to stop them. May be nil in tests.
 func (l *Loop) SetBackgroundProcessManager(mgr *tools.BackgroundProcessManager) {
 	l.bgManager = mgr
 }

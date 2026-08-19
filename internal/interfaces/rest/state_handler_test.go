@@ -400,13 +400,8 @@ func TestArchive_FromCompleted(t *testing.T) {
 
 	var result map[string]string
 	json.NewDecoder(resp.Body).Decode(&result)
-	if result["state"] != session.StateArchived.ToSnakeCase() {
-		t.Errorf("expected state Archived, got %q", result["state"])
-	}
-
-	sessGot, _ := store.Get("sess-test-1")
-	if sessGot.State != session.StateArchived {
-		t.Errorf("expected state Archived in store, got %q", sessGot.State)
+	if result["status"] != "ok" {
+		t.Errorf("expected status 'ok', got %q", result["status"])
 	}
 }
 

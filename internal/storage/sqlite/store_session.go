@@ -51,22 +51,21 @@ func (s *GormStore) Update(sess *session.Session) error {
 	updates := map[string]interface{}{
 		"title":                        sess.Title,
 		"working_directory":            sess.WorkingDirectory,
+		"agent_id":                     sess.AgentID,
 		"state":                        string(sess.State),
 		"last_active_at":               sess.LastActiveAt,
 		"active_sse_connections":       sess.ActiveSSEConnections,
 		"trust_level":                  sess.TrustLevel,
 		"approval_timeout_seconds":     sess.ApprovalTimeoutSeconds,
-		"tool_call_limit":              sess.ToolCallLimit,
 		"tool_call_count":              sess.ToolCallCount,
 		"last_loop_termination_reason": string(sess.LastLoopTerminationReason),
 		"token_usage_input":            sess.TokenUsage.Input,
 		"token_usage_output":           sess.TokenUsage.Output,
 		"token_usage_total":            sess.TokenUsage.Total,
 		"compression_count":            sess.CompressionCount,
-		"max_context_tokens":           sess.MaxContextTokens,
-		"keep_recent":                  sess.KeepRecent,
+		"max_concurrent_tool_calls":    sess.MaxConcurrentToolCalls,
+		"max_concurrent_subprocesses":  sess.MaxConcurrentSubprocesses,
 		"current_context_tokens":       sess.CurrentContextTokens,
-		"system_prompt_override":       sess.SystemPromptOverride,
 	}
 
 	if sess.ApprovalPolicy != nil {

@@ -370,7 +370,7 @@ func TestAgentLoop_ReadOnlyToolsNoApproval(t *testing.T) {
 
 func TestResolveApproval_InvalidDecision(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	err := loop.ResolveApproval("sess-1", "approval-1", "invalid")
 	if err == nil {
@@ -380,7 +380,7 @@ func TestResolveApproval_InvalidDecision(t *testing.T) {
 
 func TestResolveApproval_NotFound(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	err := loop.ResolveApproval("sess-1", "nonexistent", "approve")
 	if err == nil {

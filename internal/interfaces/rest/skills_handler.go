@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -226,12 +227,12 @@ func (h *Handler) SolidifySession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.skillsManager == nil || h.loop == nil {
-		writeError(w, http.StatusInternalServerError, "skills manager or loop not available")
+	if h.skillsManager == nil || h.agentRegistry == nil {
+		writeError(w, http.StatusInternalServerError, "skills manager or agent registry not available")
 		return
 	}
 
-	result, err := h.loop.SolidifySession(context.Background(), id)
+	result, err := h.getAgent(sess).SolidifySession(context.Background(), id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "solidify failed: "+err.Error())
 		return
@@ -242,7 +243,7 @@ func (h *Handler) SolidifySession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	approvalManager := h.loop.GetApprovalManager()
+	approvalManager := h.getAgent(sess).GetApprovalManager()
 	opType := approval.OpSolidifySkill
 	sessionPolicy := make(map[approval.OperationType]approval.PolicyLevel)
 	for k, v := range sess.ApprovalPolicy {
@@ -299,7 +300,12 @@ func (h *Handler) SolidifyApprove(sessionID, approvalID string, approved bool) (
 		return nil, errors.New("skills manager not available")
 	}
 
-	approvalManager := h.loop.GetApprovalManager()
+	sess, err := h.store.Get(sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("get session: %w", err)
+	}
+
+	approvalManager := h.getAgent(sess).GetApprovalManager()
 	req, ok := approvalManager.GetRequest(approvalID)
 	if !ok {
 		return nil, errors.New("approval request not found")

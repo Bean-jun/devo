@@ -70,11 +70,9 @@ func TestAssembler_Assemble_Basic(t *testing.T) {
 		ID:               "sess-test-1",
 		WorkingDirectory: tmpDir,
 		TrustLevel:       "session_trust",
-		ToolCallLimit:    50,
-		ToolCallCount:    0,
 	}
 
-	assembler := NewAssembler()
+	assembler := NewAssembler(DefaultSystemPrompt())
 	result := assembler.Assemble(sess)
 
 	if !strings.Contains(result, "You are Devo") {
@@ -88,22 +86,20 @@ func TestAssembler_Assemble_Basic(t *testing.T) {
 	}
 }
 
-func TestAssembler_Assemble_WithSystemPromptOverride(t *testing.T) {
+func TestAssembler_Assemble_WithCustomSystemPrompt(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	sess := &session.Session{
-		ID:                   "sess-test-1",
-		WorkingDirectory:     tmpDir,
-		SystemPromptOverride: "请使用中文回答所有问题",
-		TrustLevel:           "session_trust",
-		ToolCallLimit:        50,
+		ID:               "sess-test-1",
+		WorkingDirectory: tmpDir,
+		TrustLevel:       "session_trust",
 	}
 
-	assembler := NewAssembler()
+	assembler := NewAssembler("请使用中文回答所有问题")
 	result := assembler.Assemble(sess)
 
 	if !strings.Contains(result, "请使用中文回答所有问题") {
-		t.Error("expected system prompt override in assembled result")
+		t.Error("expected custom system prompt in assembled result")
 	}
 }
 
@@ -115,10 +111,9 @@ func TestAssembler_Assemble_WithAgentsMD(t *testing.T) {
 		ID:               "sess-test-1",
 		WorkingDirectory: tmpDir,
 		TrustLevel:       "session_trust",
-		ToolCallLimit:    50,
 	}
 
-	assembler := NewAssembler()
+	assembler := NewAssembler(DefaultSystemPrompt())
 	result := assembler.Assemble(sess)
 
 	if !strings.Contains(result, "所有 Python 文件必须包含文件头注释") {
@@ -133,10 +128,9 @@ func TestAssembler_Assemble_WithoutAgentsMD(t *testing.T) {
 		ID:               "sess-test-1",
 		WorkingDirectory: tmpDir,
 		TrustLevel:       "session_trust",
-		ToolCallLimit:    50,
 	}
 
-	assembler := NewAssembler()
+	assembler := NewAssembler(DefaultSystemPrompt())
 	result := assembler.Assemble(sess)
 
 	if strings.Contains(result, "agents.md") {
@@ -152,7 +146,7 @@ func TestAssembler_Assemble_DynamicInfo(t *testing.T) {
 		WorkingDirectory: tmpDir,
 	}
 
-	assembler := NewAssembler()
+	assembler := NewAssembler(DefaultSystemPrompt())
 	result := assembler.Assemble(sess)
 
 	if !strings.Contains(result, "sess-dynamic") {
@@ -168,135 +162,100 @@ func TestAssembler_Assemble_Ordering(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "agents.md"), []byte("AGENTS_MD_RULE"), 0644)
 
 	sess := &session.Session{
-		ID:                   "sess-order",
-		WorkingDirectory:     tmpDir,
-		SystemPromptOverride: "OVERRIDE_TEXT",
-		TrustLevel:           "session_trust",
-		ToolCallLimit:        50,
+		ID:               "sess-order",
+		WorkingDirectory: tmpDir,
+		TrustLevel:       "session_trust",
 	}
 
-	assembler := NewAssembler()
+	assembler := NewAssembler("CUSTOM_SYSTEM_PROMPT")
 	result := assembler.Assemble(sess)
 
-	baseIdx := strings.Index(result, "You are Devo")
-	overrideIdx := strings.Index(result, "OVERRIDE_TEXT")
+	baseIdx := strings.Index(result, "CUSTOM_SYSTEM_PROMPT")
 	agentsIdx := strings.Index(result, "AGENTS_MD_RULE")
 	dynamicIdx := strings.Index(result, "session ID")
 
-	if baseIdx < 0 || overrideIdx < 0 || agentsIdx < 0 || dynamicIdx < 0 {
+	if baseIdx < 0 || agentsIdx < 0 || dynamicIdx < 0 {
 		t.Fatal("expected all sections to be present")
 	}
 
-	if !(baseIdx < overrideIdx) {
-		t.Error("base prompt should come before override")
-	}
-	if !(overrideIdx < agentsIdx) {
-		t.Error("override should come before agents.md")
+	if !(baseIdx < agentsIdx) {
+		t.Error("system prompt should come before agents.md")
 	}
 	if !(agentsIdx < dynamicIdx) {
 		t.Error("agents.md should come before dynamic info")
 	}
 }
 
-func TestAssembler_SetBasePrompt(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	sess := &session.Session{
-		ID:               "sess-1",
-		WorkingDirectory: tmpDir,
-		TrustLevel:       "session_trust",
-		ToolCallLimit:    50,
-	}
-
-	assembler := NewAssembler()
-	assembler.SetBasePrompt("You are a Python expert. Write clean code.")
-
-	result := assembler.Assemble(sess)
-
-	if !strings.Contains(result, "You are a Python expert") {
-		t.Error("expected custom base prompt in assembled result")
-	}
-	if strings.Contains(result, "You are Devo") {
-		t.Error("expected default base prompt to be replaced")
-	}
-}
-
-type mockSkillsProvider struct {
-	prompt string
-}
-
-func (m *mockSkillsProvider) GetActiveSkillsPrompt() string {
-	return m.prompt
-}
-
 func TestAssembler_Assemble_WithSkillsProvider(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	sess := &session.Session{
-		ID:               "sess-1",
+		ID:               "sess-test-1",
 		WorkingDirectory: tmpDir,
-		TrustLevel:       "session_trust",
-		ToolCallLimit:    50,
 	}
 
-	assembler := NewAssembler()
-	assembler.SetSkillsProvider(&mockSkillsProvider{prompt: "你是一个 Vue 专家，请使用 Composition API"})
+	assembler := NewAssembler(DefaultSystemPrompt())
+	assembler.SetSkillsProvider(&mockSkillsProvider{})
 
 	result := assembler.Assemble(sess)
 
-	if !strings.Contains(result, "Composition API") {
-		t.Error("expected skills prompt in assembled result")
+	if !strings.Contains(result, "ACTIVE_SKILLS_CONTENT") {
+		t.Error("expected skills provider content in assembled result")
 	}
-}
-
-type mockMemoryProvider struct {
-	memory string
-}
-
-func (m *mockMemoryProvider) GetRelevantMemories(workingDir, sessionID string) string {
-	return m.memory
 }
 
 func TestAssembler_Assemble_WithMemoryProvider(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	sess := &session.Session{
-		ID:               "sess-mem",
+		ID:               "sess-test-1",
 		WorkingDirectory: tmpDir,
-		TrustLevel:       "session_trust",
-		ToolCallLimit:    50,
 	}
 
-	assembler := NewAssembler()
-	assembler.SetMemoryProvider(&mockMemoryProvider{memory: "用户偏好使用 TypeScript 而非 JavaScript"})
+	assembler := NewAssembler(DefaultSystemPrompt())
+	assembler.SetMemoryProvider(&mockMemoryProvider{})
 
 	result := assembler.Assemble(sess)
 
-	if !strings.Contains(result, "TypeScript") {
-		t.Error("expected memory content in assembled result")
+	if !strings.Contains(result, "RELEVANT_MEMORIES_CONTENT") {
+		t.Error("expected memory provider content in assembled result")
 	}
 }
 
-func TestAssembler_Assemble_EmptyProviders(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	sess := &session.Session{
-		ID:               "sess-1",
-		WorkingDirectory: tmpDir,
-		TrustLevel:       "session_trust",
-		ToolCallLimit:    50,
+func TestDefaultSystemPrompt(t *testing.T) {
+	prompt := DefaultSystemPrompt()
+	if prompt == "" {
+		t.Error("expected non-empty default system prompt")
 	}
-
-	assembler := NewAssembler()
-	assembler.SetSkillsProvider(&mockSkillsProvider{prompt: ""})
-	assembler.SetMemoryProvider(&mockMemoryProvider{memory: ""})
-
-	result := assembler.Assemble(sess)
-
-	if strings.Contains(result, "Composition API") {
-		t.Error("empty skills should not appear in result")
+	if !strings.Contains(prompt, "You are Devo") {
+		t.Error("expected default prompt to contain 'You are Devo'")
 	}
-	if strings.Contains(result, "TypeScript") {
-		t.Error("empty memory should not appear in result")
+}
+
+func TestNewAssembler_EmptyPrompt(t *testing.T) {
+	assembler := NewAssembler("")
+	if assembler.systemPrompt != DefaultSystemPrompt() {
+		t.Error("expected default system prompt when empty string is provided")
 	}
+}
+
+func TestAssembler_SetSystemPrompt(t *testing.T) {
+	assembler := NewAssembler(DefaultSystemPrompt())
+	assembler.SetSystemPrompt("New prompt")
+
+	if assembler.systemPrompt != "New prompt" {
+		t.Errorf("expected 'New prompt', got %q", assembler.systemPrompt)
+	}
+}
+
+type mockSkillsProvider struct{}
+
+func (m *mockSkillsProvider) GetActiveSkillsPrompt() string {
+	return "ACTIVE_SKILLS_CONTENT"
+}
+
+type mockMemoryProvider struct{}
+
+func (m *mockMemoryProvider) GetRelevantMemories(workingDir, sessionID string) string {
+	return "RELEVANT_MEMORIES_CONTENT"
 }

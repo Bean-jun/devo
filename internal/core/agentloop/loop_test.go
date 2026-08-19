@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"devo/internal/config"
+	"devo/internal/core/approval"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
@@ -14,12 +16,28 @@ import (
 
 func setupTestLoop() (*Loop, *session.InMemoryStore) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 	return loop, store
 }
 
 func newTestLoopWithTools(t *testing.T, store *session.InMemoryStore, client llmclient.Client, toolRegistry *tools.Registry) *Loop {
 	loop := NewWithTools(store, client, toolRegistry)
+	t.Cleanup(func() {
+		done := make(chan struct{})
+		go func() {
+			loop.WaitForCompletion()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+		}
+	})
+	return loop
+}
+
+func newTestLoopWithConfig(t *testing.T, store *session.InMemoryStore, client llmclient.Client, toolRegistry *tools.Registry, cfg *config.Config) *Loop {
+	loop := New(store, client, toolRegistry, cfg, approval.NewManager(), nil, nil, nil, nil, nil)
 	t.Cleanup(func() {
 		done := make(chan struct{})
 		go func() {
@@ -245,7 +263,7 @@ func TestProcessMessageConflictDuringProcessing(t *testing.T) {
 	createTestSession(store, "sess-1")
 
 	slowClient := &slowLLMClient{}
-	loop := New(store, slowClient)
+	loop := NewWithTools(store, slowClient, nil)
 
 	if err := loop.ProcessMessage(context.Background(), "sess-1", session.Message{Content: "First"}); err != nil {
 		t.Fatalf("first message: %v", err)
@@ -281,7 +299,7 @@ func TestStateRevertsOnLLMError(t *testing.T) {
 	createTestSession(store, "sess-1")
 
 	failingClient := &errorLLMClient{}
-	loop := New(store, failingClient)
+	loop := NewWithTools(store, failingClient, nil)
 
 	eventBus, _ := store.GetEventBus("sess-1")
 	ch, unsubscribe := eventBus.Subscribe()
@@ -416,7 +434,7 @@ func TestConcurrentSessionProcessing(t *testing.T) {
 		store.Create(sess)
 	}
 
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	var wg sync.WaitGroup
 	errs := make(chan error, 5)
@@ -466,7 +484,7 @@ func TestConcurrentSessionStateIsolation(t *testing.T) {
 	createTestSession(store, "sess-b")
 
 	slowClient := &slowLLMClient{}
-	loop := New(store, slowClient)
+	loop := NewWithTools(store, slowClient, nil)
 
 	if err := loop.ProcessMessage(context.Background(), "sess-a", session.Message{Content: "Message A"}); err != nil {
 		t.Fatalf("session A: %v", err)
@@ -492,7 +510,7 @@ func TestUpdateConcurrencyConfig(t *testing.T) {
 	store := session.NewInMemoryStore()
 	createTestSession(store, "sess-1")
 
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	maxToolCalls := 5
 	maxSubprocesses := 3
@@ -512,7 +530,7 @@ func TestUpdateConcurrencyConfig(t *testing.T) {
 
 func TestUpdateConcurrencyConfigNotFound(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	maxToolCalls := 5
 	err := loop.UpdateConcurrencyConfig("nonexistent", &maxToolCalls, nil)
@@ -525,7 +543,7 @@ func TestUpdateConcurrencyConfigNegativeValue(t *testing.T) {
 	store := session.NewInMemoryStore()
 	createTestSession(store, "sess-1")
 
-	loop := New(store, llmclient.NewMockClient())
+	loop := NewWithTools(store, llmclient.NewMockClient(), nil)
 
 	badValue := -1
 	err := loop.UpdateConcurrencyConfig("sess-1", nil, &badValue)

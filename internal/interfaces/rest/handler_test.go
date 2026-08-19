@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"devo/internal/core/agentloop"
+	"devo/internal/config"
+	"devo/internal/core/agent"
 	"devo/internal/core/approval"
 	"devo/internal/core/concurrency"
 	"devo/internal/core/memory"
@@ -22,8 +23,7 @@ import (
 func setupTestServer() (*httptest.Server, *session.InMemoryStore) {
 	store := session.NewInMemoryStore()
 	llm := llmclient.NewMockClient()
-	loop := agentloop.New(store, llm)
-	// Use temp dir for test
+
 	tmpDir, err := os.MkdirTemp("", "devo-test-*")
 	if err != nil {
 		panic(err)
@@ -35,8 +35,15 @@ func setupTestServer() (*httptest.Server, *session.InMemoryStore) {
 	pathLock := concurrency.NewPathLockManager()
 	approvalMgr := approval.NewManager()
 	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
-	loop.SetMemoryManager(memManager)
-	handler := NewHandler(store, loop, memManager, "0.0.1")
+
+	ag := agent.New(
+		agent.Config{ID: "test", Name: "Test", Description: "Test agent", SystemPrompt: "", Tools: nil},
+		store, llm, nil, config.DefaultConfig(),
+		approvalMgr, memManager, nil, nil, nil, nil,
+	)
+	registry := agent.NewRegistry(ag)
+
+	handler := NewHandler(HandlerDeps{Store: store, AgentRegistry: registry, Version: "0.0.1"})
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
@@ -44,15 +51,14 @@ func setupTestServer() (*httptest.Server, *session.InMemoryStore) {
 	return httptest.NewServer(mux), store
 }
 
-func setupTestServerWithTools() (*httptest.Server, *session.InMemoryStore, *agentloop.Loop) {
+func setupTestServerWithTools() (*httptest.Server, *session.InMemoryStore, *agent.Agent) {
 	store := session.NewInMemoryStore()
 
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.WriteFileTool{})
 
 	llm := &approvalMockClient{}
-	loop := agentloop.NewWithTools(store, llm, toolRegistry)
-	// Use temp dir for test
+
 	tmpDir, err := os.MkdirTemp("", "devo-test-*")
 	if err != nil {
 		panic(err)
@@ -64,13 +70,20 @@ func setupTestServerWithTools() (*httptest.Server, *session.InMemoryStore, *agen
 	pathLock := concurrency.NewPathLockManager()
 	approvalMgr := approval.NewManager()
 	memManager := memory.NewManager(memStore, pathLock, approvalMgr)
-	loop.SetMemoryManager(memManager)
-	handler := NewHandler(store, loop, memManager, "0.0.1")
+
+	ag := agent.New(
+		agent.Config{ID: "test", Name: "Test", Description: "Test agent", SystemPrompt: "", Tools: nil},
+		store, llm, toolRegistry, config.DefaultConfig(),
+		approvalMgr, memManager, nil, nil, nil, nil,
+	)
+	registry := agent.NewRegistry(ag)
+
+	handler := NewHandler(HandlerDeps{Store: store, AgentRegistry: registry, Version: "0.0.1"})
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	return httptest.NewServer(mux), store, loop
+	return httptest.NewServer(mux), store, ag
 }
 
 type approvalMockClient struct {

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"devo/internal/config"
 	"devo/internal/core/session"
 	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/tools"
@@ -238,7 +239,7 @@ func TestAgentLoopWithMultipleToolCalls(t *testing.T) {
 
 func TestAgentLoopWithoutToolExecutor(t *testing.T) {
 	store := session.NewInMemoryStore()
-	loop := New(store, &toolCallingMockClient{})
+	loop := NewWithTools(store, &toolCallingMockClient{}, nil)
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
@@ -330,12 +331,11 @@ func TestToolCallLimitReached(t *testing.T) {
 	toolRegistry := tools.NewRegistry()
 	toolRegistry.Register(&tools.ReadFileTool{})
 
-	loop := newTestLoopWithTools(t, store, &limitedToolMockClient{maxCalls: 100}, toolRegistry)
+	loop := newTestLoopWithConfig(t, store, &limitedToolMockClient{maxCalls: 100}, toolRegistry, &config.Config{ToolCallLimit: 3})
 
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
 	sess.WorkingDirectory = tmpDir
-	sess.ToolCallLimit = 3
 	store.Update(sess)
 
 	eventBus, _ := store.GetEventBus("sess-1")
@@ -401,7 +401,7 @@ func TestContinuationAfterToolLimit(t *testing.T) {
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
 	sess.WorkingDirectory = tmpDir
-	sess.ToolCallLimit = 2
+	loop.cfg.ToolCallLimit = 2
 	store.Update(sess)
 
 	eventBus, _ := store.GetEventBus("sess-1")
@@ -471,53 +471,6 @@ func TestContinuationAfterToolLimit(t *testing.T) {
 	}
 }
 
-func TestUpdateConfigToolCallLimit(t *testing.T) {
-	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
-
-	createTestSession(store, "sess-1")
-	sess, _ := store.Get("sess-1")
-	sess.ToolCallLimit = 50
-	store.Update(sess)
-
-	err := loop.UpdateConfig("sess-1", 80)
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-
-	sess, _ = store.Get("sess-1")
-	if sess.ToolCallLimit != 80 {
-		t.Errorf("expected tool_call_limit 80, got %d", sess.ToolCallLimit)
-	}
-}
-
-func TestUpdateConfigInvalidValue(t *testing.T) {
-	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
-
-	createTestSession(store, "sess-1")
-
-	err := loop.UpdateConfig("sess-1", 0)
-	if err == nil {
-		t.Fatal("expected error for tool_call_limit <= 0")
-	}
-
-	err = loop.UpdateConfig("sess-1", -5)
-	if err == nil {
-		t.Fatal("expected error for negative tool_call_limit")
-	}
-}
-
-func TestUpdateConfigSessionNotFound(t *testing.T) {
-	store := session.NewInMemoryStore()
-	loop := New(store, llmclient.NewMockClient())
-
-	err := loop.UpdateConfig("nonexistent", 80)
-	if err == nil {
-		t.Fatal("expected error for nonexistent session")
-	}
-}
-
 func TestToolCallCountResetsOnNewLoop(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("hello"), 0644)
@@ -532,7 +485,7 @@ func TestToolCallCountResetsOnNewLoop(t *testing.T) {
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
 	sess.WorkingDirectory = tmpDir
-	sess.ToolCallLimit = 1
+	loop.cfg.ToolCallLimit = 1
 	store.Update(sess)
 
 	eventBus, _ := store.GetEventBus("sess-1")
@@ -581,7 +534,7 @@ func TestContinuationWithNewTask(t *testing.T) {
 	createTestSession(store, "sess-1")
 	sess, _ := store.Get("sess-1")
 	sess.WorkingDirectory = tmpDir
-	sess.ToolCallLimit = 2
+	loop.cfg.ToolCallLimit = 2
 	store.Update(sess)
 
 	eventBus, _ := store.GetEventBus("sess-1")

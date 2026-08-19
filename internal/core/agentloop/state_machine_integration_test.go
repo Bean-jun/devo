@@ -299,7 +299,7 @@ func TestIntegration_ToolCallLimit(t *testing.T) {
 
 	sess, _ := store.Get("sess-tool-limit")
 	sess.WorkingDirectory = tmpDir
-	sess.ToolCallLimit = 1
+	loop.cfg.ToolCallLimit = 1
 	store.Update(sess)
 
 	eventBus, _ := store.GetEventBus("sess-tool-limit")
@@ -332,7 +332,7 @@ func TestIntegration_ErrorRecovery(t *testing.T) {
 	store := session.NewInMemoryStore()
 	createTestSession(store, "sess-error-recovery")
 
-	loop := New(store, &errorMockClient{})
+	loop := NewWithTools(store, &errorMockClient{}, nil)
 
 	sess, _ := store.Get("sess-error-recovery")
 	store.Update(sess)
