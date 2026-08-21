@@ -12,13 +12,13 @@ const crashRecoverySystemMessage = "系统检测到上次服务异常中断，�
 
 func (l *Loop) RecoverCrashedSessions() error {
 	ctx := context.Background()
-	sessions, total, err := l.store.ListSessions("all", "", 0, 0)
+	sessions, total, err := l.store.ListSessions("all", "", "", 0, 0)
 	if err != nil {
 		return fmt.Errorf("list sessions for crash recovery: %w", err)
 	}
 
 	if total > len(sessions) {
-		sessions, _, err = l.store.ListSessions("all", "", total, 0)
+		sessions, _, err = l.store.ListSessions("all", "", "", total, 0)
 		if err != nil {
 			return fmt.Errorf("list all sessions for crash recovery: %w", err)
 		}

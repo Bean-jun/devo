@@ -580,6 +580,10 @@ func (m *Manager) GetSkill(name string) (*Skill, error) {
 	return nil, ErrSkillNotFound
 }
 
+func (m *Manager) IsSkillAllowed(name string) bool {
+	return true
+}
+
 func (m *Manager) Rescan() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

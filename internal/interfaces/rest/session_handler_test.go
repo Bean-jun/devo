@@ -181,6 +181,88 @@ func TestCreateSession_DefaultTimeout(t *testing.T) {
 	}
 }
 
+func TestCreateSession_WithAgentID(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+
+	body := map[string]string{
+		"working_directory": tmpDir,
+		"agent_id":          "test",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, err := http.Post(server.URL+"/api/v1/sessions", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected 201, got %d", resp.StatusCode)
+	}
+
+	var result createSessionResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	if result.AgentID != "test" {
+		t.Errorf("expected agent_id 'test', got %q", result.AgentID)
+	}
+}
+
+func TestCreateSession_InvalidAgentID(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+
+	body := map[string]string{
+		"working_directory": tmpDir,
+		"agent_id":          "nonexistent-agent",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, err := http.Post(server.URL+"/api/v1/sessions", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid agent_id, got %d", resp.StatusCode)
+	}
+}
+
+func TestCreateSession_DefaultAgentID(t *testing.T) {
+	server, _ := setupTestServer()
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+
+	body := map[string]string{
+		"working_directory": tmpDir,
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	resp, err := http.Post(server.URL+"/api/v1/sessions", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected 201, got %d", resp.StatusCode)
+	}
+
+	var result createSessionResponse
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	if result.AgentID != "test" {
+		t.Errorf("expected agent_id 'test' (default agent), got %q", result.AgentID)
+	}
+}
+
 func TestGetSession_Success(t *testing.T) {
 	server, store := setupTestServer()
 	defer server.Close()

@@ -142,7 +142,7 @@ func (s *InMemoryStore) DecrementSSEConnections(sessionID string) error {
 	return nil
 }
 
-func (s *InMemoryStore) ListSessions(status, project string, limit, offset int) ([]Session, int, error) {
+func (s *InMemoryStore) ListSessions(status, project, agentID string, limit, offset int) ([]Session, int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -152,6 +152,9 @@ func (s *InMemoryStore) ListSessions(status, project string, limit, offset int) 
 			continue
 		}
 		if project != "" && sess.WorkingDirectory != project {
+			continue
+		}
+		if agentID != "" && sess.AgentID != agentID {
 			continue
 		}
 		result = append(result, *sess)

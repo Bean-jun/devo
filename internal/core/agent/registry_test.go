@@ -169,3 +169,33 @@ func TestRegistry_MultipleAgents(t *testing.T) {
 		t.Errorf("expected default agent for empty ID, got %q", agent.Config.ID)
 	}
 }
+
+func TestRegistry_Exists(t *testing.T) {
+	defaultAgent := newTestAgent(t, "devo-default", "Devo")
+	r := NewRegistry(defaultAgent)
+
+	t.Run("empty string is always true", func(t *testing.T) {
+		if !r.Exists("") {
+			t.Error("expected Exists to return true for empty string")
+		}
+	})
+
+	t.Run("default agent exists", func(t *testing.T) {
+		if !r.Exists("devo-default") {
+			t.Error("expected Exists to return true for default agent")
+		}
+	})
+
+	t.Run("unknown agent does not exist", func(t *testing.T) {
+		if r.Exists("nonexistent") {
+			t.Error("expected Exists to return false for unknown agent")
+		}
+	})
+
+	t.Run("registered agent exists", func(t *testing.T) {
+		r.Register(newTestAgent(t, "python-expert", "Python Expert"))
+		if !r.Exists("python-expert") {
+			t.Error("expected Exists to return true for registered agent")
+		}
+	})
+}

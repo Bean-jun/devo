@@ -150,7 +150,7 @@ type SessionStore interface {
 	Create(s *Session) error
 	Get(id string) (*Session, error)
 	Update(s *Session) error
-	ListSessions(status, project string, limit, offset int) ([]Session, int, error)
+	ListSessions(status, project, agentID string, limit, offset int) ([]Session, int, error)
 	ListUniqueWorkspaces() ([]string, error)
 	DeleteByWorkspace(path string) (int, error)
 	DeleteSession(id string) error

@@ -85,7 +85,7 @@ func (s *GormStore) Update(sess *session.Session) error {
 	return nil
 }
 
-func (s *GormStore) ListSessions(status, project string, limit, offset int) ([]session.Session, int, error) {
+func (s *GormStore) ListSessions(status, project, agentID string, limit, offset int) ([]session.Session, int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -96,6 +96,9 @@ func (s *GormStore) ListSessions(status, project string, limit, offset int) ([]s
 	}
 	if project != "" {
 		query = query.Where("working_directory = ?", project)
+	}
+	if agentID != "" {
+		query = query.Where("agent_id = ?", agentID)
 	}
 
 	var total int64

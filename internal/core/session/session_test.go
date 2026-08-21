@@ -197,7 +197,7 @@ func TestListSessions(t *testing.T) {
 	store.Create(sess3)
 
 	t.Run("all", func(t *testing.T) {
-		sessions, total, err := store.ListSessions("all", "", 0, 0)
+		sessions, total, err := store.ListSessions("all", "", "", 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -210,7 +210,7 @@ func TestListSessions(t *testing.T) {
 	})
 
 	t.Run("filter_by_status", func(t *testing.T) {
-		sessions, total, err := store.ListSessions("Idle", "", 0, 0)
+		sessions, total, err := store.ListSessions("Idle", "", "", 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -223,7 +223,7 @@ func TestListSessions(t *testing.T) {
 	})
 
 	t.Run("filter_by_project", func(t *testing.T) {
-		_, total, err := store.ListSessions("", "/tmp/proj1", 0, 0)
+		_, total, err := store.ListSessions("", "/tmp/proj1", "", 0, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -233,7 +233,7 @@ func TestListSessions(t *testing.T) {
 	})
 
 	t.Run("limit_offset", func(t *testing.T) {
-		sessions, total, err := store.ListSessions("all", "", 1, 0)
+		sessions, total, err := store.ListSessions("all", "", "", 1, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -246,12 +246,35 @@ func TestListSessions(t *testing.T) {
 	})
 
 	t.Run("offset_beyond", func(t *testing.T) {
-		sessions, _, err := store.ListSessions("all", "", 0, 10)
+		sessions, _, err := store.ListSessions("all", "", "", 0, 10)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if len(sessions) != 0 {
 			t.Errorf("expected 0 sessions, got %d", len(sessions))
+		}
+	})
+
+	t.Run("filter_by_agent_id", func(t *testing.T) {
+		store2 := NewInMemoryStore()
+		store2.Create(&Session{ID: "sess-a1", AgentID: "agent-1", State: StateIdle, CreatedAt: time.Now(), LastActiveAt: time.Now()})
+		store2.Create(&Session{ID: "sess-a2", AgentID: "agent-2", State: StateIdle, CreatedAt: time.Now(), LastActiveAt: time.Now()})
+		store2.Create(&Session{ID: "sess-a3", AgentID: "agent-1", State: StateIdle, CreatedAt: time.Now(), LastActiveAt: time.Now()})
+
+		sessions, total, err := store2.ListSessions("", "", "agent-1", 0, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if total != 2 {
+			t.Errorf("expected 2 sessions for agent-1, got %d", total)
+		}
+		if len(sessions) != 2 {
+			t.Errorf("expected 2 sessions, got %d", len(sessions))
+		}
+		for _, s := range sessions {
+			if s.AgentID != "agent-1" {
+				t.Errorf("expected agent_id 'agent-1', got %q", s.AgentID)
+			}
 		}
 	})
 }

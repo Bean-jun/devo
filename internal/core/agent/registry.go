@@ -28,6 +28,14 @@ func (r *Registry) Get(agentID string) *Agent {
 	return r.defaultAgent
 }
 
+func (r *Registry) Exists(agentID string) bool {
+	if agentID == "" {
+		return true
+	}
+	_, ok := r.agents[agentID]
+	return ok
+}
+
 func (r *Registry) DefaultAgent() *Agent {
 	return r.defaultAgent
 }

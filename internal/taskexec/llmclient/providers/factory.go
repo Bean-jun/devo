@@ -16,6 +16,22 @@ func NewClient(cfg *config.Config, registry *tools.Registry) llmclient.Client {
 		return llmclient.NewMockClient()
 	}
 
+	return newClientFromModel(active, registry)
+}
+
+func NewClientForModel(cfg *config.Config, modelID string, registry *tools.Registry) llmclient.Client {
+	for i := range cfg.LLM.Models {
+		if cfg.LLM.Models[i].ID == modelID {
+			return newClientFromModel(&cfg.LLM.Models[i], registry)
+		}
+	}
+	logging.Info(context.Background(), "model not found, falling back to mock client",
+		"model_id", modelID,
+	)
+	return llmclient.NewMockClient()
+}
+
+func newClientFromModel(active *config.ModelConfig, registry *tools.Registry) llmclient.Client {
 	llmCfg := &config.LLMConfig{
 		APIKey:          active.APIKey,
 		BaseURL:         active.BaseURL,

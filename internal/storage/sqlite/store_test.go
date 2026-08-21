@@ -160,7 +160,7 @@ func TestGormStoreListSessionsAll(t *testing.T) {
 		LastActiveAt:     time.Now(),
 	})
 
-	sessions, total, err := store.ListSessions("all", "", 10, 0)
+	sessions, total, err := store.ListSessions("all", "", "", 10, 0)
 	if err != nil {
 		t.Fatalf("list sessions: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestGormStoreListSessionsFilterByStatus(t *testing.T) {
 		LastActiveAt:     time.Now(),
 	})
 
-	sessions, total, err := store.ListSessions("Idle", "", 10, 0)
+	sessions, total, err := store.ListSessions("Idle", "", "", 10, 0)
 	if err != nil {
 		t.Fatalf("list sessions: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestGormStoreListSessionsFilterByProject(t *testing.T) {
 		LastActiveAt:     time.Now(),
 	})
 
-	sessions, total, err := store.ListSessions("", dir1, 10, 0)
+	sessions, total, err := store.ListSessions("", dir1, "", 10, 0)
 	if err != nil {
 		t.Fatalf("list sessions: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestGormStoreListSessionsPagination(t *testing.T) {
 		})
 	}
 
-	sessions, total, err := store.ListSessions("", "", 2, 0)
+	sessions, total, err := store.ListSessions("", "", "", 2, 0)
 	if err != nil {
 		t.Fatalf("list sessions: %v", err)
 	}

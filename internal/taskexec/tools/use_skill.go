@@ -8,15 +8,21 @@ import (
 	"devo/internal/core/skills"
 )
 
-type UseSkillTool struct {
-	manager *skills.Manager
-	loaded  map[string]bool
+type SkillsProvider interface {
+	GetSkill(name string) (*skills.Skill, error)
+	ListSkillResources(location string) (scripts, references, assets []string)
+	IsSkillAllowed(name string) bool
 }
 
-func NewUseSkillTool(manager *skills.Manager) *UseSkillTool {
+type UseSkillTool struct {
+	provider SkillsProvider
+	loaded   map[string]bool
+}
+
+func NewUseSkillTool(provider SkillsProvider) *UseSkillTool {
 	return &UseSkillTool{
-		manager: manager,
-		loaded:  make(map[string]bool),
+		provider: provider,
+		loaded:   make(map[string]bool),
 	}
 }
 
@@ -67,12 +73,16 @@ func (t *UseSkillTool) Execute(ctx context.Context, workingDir string, params ma
 		return fmt.Errorf("missing required parameter: skill_name")
 	}
 
+	if !t.provider.IsSkillAllowed(skillName) {
+		return fmt.Errorf("skill '%s' is not available for this agent", skillName)
+	}
+
 	if t.loaded[skillName] {
 		w.WriteDone(true, fmt.Sprintf("Skill '%s' is already loaded. Its instructions are already in the conversation context.", skillName))
 		return nil
 	}
 
-	skill, err := t.manager.GetSkill(skillName)
+	skill, err := t.provider.GetSkill(skillName)
 	if err != nil {
 		return fmt.Errorf("skill not found: %s. Make sure the skill name matches exactly one of the available skills.", skillName)
 	}
@@ -93,7 +103,7 @@ func (t *UseSkillTool) Execute(ctx context.Context, workingDir string, params ma
 		result.WriteString("\n")
 	}
 
-	scripts, references, assets := t.manager.ListSkillResources(skill.Location)
+	scripts, references, assets := t.provider.ListSkillResources(skill.Location)
 
 	if len(scripts) > 0 || len(references) > 0 || len(assets) > 0 {
 		result.WriteString("\n[Available Resources]\n")

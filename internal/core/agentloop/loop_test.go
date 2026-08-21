@@ -3,6 +3,7 @@ package agentloop
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func newTestLoopWithTools(t *testing.T, store *session.InMemoryStore, client llm
 }
 
 func newTestLoopWithConfig(t *testing.T, store *session.InMemoryStore, client llmclient.Client, toolRegistry *tools.Registry, cfg *config.Config) *Loop {
-	loop := New(store, client, toolRegistry, cfg, approval.NewManager(), nil, nil, nil, nil, nil)
+	loop := New(store, client, toolRegistry, cfg, approval.NewManager(), nil, nil, nil, nil, nil, "")
 	t.Cleanup(func() {
 		done := make(chan struct{})
 		go func() {
@@ -550,4 +551,47 @@ func TestUpdateConcurrencyConfigNegativeValue(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for negative max_concurrent_subprocesses")
 	}
+}
+
+func TestSystemPromptPropagation(t *testing.T) {
+	store := session.NewInMemoryStore()
+	cfg := config.DefaultConfig()
+	customPrompt := "You are a specialized code reviewer. Be strict."
+
+	t.Run("custom prompt is used when provided", func(t *testing.T) {
+		loop := New(store, llmclient.NewMockClient(), nil, cfg,
+			approval.NewManager(), nil, nil, nil, nil, nil,
+			customPrompt)
+
+		sess := &session.Session{
+			ID:               "test-prompt",
+			Title:            "Test",
+			WorkingDirectory: "/tmp/test",
+			State:            session.StateIdle,
+		}
+		assembled := loop.promptAssembler.Assemble(sess)
+		if !strings.Contains(assembled, customPrompt) {
+			t.Errorf("expected assembled prompt to contain custom system prompt\nGot: %s", assembled)
+		}
+		if strings.Contains(assembled, "You are Devo") {
+			t.Error("assembled prompt should NOT contain default SystemPrompt when custom is provided")
+		}
+	})
+
+	t.Run("empty string falls back to default", func(t *testing.T) {
+		loop := New(store, llmclient.NewMockClient(), nil, cfg,
+			approval.NewManager(), nil, nil, nil, nil, nil,
+			"")
+
+		sess := &session.Session{
+			ID:               "test-default",
+			Title:            "Test",
+			WorkingDirectory: "/tmp/test",
+			State:            session.StateIdle,
+		}
+		assembled := loop.promptAssembler.Assemble(sess)
+		if !strings.Contains(assembled, "You are Devo") {
+			t.Error("expected assembled prompt to contain default SystemPrompt when empty string is passed")
+		}
+	})
 }

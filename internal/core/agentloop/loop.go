@@ -68,9 +68,12 @@ func New(
 	bgProcManager *tools.BackgroundProcessManager,
 	mcpMgr *mcp.Manager,
 	solidifier *skills.Solidifier,
+	systemPrompt string,
 ) *Loop {
 	pathLockManager := concurrency.NewPathLockManager()
-	systemPrompt := prompt.DefaultSystemPrompt()
+	if systemPrompt == "" {
+		systemPrompt = prompt.DefaultSystemPrompt()
+	}
 	assembler := prompt.NewAssembler(systemPrompt)
 	if memoryMgr != nil {
 		assembler.SetMemoryProvider(memoryMgr)

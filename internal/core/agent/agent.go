@@ -12,6 +12,7 @@ import (
 	"devo/internal/core/session"
 	"devo/internal/core/skills"
 	"devo/internal/taskexec/llmclient"
+	"devo/internal/taskexec/llmclient/providers"
 	"devo/internal/taskexec/mcp"
 	"devo/internal/taskexec/tools"
 )
@@ -21,6 +22,7 @@ type Config struct {
 	Name         string   `json:"name"`
 	Description  string   `json:"description"`
 	SystemPrompt string   `json:"system_prompt"`
+	ModelID      string   `json:"model_id"`
 	Tools        []string `json:"tools"`
 }
 
@@ -42,9 +44,14 @@ func New(
 	mcpMgr *mcp.Manager,
 	solidifier *skills.Solidifier,
 ) *Agent {
+	llmClient := llm
+	if cfg.ModelID != "" {
+		llmClient = providers.NewClientForModel(appCfg, cfg.ModelID, registry)
+	}
 	a := &Agent{Config: cfg}
-	a.loop = agentloop.New(store, llm, registry, appCfg,
-		approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+	a.loop = agentloop.New(store, llmClient, registry, appCfg,
+		approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier,
+		cfg.SystemPrompt)
 	return a
 }
 

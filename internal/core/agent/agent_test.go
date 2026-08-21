@@ -20,6 +20,7 @@ func TestConfig_Fields(t *testing.T) {
 		Name:         "Test Agent",
 		Description:  "A test agent",
 		SystemPrompt: "You are a test agent.",
+		ModelID:      "gpt-4o",
 		Tools:        []string{"read_file", "write_file"},
 	}
 
@@ -34,6 +35,9 @@ func TestConfig_Fields(t *testing.T) {
 	}
 	if cfg.SystemPrompt != "You are a test agent." {
 		t.Errorf("expected SystemPrompt 'You are a test agent.', got %q", cfg.SystemPrompt)
+	}
+	if cfg.ModelID != "gpt-4o" {
+		t.Errorf("expected ModelID 'gpt-4o', got %q", cfg.ModelID)
 	}
 	if len(cfg.Tools) != 2 {
 		t.Errorf("expected 2 tools, got %d", len(cfg.Tools))
@@ -313,4 +317,67 @@ func TestAgent_ForwardingMethods(t *testing.T) {
 			t.Error("expected error for nonexistent session")
 		}
 	})
+}
+
+func TestNew_WithModelID(t *testing.T) {
+	store := session.NewInMemoryStore()
+	cfg := config.DefaultConfig()
+	llm := llmclient.NewMockClient()
+	registry := tools.NewRegistry()
+	approvalMgr := approval.NewManager()
+	memoryFileStore, _ := memory.DefaultFileStore()
+	memoryMgr := memory.NewManager(memoryFileStore, concurrency.NewPathLockManager(), approvalMgr)
+	skillsMgr := skills.NewManager(t.TempDir())
+	bgProcManager := tools.NewBackgroundProcessManager()
+	mcpMgr := mcp.NewManager(t.TempDir())
+	solidifier := skills.NewSolidifier(llm, skillsMgr, store)
+
+	agent := New(Config{
+		ID:           "model-agent",
+		Name:         "Model Agent",
+		Description:  "Agent with model binding",
+		SystemPrompt: "You are a model agent.",
+		ModelID:      "gpt-4o",
+		Tools:        nil,
+	}, store, llm, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+
+	if agent == nil {
+		t.Fatal("expected non-nil agent")
+	}
+	if agent.Config.ModelID != "gpt-4o" {
+		t.Errorf("expected ModelID 'gpt-4o', got %q", agent.Config.ModelID)
+	}
+	if agent.loop == nil {
+		t.Error("expected non-nil loop")
+	}
+}
+
+func TestNew_EmptyModelIDUsesPassedClient(t *testing.T) {
+	store := session.NewInMemoryStore()
+	cfg := config.DefaultConfig()
+	llm := llmclient.NewMockClient()
+	registry := tools.NewRegistry()
+	approvalMgr := approval.NewManager()
+	memoryFileStore, _ := memory.DefaultFileStore()
+	memoryMgr := memory.NewManager(memoryFileStore, concurrency.NewPathLockManager(), approvalMgr)
+	skillsMgr := skills.NewManager(t.TempDir())
+	bgProcManager := tools.NewBackgroundProcessManager()
+	mcpMgr := mcp.NewManager(t.TempDir())
+	solidifier := skills.NewSolidifier(llm, skillsMgr, store)
+
+	agent := New(Config{
+		ID:           "default-model-agent",
+		Name:         "Default Model Agent",
+		Description:  "Agent without model binding",
+		SystemPrompt: "You are a default model agent.",
+		ModelID:      "",
+		Tools:        nil,
+	}, store, llm, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+
+	if agent == nil {
+		t.Fatal("expected non-nil agent")
+	}
+	if agent.Config.ModelID != "" {
+		t.Errorf("expected empty ModelID, got %q", agent.Config.ModelID)
+	}
 }

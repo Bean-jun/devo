@@ -61,7 +61,12 @@ func (h *Handler) CreateSession(w http.ResponseWriter, r *http.Request) {
 
 	agentID := req.AgentID
 	if agentID == "" {
-		agentID = "devo-default"
+		agentID = h.agentRegistry.DefaultAgent().Config.ID
+	}
+
+	if !h.agentRegistry.Exists(agentID) {
+		writeError(w, http.StatusBadRequest, "unknown agent_id: "+agentID)
+		return
 	}
 
 	now := time.Now()
@@ -169,6 +174,7 @@ type listSessionsItem struct {
 	ID                   string             `json:"id"`
 	Title                string             `json:"title"`
 	ProjectPath          string             `json:"project_path"`
+	AgentID              string             `json:"agent_id"`
 	State                string             `json:"state"`
 	CreatedAt            string             `json:"created_at"`
 	LastActiveAt         string             `json:"last_active_at"`
@@ -188,6 +194,7 @@ type listSessionsResponse struct {
 func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	project := r.URL.Query().Get("project")
+	agentID := r.URL.Query().Get("agent_id")
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 
@@ -211,7 +218,7 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sessions, total, err := h.store.ListSessions(status, project, limit, offset)
+	sessions, total, err := h.store.ListSessions(status, project, agentID, limit, offset)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -229,6 +236,7 @@ func (h *Handler) ListSessions(w http.ResponseWriter, r *http.Request) {
 			ID:                   s.ID,
 			Title:                s.Title,
 			ProjectPath:          s.WorkingDirectory,
+			AgentID:              s.AgentID,
 			State:                s.State.ToSnakeCase(),
 			CreatedAt:            s.CreatedAt.Format(time.RFC3339),
 			LastActiveAt:         s.LastActiveAt.Format(time.RFC3339),

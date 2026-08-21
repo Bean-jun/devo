@@ -266,3 +266,32 @@ func TestUseSkillTool_Execute_NoResources(t *testing.T) {
 		t.Error("expected instructions in result")
 	}
 }
+
+func TestUseSkillTool_SkillNotAllowed(t *testing.T) {
+	mgr, _ := setupTestSkillsManager(t)
+
+	deniedProvider := &deniedSkillsProvider{mgr}
+	tool := NewUseSkillTool(deniedProvider)
+
+	result, err := executeTool(t, tool, "/tmp", map[string]interface{}{
+		"skill_name": "Python Expert",
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Error == "" {
+		t.Fatal("expected error for denied skill")
+	}
+	if !strings.Contains(result.Error, "not available") {
+		t.Errorf("expected 'not available' error, got: %q", result.Error)
+	}
+}
+
+type deniedSkillsProvider struct {
+	*skills.Manager
+}
+
+func (d *deniedSkillsProvider) IsSkillAllowed(name string) bool {
+	return false
+}

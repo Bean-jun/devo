@@ -103,7 +103,7 @@ func (m *mockSessionStore) Update(s *session.Session) error {
 	return nil
 }
 
-func (m *mockSessionStore) ListSessions(status, project string, limit, offset int) ([]session.Session, int, error) {
+func (m *mockSessionStore) ListSessions(status, project, agentID string, limit, offset int) ([]session.Session, int, error) {
 	return nil, 0, nil
 }
 
