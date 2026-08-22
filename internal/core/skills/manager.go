@@ -647,3 +647,79 @@ func copyDir(src, dst string) error {
 
 	return nil
 }
+
+func (m *Manager) WithFilter(skillNames []string) *FilteredSkillsView {
+	return &FilteredSkillsView{
+		manager:      m,
+		allowedNames: skillNames,
+	}
+}
+
+type FilteredSkillsView struct {
+	manager      *Manager
+	allowedNames []string
+}
+
+func (v *FilteredSkillsView) GetActiveSkillsPrompt() string {
+	v.manager.mu.RLock()
+	defer v.manager.mu.RUnlock()
+
+	merged := v.manager.mergeSkills()
+
+	var catalogParts []string
+
+	for _, skill := range merged {
+		if !skill.Enabled {
+			continue
+		}
+		if !v.isAllowed(skill.Name) {
+			continue
+		}
+
+		desc := skill.Description
+		if desc == "" {
+			desc = "No description"
+		}
+		catalogParts = append(catalogParts, fmt.Sprintf("- **%s**: %s", skill.Name, desc))
+	}
+
+	if len(catalogParts) == 0 {
+		return ""
+	}
+
+	result := "## Available Skills\nYou have access to the following skills. Use the `use_skill` tool to load full instructions for any skill.\n\n" +
+		strings.Join(catalogParts, "\n") + "\n"
+
+	return result
+}
+
+func (v *FilteredSkillsView) IsSkillAllowed(name string) bool {
+	return v.isAllowed(name)
+}
+
+func (v *FilteredSkillsView) GetSkill(name string) (*Skill, error) {
+	if !v.isAllowed(name) {
+		return nil, ErrSkillNotFound
+	}
+	return v.manager.GetSkill(name)
+}
+
+func (v *FilteredSkillsView) ListSkillResources(location string) (scripts, references, assets []string) {
+	return v.manager.ListSkillResources(location)
+}
+
+func (v *FilteredSkillsView) GetManager() *Manager {
+	return v.manager
+}
+
+func (v *FilteredSkillsView) isAllowed(name string) bool {
+	if v.allowedNames == nil {
+		return true
+	}
+	for _, allowed := range v.allowedNames {
+		if strings.EqualFold(allowed, name) {
+			return true
+		}
+	}
+	return false
+}

@@ -19,7 +19,6 @@ import (
 	"devo/internal/interfaces/tui"
 	"devo/internal/pkg/logging"
 	"devo/internal/storage/sqlite"
-	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/llmclient/providers"
 	"devo/internal/taskexec/mcp"
 	"devo/internal/taskexec/tools"
@@ -38,7 +37,6 @@ type App struct {
 	mcpMgr        *mcp.Manager
 	memoryMgr     *memory.Manager
 	toolRegistry  *tools.Registry
-	llm           llmclient.Client
 	bgProcManager *tools.BackgroundProcessManager
 	addr          string
 	baseURL       string
@@ -88,7 +86,6 @@ func NewApp(tuiMode, webMode bool, portFlag int, version string) (*App, error) {
 	}
 
 	app.initRegistry()
-	app.initLLM()
 	app.initMCP()
 	app.initSkills()
 	app.initTools()
@@ -133,10 +130,6 @@ func (a *App) initDB() error {
 
 func (a *App) initRegistry() {
 	a.toolRegistry = tools.NewRegistry()
-}
-
-func (a *App) initLLM() {
-	a.llm = providers.NewClient(a.cfg, a.toolRegistry)
 }
 
 func (a *App) initMCP() {
@@ -189,32 +182,35 @@ func (a *App) initMemory() {
 
 func (a *App) initAgent() {
 	approvalMgr := approval.NewManager()
-	solidifier := skills.NewSolidifier(a.llm, a.skillsMgr, a.store)
+	defaultLLM := providers.NewClient(a.cfg, a.toolRegistry)
+	solidifier := skills.NewSolidifier(defaultLLM, a.skillsMgr, a.store)
 
-	defaultAgentCfg := agent.Config{
-		ID:           "devo-default",
-		Name:         "Devo",
-		Description:  "Devo - AI Coding Agent",
-		SystemPrompt: "",
-		Tools:        nil,
+	delegateTool := tools.NewDelegateToTool(nil, a.store, a.cfg)
+	a.toolRegistry.Register(delegateTool)
+
+	for _, cfg := range agent.BuiltinAgents {
+		ag := agent.New(
+			cfg,
+			a.store,
+			a.toolRegistry,
+			a.cfg,
+			approvalMgr,
+			a.memoryMgr,
+			a.skillsMgr,
+			a.bgProcManager,
+			a.mcpMgr,
+			solidifier,
+		)
+		if a.agentRegistry == nil {
+			a.agentRegistry = agent.NewRegistry(ag)
+		} else {
+			a.agentRegistry.Register(ag)
+		}
 	}
 
-	defaultAgent := agent.New(
-		defaultAgentCfg,
-		a.store,
-		a.llm,
-		a.toolRegistry,
-		a.cfg,
-		approvalMgr,
-		a.memoryMgr,
-		a.skillsMgr,
-		a.bgProcManager,
-		a.mcpMgr,
-		solidifier,
-	)
+	delegateTool.SetProvider(a.agentRegistry)
 
-	a.bgProcManager.SetOutputForwarder(defaultAgent)
-	a.agentRegistry = agent.NewRegistry(defaultAgent)
+	a.bgProcManager.SetOutputForwarder(a.agentRegistry.DefaultAgent())
 }
 
 func (a *App) initHandler() {

@@ -26,6 +26,7 @@ type getGlobalConfigResponse struct {
 	ToolCallLimit    int               `json:"tool_call_limit,omitempty"`
 	MaxContextTokens int               `json:"max_context_tokens,omitempty"`
 	KeepRecent       int               `json:"keep_recent,omitempty"`
+	TeamMode         bool              `json:"team_mode,omitempty"`
 }
 
 type setGlobalConfigRequest struct {
@@ -36,6 +37,7 @@ type setGlobalConfigRequest struct {
 	ToolCallLimit    *int              `json:"tool_call_limit,omitempty"`
 	MaxContextTokens *int              `json:"max_context_tokens,omitempty"`
 	KeepRecent       *int              `json:"keep_recent,omitempty"`
+	TeamMode         *bool             `json:"team_mode,omitempty"`
 }
 
 func (h *Handler) GetGlobalConfig(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +60,7 @@ func (h *Handler) GetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 		ToolCallLimit:    cfg.ToolCallLimit,
 		MaxContextTokens: cfg.MaxContextTokens,
 		KeepRecent:       cfg.KeepRecent,
+		TeamMode:         cfg.TeamMode,
 	})
 }
 
@@ -115,6 +118,9 @@ func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 	if req.KeepRecent != nil {
 		h.cfg.KeepRecent = *req.KeepRecent
 	}
+	if req.TeamMode != nil {
+		h.cfg.TeamMode = *req.TeamMode
+	}
 
 	if err := config.SaveGlobalConfig(h.cfg); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save global config: "+err.Error())
@@ -135,6 +141,7 @@ func (h *Handler) SetGlobalConfig(w http.ResponseWriter, r *http.Request) {
 		ToolCallLimit:    h.cfg.ToolCallLimit,
 		MaxContextTokens: h.cfg.MaxContextTokens,
 		KeepRecent:       h.cfg.KeepRecent,
+		TeamMode:         h.cfg.TeamMode,
 	})
 }
 
@@ -505,4 +512,41 @@ func (h *Handler) rebuildLLMClient(cfg *config.Config) {
 	}
 	client := providers.NewClient(cfg, nil)
 	h.getDefaultAgent().UpdateLLMClient(client)
+}
+
+func (h *Handler) SetTeamMode(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	cfg, err := config.LoadGlobal()
+	if err != nil || cfg == nil {
+		cfg = &config.Config{}
+	}
+
+	cfg.TeamMode = req.Enabled
+	if h.cfg != nil {
+		h.cfg.TeamMode = req.Enabled
+	}
+
+	if err := config.SaveGlobalConfig(cfg); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save config: "+err.Error())
+		return
+	}
+
+	subAgents := make([]string, 0)
+	for _, ag := range h.agentRegistry.List() {
+		if ag.Config.Builtin && ag.Config.ID != h.agentRegistry.DefaultAgent().Config.ID {
+			subAgents = append(subAgents, ag.Config.ID)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"team_mode":            cfg.TeamMode,
+		"available_sub_agents": subAgents,
+	})
 }

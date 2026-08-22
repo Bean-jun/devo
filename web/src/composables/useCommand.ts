@@ -80,6 +80,14 @@ export function useCommand() {
       mobileLabel: '取消当前操作',
     },
     {
+      id: 'team',
+      name: '/team',
+      description: '切换 Team Mode',
+      group: 'session',
+      icon: 'users',
+      mobileLabel: '切换 Team Mode',
+    },
+    {
       id: 'compact',
       name: '/compact',
       description: '压缩当前会话上下文',

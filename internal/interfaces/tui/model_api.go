@@ -74,9 +74,9 @@ func (m *Model) fetchWorkspacesFromAPI() tea.Cmd {
 	}
 }
 
-func (m *Model) createSessionFromAPI(workingDir, title string) tea.Cmd {
+func (m *Model) createSessionFromAPI(workingDir, title, agentID string) tea.Cmd {
 	return func() tea.Msg {
-		session, err := m.apiClient.CreateSession(workingDir, title)
+		session, err := m.apiClient.CreateSession(workingDir, title, agentID)
 		if err != nil {
 			return apiResponseMsg{kind: "create_session_error", err: err}
 		}
@@ -391,5 +391,25 @@ func (m *Model) activateModelFromAPI(modelID string) tea.Cmd {
 			return apiResponseMsg{kind: "model_activate_error", err: err}
 		}
 		return apiResponseMsg{kind: "model_activated", modelID: modelID}
+	}
+}
+
+func (m *Model) fetchAgentsFromAPI() tea.Cmd {
+	return func() tea.Msg {
+		agents, err := m.apiClient.GetAgents()
+		if err != nil {
+			return apiResponseMsg{kind: "agents_error", err: err}
+		}
+		return apiResponseMsg{kind: "agents_loaded", data: agents}
+	}
+}
+
+func (m *Model) setTeamModeFromAPI(enabled bool) tea.Cmd {
+	return func() tea.Msg {
+		result, err := m.apiClient.SetTeamMode(enabled)
+		if err != nil {
+			return apiResponseMsg{kind: "team_mode_error", err: err}
+		}
+		return apiResponseMsg{kind: "team_mode_updated", data: result}
 	}
 }

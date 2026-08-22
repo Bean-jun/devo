@@ -90,6 +90,17 @@ const {
             @keydown.enter="confirmNewSession"
             @keydown.escape.stop="cancelNewSession"
           />
+          <select
+            v-if="sessionStore.agents.length > 0"
+            v-model="sessionStore.selectedAgentId"
+            class="new-session-mobile-input agent-select"
+          >
+            <option
+              v-for="agent in sessionStore.agents"
+              :key="agent.id"
+              :value="agent.id"
+            >{{ agent.name }}</option>
+          </select>
           <div class="dialog-actions">
             <button class="dialog-btn-cancel" @click="cancelNewSession">取消</button>
             <button class="dialog-btn-confirm" @click="confirmNewSession">创建</button>

@@ -85,10 +85,11 @@ func (c *Client) del(path string) error {
 
 // ─── Sessions ───
 
-func (c *Client) CreateSession(workingDir, title string) (*types.SessionInfo, error) {
+func (c *Client) CreateSession(workingDir, title, agentID string) (*types.SessionInfo, error) {
 	req := types.CreateSessionRequest{
 		WorkingDirectory: workingDir,
 		Title:            title,
+		AgentID:          agentID,
 	}
 	var session types.SessionInfo
 	if err := c.post("/api/v1/sessions", req, &session); err != nil {
@@ -496,6 +497,7 @@ type GlobalConfigInfo struct {
 	KeepRecent       *int           `json:"keep_recent"`
 	LLM              *LLMConfigInfo `json:"llm"`
 	ApprovalPolicy   ApprovalPolicy `json:"approval_policy"`
+	TeamMode         bool           `json:"team_mode"`
 }
 
 type LLMConfigInfo struct {
@@ -577,4 +579,32 @@ func (c *Client) GetModels() ([]ModelInfo, error) {
 
 func (c *Client) ActivateModel(modelID string) error {
 	return c.put("/api/v1/global/config/models/"+url.PathEscape(modelID)+"/activate", nil, nil)
+}
+
+// ─── Agents ───
+
+type AgentInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ModelID     string `json:"model_id"`
+	Builtin     bool   `json:"builtin"`
+}
+
+func (c *Client) GetAgents() ([]AgentInfo, error) {
+	var agents []AgentInfo
+	if err := c.get("/api/v1/agents", &agents); err != nil {
+		return nil, err
+	}
+	return agents, nil
+}
+
+// ─── Team Mode ───
+
+func (c *Client) SetTeamMode(enabled bool) (map[string]interface{}, error) {
+	var result map[string]interface{}
+	if err := c.put("/api/v1/config/team-mode", map[string]bool{"enabled": enabled}, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

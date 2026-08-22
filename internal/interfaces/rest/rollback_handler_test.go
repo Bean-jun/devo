@@ -14,11 +14,9 @@ import (
 	"devo/internal/core/concurrency"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
-	"devo/internal/taskexec/llmclient"
 )
 
 func setupRollbackHandler(store *session.InMemoryStore) *Handler {
-	llm := llmclient.NewMockClient()
 	memStore, _ := memory.NewFileStore("")
 	pathLock := concurrency.NewPathLockManager()
 	approvalMgr := approval.NewManager()
@@ -26,7 +24,7 @@ func setupRollbackHandler(store *session.InMemoryStore) *Handler {
 
 	ag := agent.New(
 		agent.Config{ID: "test", Name: "Test", Description: "Test agent", SystemPrompt: "", Tools: nil},
-		store, llm, nil, config.DefaultConfig(),
+		store, nil, config.DefaultConfig(),
 		approvalMgr, memManager, nil, nil, nil, nil,
 	)
 	registry := agent.NewRegistry(ag)

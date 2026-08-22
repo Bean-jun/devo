@@ -22,6 +22,9 @@ func TestConfig_Fields(t *testing.T) {
 		SystemPrompt: "You are a test agent.",
 		ModelID:      "gpt-4o",
 		Tools:        []string{"read_file", "write_file"},
+		Skills:       []string{"react", "python"},
+		Builtin:      true,
+		SubAgentOf:   "parent-agent",
 	}
 
 	if cfg.ID != "test-agent" {
@@ -42,6 +45,18 @@ func TestConfig_Fields(t *testing.T) {
 	if len(cfg.Tools) != 2 {
 		t.Errorf("expected 2 tools, got %d", len(cfg.Tools))
 	}
+	if len(cfg.Skills) != 2 {
+		t.Errorf("expected 2 skills, got %d", len(cfg.Skills))
+	}
+	if cfg.Skills[0] != "react" {
+		t.Errorf("expected first skill 'react', got %q", cfg.Skills[0])
+	}
+	if !cfg.Builtin {
+		t.Error("expected Builtin to be true")
+	}
+	if cfg.SubAgentOf != "parent-agent" {
+		t.Errorf("expected SubAgentOf 'parent-agent', got %q", cfg.SubAgentOf)
+	}
 }
 
 func TestConfig_EmptyTools(t *testing.T) {
@@ -60,7 +75,6 @@ func TestConfig_EmptyTools(t *testing.T) {
 func TestNew(t *testing.T) {
 	store := session.NewInMemoryStore()
 	cfg := config.DefaultConfig()
-	llm := llmclient.NewMockClient()
 	registry := tools.NewRegistry()
 	approvalMgr := approval.NewManager()
 	memoryFileStore, _ := memory.DefaultFileStore()
@@ -68,7 +82,7 @@ func TestNew(t *testing.T) {
 	skillsMgr := skills.NewManager(t.TempDir())
 	bgProcManager := tools.NewBackgroundProcessManager()
 	mcpMgr := mcp.NewManager(t.TempDir())
-	solidifier := skills.NewSolidifier(llm, skillsMgr, store)
+	solidifier := skills.NewSolidifier(nil, skillsMgr, store)
 
 	agent := New(Config{
 		ID:           "test-agent",
@@ -76,7 +90,7 @@ func TestNew(t *testing.T) {
 		Description:  "A test agent",
 		SystemPrompt: "You are a test agent.",
 		Tools:        nil,
-	}, store, llm, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+	}, store, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
 
 	if agent == nil {
 		t.Fatal("expected non-nil agent")
@@ -98,7 +112,6 @@ func TestNew(t *testing.T) {
 func TestNew_WithTools(t *testing.T) {
 	store := session.NewInMemoryStore()
 	cfg := config.DefaultConfig()
-	llm := llmclient.NewMockClient()
 	registry := tools.NewRegistry()
 	approvalMgr := approval.NewManager()
 	memoryFileStore, _ := memory.DefaultFileStore()
@@ -106,7 +119,7 @@ func TestNew_WithTools(t *testing.T) {
 	skillsMgr := skills.NewManager(t.TempDir())
 	bgProcManager := tools.NewBackgroundProcessManager()
 	mcpMgr := mcp.NewManager(t.TempDir())
-	solidifier := skills.NewSolidifier(llm, skillsMgr, store)
+	solidifier := skills.NewSolidifier(nil, skillsMgr, store)
 
 	agent := New(Config{
 		ID:           "tool-agent",
@@ -114,7 +127,7 @@ func TestNew_WithTools(t *testing.T) {
 		Description:  "Agent with specific tools",
 		SystemPrompt: "You are a tool agent.",
 		Tools:        []string{"read_file", "glob"},
-	}, store, llm, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+	}, store, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
 
 	if agent == nil {
 		t.Fatal("expected non-nil agent")
@@ -133,7 +146,6 @@ func TestNew_WithTools(t *testing.T) {
 func TestDefault(t *testing.T) {
 	store := session.NewInMemoryStore()
 	cfg := config.DefaultConfig()
-	llm := llmclient.NewMockClient()
 	registry := tools.NewRegistry()
 	approvalMgr := approval.NewManager()
 	memoryFileStore, _ := memory.DefaultFileStore()
@@ -141,9 +153,9 @@ func TestDefault(t *testing.T) {
 	skillsMgr := skills.NewManager(t.TempDir())
 	bgProcManager := tools.NewBackgroundProcessManager()
 	mcpMgr := mcp.NewManager(t.TempDir())
-	solidifier := skills.NewSolidifier(llm, skillsMgr, store)
+	solidifier := skills.NewSolidifier(nil, skillsMgr, store)
 
-	agent := Default(store, llm, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+	agent := Default(store, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
 
 	if agent == nil {
 		t.Fatal("expected non-nil agent")
@@ -168,7 +180,6 @@ func TestDefault(t *testing.T) {
 func TestAgent_ForwardingMethods(t *testing.T) {
 	store := session.NewInMemoryStore()
 	cfg := config.DefaultConfig()
-	llm := llmclient.NewMockClient()
 	registry := tools.NewRegistry()
 	approvalMgr := approval.NewManager()
 	memoryFileStore, _ := memory.DefaultFileStore()
@@ -176,9 +187,9 @@ func TestAgent_ForwardingMethods(t *testing.T) {
 	skillsMgr := skills.NewManager(t.TempDir())
 	bgProcManager := tools.NewBackgroundProcessManager()
 	mcpMgr := mcp.NewManager(t.TempDir())
-	solidifier := skills.NewSolidifier(llm, skillsMgr, store)
+	solidifier := skills.NewSolidifier(nil, skillsMgr, store)
 
-	agent := Default(store, llm, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+	agent := Default(store, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
 
 	t.Run("GetApprovalManager", func(t *testing.T) {
 		mgr := agent.GetApprovalManager()
@@ -322,7 +333,6 @@ func TestAgent_ForwardingMethods(t *testing.T) {
 func TestNew_WithModelID(t *testing.T) {
 	store := session.NewInMemoryStore()
 	cfg := config.DefaultConfig()
-	llm := llmclient.NewMockClient()
 	registry := tools.NewRegistry()
 	approvalMgr := approval.NewManager()
 	memoryFileStore, _ := memory.DefaultFileStore()
@@ -330,7 +340,7 @@ func TestNew_WithModelID(t *testing.T) {
 	skillsMgr := skills.NewManager(t.TempDir())
 	bgProcManager := tools.NewBackgroundProcessManager()
 	mcpMgr := mcp.NewManager(t.TempDir())
-	solidifier := skills.NewSolidifier(llm, skillsMgr, store)
+	solidifier := skills.NewSolidifier(nil, skillsMgr, store)
 
 	agent := New(Config{
 		ID:           "model-agent",
@@ -339,7 +349,7 @@ func TestNew_WithModelID(t *testing.T) {
 		SystemPrompt: "You are a model agent.",
 		ModelID:      "gpt-4o",
 		Tools:        nil,
-	}, store, llm, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+	}, store, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
 
 	if agent == nil {
 		t.Fatal("expected non-nil agent")
@@ -352,10 +362,9 @@ func TestNew_WithModelID(t *testing.T) {
 	}
 }
 
-func TestNew_EmptyModelIDUsesPassedClient(t *testing.T) {
+func TestNew_EmptyModelID(t *testing.T) {
 	store := session.NewInMemoryStore()
 	cfg := config.DefaultConfig()
-	llm := llmclient.NewMockClient()
 	registry := tools.NewRegistry()
 	approvalMgr := approval.NewManager()
 	memoryFileStore, _ := memory.DefaultFileStore()
@@ -363,7 +372,7 @@ func TestNew_EmptyModelIDUsesPassedClient(t *testing.T) {
 	skillsMgr := skills.NewManager(t.TempDir())
 	bgProcManager := tools.NewBackgroundProcessManager()
 	mcpMgr := mcp.NewManager(t.TempDir())
-	solidifier := skills.NewSolidifier(llm, skillsMgr, store)
+	solidifier := skills.NewSolidifier(nil, skillsMgr, store)
 
 	agent := New(Config{
 		ID:           "default-model-agent",
@@ -372,12 +381,129 @@ func TestNew_EmptyModelIDUsesPassedClient(t *testing.T) {
 		SystemPrompt: "You are a default model agent.",
 		ModelID:      "",
 		Tools:        nil,
-	}, store, llm, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+	}, store, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
 
 	if agent == nil {
 		t.Fatal("expected non-nil agent")
 	}
 	if agent.Config.ModelID != "" {
 		t.Errorf("expected empty ModelID, got %q", agent.Config.ModelID)
+	}
+}
+
+func TestNew_TeamModeOn_DelegateToIncluded(t *testing.T) {
+	store := session.NewInMemoryStore()
+	cfg := config.DefaultConfig()
+	cfg.TeamMode = true
+	registry := tools.NewRegistry()
+	registry.Register(&tools.ReadFileTool{})
+	registry.Register(&tools.WriteFileTool{})
+	delegateTool := tools.NewDelegateToTool(nil, store, cfg)
+	registry.Register(delegateTool)
+
+	approvalMgr := approval.NewManager()
+	memoryFileStore, _ := memory.DefaultFileStore()
+	memoryMgr := memory.NewManager(memoryFileStore, concurrency.NewPathLockManager(), approvalMgr)
+	skillsMgr := skills.NewManager(t.TempDir())
+	bgProcManager := tools.NewBackgroundProcessManager()
+	mcpMgr := mcp.NewManager(t.TempDir())
+	solidifier := skills.NewSolidifier(nil, skillsMgr, store)
+
+	agent := New(Config{
+		ID:           "devo-default",
+		Name:         "Devo",
+		Description:  "Default agent",
+		SystemPrompt: "You are a helpful assistant.",
+		Tools:        nil,
+	}, store, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+
+	if agent == nil {
+		t.Fatal("expected non-nil agent")
+	}
+
+	hasDelegateTo := false
+	for _, tool := range agent.ListTools() {
+		if tool.Name() == "delegate_to" {
+			hasDelegateTo = true
+			break
+		}
+	}
+	if !hasDelegateTo {
+		t.Error("expected delegate_to to be included when TeamMode is ON")
+	}
+}
+
+func TestNew_TeamModeOff_DelegateToExcluded(t *testing.T) {
+	store := session.NewInMemoryStore()
+	cfg := config.DefaultConfig()
+	cfg.TeamMode = false
+	registry := tools.NewRegistry()
+	registry.Register(&tools.ReadFileTool{})
+	registry.Register(&tools.WriteFileTool{})
+	delegateTool := tools.NewDelegateToTool(nil, store, cfg)
+	registry.Register(delegateTool)
+
+	approvalMgr := approval.NewManager()
+	memoryFileStore, _ := memory.DefaultFileStore()
+	memoryMgr := memory.NewManager(memoryFileStore, concurrency.NewPathLockManager(), approvalMgr)
+	skillsMgr := skills.NewManager(t.TempDir())
+	bgProcManager := tools.NewBackgroundProcessManager()
+	mcpMgr := mcp.NewManager(t.TempDir())
+	solidifier := skills.NewSolidifier(nil, skillsMgr, store)
+
+	agent := New(Config{
+		ID:           "devo-default",
+		Name:         "Devo",
+		Description:  "Default agent",
+		SystemPrompt: "You are a helpful assistant.",
+		Tools:        nil,
+	}, store, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+
+	if agent == nil {
+		t.Fatal("expected non-nil agent")
+	}
+
+	for _, tool := range agent.ListTools() {
+		if tool.Name() == "delegate_to" {
+			t.Error("expected delegate_to to be excluded when TeamMode is OFF")
+		}
+	}
+}
+
+func TestNew_SubAgent_DelegateToExcluded(t *testing.T) {
+	store := session.NewInMemoryStore()
+	cfg := config.DefaultConfig()
+	cfg.TeamMode = true
+	registry := tools.NewRegistry()
+	registry.Register(&tools.ReadFileTool{})
+	registry.Register(&tools.WriteFileTool{})
+	delegateTool := tools.NewDelegateToTool(nil, store, cfg)
+	registry.Register(delegateTool)
+
+	approvalMgr := approval.NewManager()
+	memoryFileStore, _ := memory.DefaultFileStore()
+	memoryMgr := memory.NewManager(memoryFileStore, concurrency.NewPathLockManager(), approvalMgr)
+	skillsMgr := skills.NewManager(t.TempDir())
+	bgProcManager := tools.NewBackgroundProcessManager()
+	mcpMgr := mcp.NewManager(t.TempDir())
+	solidifier := skills.NewSolidifier(nil, skillsMgr, store)
+
+	agent := New(Config{
+		ID:           "code-reviewer",
+		Name:         "Code Reviewer",
+		Description:  "Sub agent",
+		SystemPrompt: "You are a code reviewer.",
+		Tools:        nil,
+		SubAgentOf:   "devo-default",
+	}, store, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+
+	if agent == nil {
+		t.Fatal("expected non-nil agent")
+	}
+
+	for _, tool := range agent.ListTools() {
+		if tool.Name() == "delegate_to" {
+			t.Error("expected delegate_to to be excluded for sub-agents even when TeamMode is ON")
+		}
 	}
 }

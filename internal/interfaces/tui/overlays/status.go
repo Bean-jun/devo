@@ -13,6 +13,7 @@ type StatusInfo struct {
 	SessionName      string
 	SessionStatus    string
 	Yolo             bool
+	TeamMode         bool
 	WorkingDir       string
 	Version          string
 	InputTokens      int
@@ -43,6 +44,10 @@ func (sp *StatusPanel) Render() string {
 	if sp.Info.Yolo {
 		yoloStatus = "开启"
 	}
+	teamStatus := "关闭"
+	if sp.Info.TeamMode {
+		teamStatus = "开启"
+	}
 	processingStatus := "空闲"
 	if sp.Info.Processing {
 		processingStatus = "处理中"
@@ -61,6 +66,7 @@ func (sp *StatusPanel) Render() string {
 		{"状态", sp.Info.SessionStatus},
 		{"处理", processingStatus},
 		{"YOLO", yoloStatus},
+		{"Team Mode", teamStatus},
 		{"思维链", reasoningStatus},
 		{"工作目录", sp.Info.WorkingDir},
 		{"版本", sp.Info.Version},

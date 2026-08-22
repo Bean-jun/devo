@@ -18,12 +18,16 @@ import (
 )
 
 type Config struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	SystemPrompt string   `json:"system_prompt"`
-	ModelID      string   `json:"model_id"`
-	Tools        []string `json:"tools"`
+	ID           string           `json:"id"`
+	Name         string           `json:"name"`
+	Description  string           `json:"description"`
+	SystemPrompt string           `json:"system_prompt"`
+	ModelID      string           `json:"model_id"`
+	Tools        []string         `json:"tools"`
+	Skills       []string         `json:"skills"`
+	Builtin      bool             `json:"builtin"`
+	SubAgentOf   string           `json:"-"`
+	LLMClient    llmclient.Client `json:"-"`
 }
 
 type Agent struct {
@@ -34,7 +38,6 @@ type Agent struct {
 func New(
 	cfg Config,
 	store session.SessionStore,
-	llm llmclient.Client,
 	registry *tools.Registry,
 	appCfg *config.Config,
 	approvalMgr *approval.Manager,
@@ -44,19 +47,57 @@ func New(
 	mcpMgr *mcp.Manager,
 	solidifier *skills.Solidifier,
 ) *Agent {
-	llmClient := llm
-	if cfg.ModelID != "" {
-		llmClient = providers.NewClientForModel(appCfg, cfg.ModelID, registry)
+	llmClient := cfg.LLMClient
+	if llmClient == nil {
+		llmClient = providers.NewClient(appCfg, registry)
+		if cfg.ModelID != "" {
+			llmClient = providers.NewClientForModel(appCfg, cfg.ModelID, registry)
+		}
 	}
+
+	var toolExecutor agentloop.ToolExecutor
+	if cfg.Tools == nil {
+		toolExecutor = registry
+	} else {
+		toolExecutor = registry.Filter(cfg.Tools)
+	}
+
+	if !appCfg.TeamMode || cfg.SubAgentOf != "" {
+		toolNames := cfg.Tools
+		if toolNames == nil {
+			allTools := registry.ListTools()
+			toolNames = make([]string, 0, len(allTools))
+			for _, t := range allTools {
+				toolNames = append(toolNames, t.Name())
+			}
+		}
+		filtered := make([]string, 0, len(toolNames))
+		for _, name := range toolNames {
+			if name != "delegate_to" {
+				filtered = append(filtered, name)
+			}
+		}
+		toolExecutor = registry.Filter(filtered)
+	}
+
+	var skillsProvider prompt.SkillsProvider
+	if skillsMgr != nil {
+		if cfg.Skills == nil {
+			skillsProvider = skillsMgr
+		} else {
+			skillsProvider = skillsMgr.WithFilter(cfg.Skills)
+		}
+	}
+
 	a := &Agent{Config: cfg}
-	a.loop = agentloop.New(store, llmClient, registry, appCfg,
-		approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier,
+	a.loop = agentloop.New(store, llmClient, toolExecutor, appCfg,
+		approvalMgr, memoryMgr, skillsProvider, bgProcManager, mcpMgr, solidifier,
 		cfg.SystemPrompt)
 	return a
 }
 
 func Default(
-	store session.SessionStore, llm llmclient.Client, registry *tools.Registry,
+	store session.SessionStore, registry *tools.Registry,
 	appCfg *config.Config,
 	approvalMgr *approval.Manager, memoryMgr *memory.Manager, skillsMgr *skills.Manager,
 	bgProcManager *tools.BackgroundProcessManager, mcpMgr *mcp.Manager, solidifier *skills.Solidifier,
@@ -67,12 +108,18 @@ func Default(
 		Description:  "通用编程助手",
 		SystemPrompt: prompt.DefaultSystemPrompt(),
 		Tools:        nil,
-	}, store, llm, registry, appCfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+	}, store, registry, appCfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
 }
 
 func (a *Agent) ProcessMessage(ctx context.Context, sessionID string, msg session.Message) error {
 	return a.loop.ProcessMessage(ctx, sessionID, msg)
 }
+
+func (a *Agent) ID() string       { return a.Config.ID }
+func (a *Agent) Name() string     { return a.Config.Name }
+func (a *Agent) IsSubAgent() bool { return a.Config.SubAgentOf != "" }
+
+func (a *Agent) ListTools() []tools.Tool { return a.loop.ListTools() }
 
 func (a *Agent) Pause(sessionID string) error    { return a.loop.Pause(sessionID) }
 func (a *Agent) Resume(sessionID string) error   { return a.loop.Resume(sessionID) }

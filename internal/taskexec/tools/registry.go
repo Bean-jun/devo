@@ -108,6 +108,16 @@ func (r *Registry) ListTools() []Tool {
 	return result
 }
 
+func (r *Registry) Filter(toolNames []string) *Registry {
+	filtered := NewRegistry()
+	for _, name := range toolNames {
+		if tool, ok := r.Get(name); ok {
+			filtered.Register(tool)
+		}
+	}
+	return filtered
+}
+
 func EstimateToolTokens(toolList []Tool) int {
 	total := 0
 	for _, t := range toolList {

@@ -153,6 +153,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case key == "ctrl+e":
+			m.statusBar.TeamMode = !m.statusBar.TeamMode
+			m.settingsPanel.TeamMode = m.statusBar.TeamMode
+			teamMsg := "Team Mode 已开启"
+			if !m.statusBar.TeamMode {
+				teamMsg = "Team Mode 已关闭"
+			}
+			m.toast.Show(teamMsg, false)
+			m.refreshViewport()
+			return m, m.setTeamModeFromAPI(m.statusBar.TeamMode)
+
 		case key == "ctrl+t":
 			components.ToggleTheme()
 			m.renderer = renderer.New(m.width)
@@ -167,7 +178,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key == "ctrl+n":
 			m.overlay.Open(overlays.OverlayNewSession)
-			return m, nil
+			return m, m.fetchAgentsFromAPI()
 
 		case key == "ctrl+p":
 			m.statusBar.Paused = !m.statusBar.Paused

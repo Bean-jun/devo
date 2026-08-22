@@ -46,6 +46,7 @@ func (hp *HelpPanel) Render() string {
 		{"Mode", []string{
 			"Ctrl+T   切换主题（暗/亮）",
 			"Ctrl+Y   切换 YOLO 模式",
+			"Ctrl+E   切换 Team Mode",
 			"Ctrl+P   暂停/恢复",
 		}},
 		{"Overlay", []string{

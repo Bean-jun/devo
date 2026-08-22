@@ -185,6 +185,10 @@
   background: linear-gradient(90deg, rgba(255, 149, 0, 0.12), rgba(255, 149, 0, 0.04) 40%, var(--color-bg-secondary) 80%);
 }
 
+.statusbar.team {
+  background: linear-gradient(90deg, rgba(88, 166, 255, 0.12), rgba(88, 166, 255, 0.04) 40%, var(--color-bg-secondary) 80%);
+}
+
 .yolo-toggle {
   display: flex;
   align-items: center;
@@ -245,6 +249,66 @@
   50% { box-shadow: 0 0 0 4px rgba(255, 149, 0, 0); }
 }
 
+.team-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  transition: all var(--transition-fast);
+  opacity: 0.7;
+}
+
+.team-toggle:hover {
+  opacity: 1;
+  border-color: var(--color-text-tertiary);
+}
+
+.team-toggle.active {
+  opacity: 1;
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.15);
+  animation: team-pulse 2s ease-in-out infinite;
+}
+
+.team-toggle.active:hover {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.22);
+}
+
+.team-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.team-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.team-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--color-text-tertiary);
+  transition: color var(--transition-fast);
+}
+
+.team-label.on {
+  color: #58a6ff;
+}
+
+@keyframes team-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(88, 166, 255, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(88, 166, 255, 0); }
+}
+
 /* ---------- density: compact (< 500px) ---------- */
 .statusbar.compact {
   padding: 0 8px;
@@ -271,6 +335,19 @@
 }
 
 .statusbar.compact .yolo-toggle .yolo-icon {
+  font-size: 14px;
+}
+
+.statusbar.compact .team-toggle {
+  padding: 0 4px;
+  gap: 0;
+  height: 28px;
+  width: 28px;
+  border-radius: 50%;
+  justify-content: center;
+}
+
+.statusbar.compact .team-toggle .team-icon {
   font-size: 14px;
 }
 

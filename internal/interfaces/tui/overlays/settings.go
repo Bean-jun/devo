@@ -35,6 +35,7 @@ type SettingsField struct {
 	Key         string
 	FieldType   string
 	IntValue    *int
+	BoolValue   *bool
 	EnumValue   string
 	EnumOptions []string
 	EnumKey     string
@@ -47,6 +48,7 @@ type SettingsPanel struct {
 	Selected      int
 	Editing       bool
 	EditBuffer    string
+	TeamMode      bool
 	ProjectConfig *api.ProjectConfigInfo
 	GlobalConfig  *api.GlobalConfigInfo
 }
@@ -171,6 +173,17 @@ func (sp *SettingsPanel) CycleEnum() *SettingsField {
 	return f
 }
 
+func (sp *SettingsPanel) ToggleBool() *SettingsField {
+	f := sp.SelectedField()
+	if f == nil || f.FieldType != "bool" {
+		return nil
+	}
+	if f.BoolValue != nil {
+		*f.BoolValue = !*f.BoolValue
+	}
+	return f
+}
+
 func (sp *SettingsPanel) BuildProjectSaveBody() map[string]interface{} {
 	body := map[string]interface{}{}
 	approvalPolicy := map[string]string{}
@@ -264,6 +277,12 @@ func (sp *SettingsPanel) Render() string {
 				valStr = fmt.Sprintf("%d", *f.IntValue)
 			} else {
 				valStr = "未设置"
+			}
+		} else if f.FieldType == "bool" {
+			if f.BoolValue != nil && *f.BoolValue {
+				valStr = "开 \u2713"
+			} else {
+				valStr = "关 \u2717"
 			}
 		} else {
 			label := ApprovalLevelLabels[f.EnumValue]

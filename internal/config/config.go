@@ -47,6 +47,7 @@ type Config struct {
 	KeepRecent                int               `json:"keep_recent,omitempty"`
 	MaxConcurrentToolCalls    int               `json:"max_concurrent_tool_calls,omitempty"`
 	MaxConcurrentSubprocesses int               `json:"max_concurrent_subprocesses,omitempty"`
+	TeamMode                  bool              `json:"team_mode,omitempty"`
 }
 
 type GlobalConfig = Config

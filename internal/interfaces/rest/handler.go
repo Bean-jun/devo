@@ -76,6 +76,7 @@ func (h *Handler) getDefaultAgent() *agent.Agent {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/health", h.GetHealth)
 	mux.HandleFunc("GET /api/v1/version", h.GetVersion)
+	mux.HandleFunc("GET /api/v1/agents", h.GetAgents)
 
 	mux.HandleFunc("GET /api/v1/current-workspace", h.GetCurrentWorkspace)
 	mux.HandleFunc("POST /api/v1/current-workspace", h.SetCurrentWorkspace)
@@ -148,6 +149,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/global/config", h.GetGlobalConfig)
 	mux.HandleFunc("PUT /api/v1/global/config", h.SetGlobalConfig)
+	mux.HandleFunc("PUT /api/v1/config/team-mode", h.SetTeamMode)
 
 	mux.HandleFunc("GET /api/v1/update/check", h.CheckUpdate)
 }
@@ -163,6 +165,29 @@ func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"version": h.version,
 	})
+}
+
+func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
+	agents := h.agentRegistry.List()
+	resp := make([]agentResponse, 0, len(agents))
+	for _, ag := range agents {
+		resp = append(resp, agentResponse{
+			ID:          ag.Config.ID,
+			Name:        ag.Config.Name,
+			Description: ag.Config.Description,
+			ModelID:     ag.Config.ModelID,
+			Builtin:     ag.Config.Builtin,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+type agentResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ModelID     string `json:"model_id"`
+	Builtin     bool   `json:"builtin"`
 }
 
 func (h *Handler) GetConfigStatus(w http.ResponseWriter, r *http.Request) {

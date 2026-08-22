@@ -9,7 +9,6 @@ import (
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
 	"devo/internal/core/skills"
-	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/mcp"
 	"devo/internal/taskexec/tools"
 )
@@ -18,7 +17,6 @@ func newTestAgent(t *testing.T, id, name string) *Agent {
 	t.Helper()
 	store := session.NewInMemoryStore()
 	cfg := config.DefaultConfig()
-	llm := llmclient.NewMockClient()
 	registry := tools.NewRegistry()
 	approvalMgr := approval.NewManager()
 	memoryFileStore, _ := memory.DefaultFileStore()
@@ -26,7 +24,7 @@ func newTestAgent(t *testing.T, id, name string) *Agent {
 	skillsMgr := skills.NewManager(t.TempDir())
 	bgProcManager := tools.NewBackgroundProcessManager()
 	mcpMgr := mcp.NewManager(t.TempDir())
-	solidifier := skills.NewSolidifier(llm, skillsMgr, store)
+	solidifier := skills.NewSolidifier(nil, skillsMgr, store)
 
 	return New(Config{
 		ID:           id,
@@ -34,7 +32,7 @@ func newTestAgent(t *testing.T, id, name string) *Agent {
 		Description:  "Test agent",
 		SystemPrompt: "You are a test agent.",
 		Tools:        nil,
-	}, store, llm, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
+	}, store, registry, cfg, approvalMgr, memoryMgr, skillsMgr, bgProcManager, mcpMgr, solidifier)
 }
 
 func TestRegistry_NewRegistry(t *testing.T) {
@@ -198,4 +196,89 @@ func TestRegistry_Exists(t *testing.T) {
 			t.Error("expected Exists to return true for registered agent")
 		}
 	})
+}
+
+func TestRegistry_List(t *testing.T) {
+	defaultAgent := newTestAgent(t, "devo-default", "Devo")
+	r := NewRegistry(defaultAgent)
+
+	agents := r.List()
+	if len(agents) != 1 {
+		t.Fatalf("expected 1 agent, got %d", len(agents))
+	}
+	if agents[0].Config.ID != "devo-default" {
+		t.Errorf("expected 'devo-default', got %q", agents[0].Config.ID)
+	}
+
+	r.Register(newTestAgent(t, "custom-1", "Custom 1"))
+	r.Register(newTestAgent(t, "custom-2", "Custom 2"))
+
+	agents = r.List()
+	if len(agents) != 3 {
+		t.Fatalf("expected 3 agents, got %d", len(agents))
+	}
+}
+
+func TestRegistry_Unregister(t *testing.T) {
+	defaultAgent := newTestAgent(t, "devo-default", "Devo")
+	r := NewRegistry(defaultAgent)
+
+	r.Register(newTestAgent(t, "custom", "Custom"))
+
+	if err := r.Unregister("custom"); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if r.Exists("custom") {
+		t.Error("expected 'custom' to be unregistered")
+	}
+}
+
+func TestRegistry_Unregister_Default(t *testing.T) {
+	defaultAgent := newTestAgent(t, "devo-default", "Devo")
+	r := NewRegistry(defaultAgent)
+
+	err := r.Unregister("devo-default")
+	if err == nil {
+		t.Error("expected error when unregistering default agent")
+	}
+	if !r.Exists("devo-default") {
+		t.Error("expected default agent to still exist")
+	}
+}
+
+func TestRegistry_Unregister_NotFound(t *testing.T) {
+	defaultAgent := newTestAgent(t, "devo-default", "Devo")
+	r := NewRegistry(defaultAgent)
+
+	err := r.Unregister("nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent agent")
+	}
+}
+
+func TestRegistry_Unregister_EmptyID(t *testing.T) {
+	defaultAgent := newTestAgent(t, "devo-default", "Devo")
+	r := NewRegistry(defaultAgent)
+
+	err := r.Unregister("")
+	if err == nil {
+		t.Error("expected error for empty ID")
+	}
+}
+
+func TestRegistry_BuiltinTracking(t *testing.T) {
+	defaultAgent := newTestAgent(t, "devo-default", "Devo")
+	r := NewRegistry(defaultAgent)
+
+	builtin1 := newTestAgent(t, "code-reviewer", "Code Reviewer")
+	builtin1.Config.Builtin = true
+	r.Register(builtin1)
+
+	err := r.Unregister("code-reviewer")
+	if err == nil {
+		t.Error("expected error when unregistering builtin agent")
+	}
+	if !r.Exists("code-reviewer") {
+		t.Error("expected builtin agent to still exist")
+	}
 }

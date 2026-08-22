@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"devo/internal/core/session"
+	"devo/internal/core/skills"
 )
 
 func TestLoadAgentsMD_Found(t *testing.T) {
@@ -232,6 +233,45 @@ func TestDefaultSystemPrompt(t *testing.T) {
 	}
 }
 
+func TestCodeReviewerPrompt(t *testing.T) {
+	prompt := CodeReviewerPrompt()
+	if prompt == "" {
+		t.Error("expected non-empty code reviewer prompt")
+	}
+	if !strings.Contains(prompt, "Code Reviewer") {
+		t.Error("expected prompt to contain 'Code Reviewer'")
+	}
+	if !strings.Contains(prompt, "read-only") {
+		t.Error("expected prompt to mention read-only constraint")
+	}
+}
+
+func TestArchitectPrompt(t *testing.T) {
+	prompt := ArchitectPrompt()
+	if prompt == "" {
+		t.Error("expected non-empty architect prompt")
+	}
+	if !strings.Contains(prompt, "Architect") {
+		t.Error("expected prompt to contain 'Architect'")
+	}
+	if !strings.Contains(prompt, "read-only") {
+		t.Error("expected prompt to mention read-only constraint")
+	}
+}
+
+func TestTestWriterPrompt(t *testing.T) {
+	prompt := TestWriterPrompt()
+	if prompt == "" {
+		t.Error("expected non-empty test writer prompt")
+	}
+	if !strings.Contains(prompt, "Test Writer") {
+		t.Error("expected prompt to contain 'Test Writer'")
+	}
+	if !strings.Contains(prompt, "test code") {
+		t.Error("expected prompt to mention test code")
+	}
+}
+
 func TestNewAssembler_EmptyPrompt(t *testing.T) {
 	assembler := NewAssembler("")
 	if assembler.systemPrompt != DefaultSystemPrompt() {
@@ -252,6 +292,14 @@ type mockSkillsProvider struct{}
 
 func (m *mockSkillsProvider) GetActiveSkillsPrompt() string {
 	return "ACTIVE_SKILLS_CONTENT"
+}
+
+func (m *mockSkillsProvider) IsSkillAllowed(name string) bool {
+	return true
+}
+
+func (m *mockSkillsProvider) GetSkill(name string) (*skills.Skill, error) {
+	return nil, nil
 }
 
 type mockMemoryProvider struct{}

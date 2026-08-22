@@ -71,6 +71,7 @@ func NewCommandSheet() CommandSheet {
 			{
 				Name: "APP",
 				Commands: []CommandItem{
+					{"/team", "切换团队协作模式"},
 					{"/toggle-theme", "切换主题"},
 					{"/reasoning", "切换思维链模式 (关/低/中/高)"},
 					{"/model", "切换模型"},

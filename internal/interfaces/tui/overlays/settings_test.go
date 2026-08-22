@@ -106,6 +106,7 @@ func TestSettingsPanel_EditIntField(t *testing.T) {
 	sp := NewSettingsPanel()
 	sp.ProjectConfig = &api.ProjectConfigInfo{ToolCallLimit: intPtr(20)}
 	sp.BuildFields()
+	sp.Selected = 0
 
 	sp.StartEditing()
 	if !sp.Editing {
@@ -135,6 +136,7 @@ func TestSettingsPanel_EditInvalidInput(t *testing.T) {
 	sp := NewSettingsPanel()
 	sp.ProjectConfig = &api.ProjectConfigInfo{ToolCallLimit: intPtr(20)}
 	sp.BuildFields()
+	sp.Selected = 0
 
 	sp.StartEditing()
 	sp.EditBuffer = "abc"
@@ -148,6 +150,7 @@ func TestSettingsPanel_EditNegativeInput(t *testing.T) {
 	sp := NewSettingsPanel()
 	sp.ProjectConfig = &api.ProjectConfigInfo{ToolCallLimit: intPtr(20)}
 	sp.BuildFields()
+	sp.Selected = 0
 
 	sp.StartEditing()
 	sp.EditBuffer = "-1"
@@ -335,13 +338,14 @@ func TestSettingsPanel_SelectedField(t *testing.T) {
 	sp := NewSettingsPanel()
 	sp.ProjectConfig = &api.ProjectConfigInfo{ToolCallLimit: intPtr(20)}
 	sp.BuildFields()
+	sp.Selected = 0
 
 	f := sp.SelectedField()
 	if f == nil {
 		t.Fatal("SelectedField() 应返回字段")
 	}
 	if f.Key != "tool_call_limit" {
-		t.Errorf("第一个字段应为 tool_call_limit, got %s", f.Key)
+		t.Errorf("第一个项目字段应为 tool_call_limit, got %s", f.Key)
 	}
 }
 

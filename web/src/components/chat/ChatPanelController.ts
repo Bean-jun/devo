@@ -194,6 +194,18 @@ async function handleExecuteCommand(text: string) {
       }
       break
     }
+    case 'team': {
+      try {
+        const prev = sessionStore.teamModeEnabled
+        await sessionStore.setTeamMode(!prev)
+        sessionStore.teamModeEnabled = !prev
+        const label = !prev ? 'Team Mode 已开启' : 'Team Mode 已关闭'
+        uiStore.showToast('success', label)
+      } catch {
+        uiStore.showToast('error', 'Team Mode 切换失败')
+      }
+      break
+    }
     case 'compact': {
       const sid = sessionStore.currentSession?.id
       if (!sid) return

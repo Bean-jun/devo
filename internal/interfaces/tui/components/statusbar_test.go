@@ -59,6 +59,17 @@ func TestStatusBar_Yolo(t *testing.T) {
 	}
 }
 
+func TestStatusBar_TeamMode(t *testing.T) {
+	sb := NewStatusBar()
+	sb.Width = 80
+	sb.TeamMode = true
+
+	result := sb.Render()
+	if !strings.Contains(result, "TEAM") {
+		t.Error("Team Mode 应显示 TEAM 标记")
+	}
+}
+
 func TestStatusBar_Disconnected(t *testing.T) {
 	sb := NewStatusBar()
 	sb.Width = 80

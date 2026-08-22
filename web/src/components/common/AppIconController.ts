@@ -81,6 +81,7 @@ import {
   PhArrowCircleUp,
   PhArrowSquareOut,
   PhArrowRight,
+  PhUsers,
 } from '@phosphor-icons/vue'
 
 export interface AppIconProps {
@@ -171,6 +172,7 @@ const iconMap: Record<IconName, Component> = {
   'arrow-circle-up': PhArrowCircleUp,
   'arrow-square-out': PhArrowSquareOut,
   'arrow-right': PhArrowRight,
+  users: PhUsers,
 }
 
 export type IconName =
@@ -254,6 +256,7 @@ export type IconName =
   | 'arrow-circle-up'
   | 'arrow-square-out'
   | 'arrow-right'
+  | 'users'
 
 export function useAppIcon(props: AppIconProps) {
   const resolvedIcon = computed(() => iconMap[props.name])

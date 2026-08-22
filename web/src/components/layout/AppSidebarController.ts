@@ -111,6 +111,7 @@ const newSessionTitle = ref('')
 function newSession() {
   newSessionTitle.value = ''
   showNewSessionDialog.value = true
+  sessionStore.fetchAgents()
   nextTick(() => {
     const input = document.querySelector('.new-session-input') as HTMLInputElement
     input?.focus()
@@ -122,6 +123,7 @@ async function confirmNewSession() {
   await sessionStore.createSession({
     workingDirectory: dir,
     title: newSessionTitle.value.trim() || undefined,
+    agent_id: sessionStore.selectedAgentId || undefined,
   })
   showNewSessionDialog.value = false
   router.push('/chat')

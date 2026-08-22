@@ -212,6 +212,12 @@ func SaveGlobalConfig(cfg *Config) error {
 		existing["keep_recent"] = keepRecentData
 	}
 
+	teamModeData, err := json.Marshal(cfg.TeamMode)
+	if err != nil {
+		return fmt.Errorf("marshal team_mode: %w", err)
+	}
+	existing["team_mode"] = teamModeData
+
 	data, err := json.MarshalIndent(existing, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)

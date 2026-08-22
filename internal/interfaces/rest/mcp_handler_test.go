@@ -13,7 +13,6 @@ import (
 	"devo/internal/core/concurrency"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
-	"devo/internal/taskexec/llmclient"
 	"devo/internal/taskexec/mcp"
 )
 
@@ -46,7 +45,6 @@ func TestGetMcpTools_NoManager(t *testing.T) {
 }
 
 func setupMcpHandler(store *session.InMemoryStore, mcpManager *mcp.Manager) (*Handler, *agent.Registry) {
-	llm := llmclient.NewMockClient()
 	tmpDir := ""
 	approvalMgr := approval.NewManager()
 	memStore, _ := memory.NewFileStore(tmpDir)
@@ -55,7 +53,7 @@ func setupMcpHandler(store *session.InMemoryStore, mcpManager *mcp.Manager) (*Ha
 
 	ag := agent.New(
 		agent.Config{ID: "test", Name: "Test", Description: "Test agent", SystemPrompt: "", Tools: nil},
-		store, llm, nil, config.DefaultConfig(),
+		store, nil, config.DefaultConfig(),
 		approvalMgr, memManager, nil, nil, nil, nil,
 	)
 	registry := agent.NewRegistry(ag)

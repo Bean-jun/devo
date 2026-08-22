@@ -14,6 +14,7 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 	switch cmd {
 	case "/new":
 		m.overlay.Open(overlays.OverlayNewSession)
+		return m.fetchAgentsFromAPI()
 	case "/switch":
 		m.sessPicker.Sessions = m.sessions
 		m.overlay.Open(overlays.OverlaySession)
@@ -56,6 +57,15 @@ func (m *Model) routeCommand(cmd string) tea.Cmd {
 		return m.fetchWorkspacesFromAPI()
 	case "/help":
 		m.overlay.Open(overlays.OverlayHelp)
+	case "/team":
+		m.statusBar.TeamMode = !m.statusBar.TeamMode
+		m.settingsPanel.TeamMode = m.statusBar.TeamMode
+		teamMsg := "Team Mode 已开启"
+		if !m.statusBar.TeamMode {
+			teamMsg = "Team Mode 已关闭"
+		}
+		m.toast.Show(teamMsg, false)
+		return m.setTeamModeFromAPI(m.statusBar.TeamMode)
 	case "/toggle-theme":
 		components.ToggleTheme()
 		m.toast.Show("主题已切换", false)
@@ -162,6 +172,7 @@ func (m *Model) updateStatusInfo() {
 		SessionName:      sessionName,
 		SessionStatus:    status,
 		Yolo:             m.statusBar.Yolo,
+		TeamMode:         m.statusBar.TeamMode,
 		WorkingDir:       m.workingDir,
 		Version:          m.version,
 		InputTokens:      inputTokens,

@@ -7,7 +7,6 @@ import (
 	"devo/internal/core/concurrency"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
-	"devo/internal/taskexec/llmclient"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +17,6 @@ import (
 
 func setupTestServerWithProjectDir(dir string) (*httptest.Server, *session.InMemoryStore) {
 	store := session.NewInMemoryStore()
-	llm := llmclient.NewMockClient()
 	tmpDir, err := os.MkdirTemp("", "devo-test-*")
 	if err != nil {
 		panic(err)
@@ -33,7 +31,7 @@ func setupTestServerWithProjectDir(dir string) (*httptest.Server, *session.InMem
 
 	ag := agent.New(
 		agent.Config{ID: "test", Name: "Test", Description: "Test agent", SystemPrompt: "", Tools: nil},
-		store, llm, nil, config.DefaultConfig(),
+		store, nil, config.DefaultConfig(),
 		approvalMgr, memManager, nil, nil, nil, nil,
 	)
 	registry := agent.NewRegistry(ag)

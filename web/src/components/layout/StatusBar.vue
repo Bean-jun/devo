@@ -17,6 +17,7 @@ const {
   renameValue,
   renameInputRef,
   yoloLoading,
+  teamModeLoading,
   spinnerChar,
   activityText,
   sessionName,
@@ -30,6 +31,7 @@ const {
   cancelRename,
   toggleTheme,
   toggleYolo,
+  toggleTeamMode,
   connectionStatusText,
   connectionColor,
   serverPort,
@@ -59,7 +61,7 @@ useKeyboard([
     ref="statusbarRef"
     v-if="sessionStore.currentSession"
     class="statusbar"
-    :class="[density, { yolo: sessionStore.yoloEnabled }]"
+    :class="[density, { yolo: sessionStore.yoloEnabled, team: sessionStore.teamModeEnabled }]"
     data-test="status-bar"
   >
     <div class="statusbar-left">
@@ -93,6 +95,19 @@ useKeyboard([
       >
         <AppIcon :name="yoloLoading ? 'hourglass' : 'fire'" :size="16" :color="sessionStore.yoloEnabled ? '#ff9500' : undefined" class="yolo-icon" />
         <span v-if="density !== 'compact'" class="yolo-label" :class="{ on: sessionStore.yoloEnabled }">YOLO</span>
+      </button>
+      <button
+        class="team-toggle"
+        :class="{
+          active: sessionStore.teamModeEnabled,
+          mini: density === 'compact',
+        }"
+        :title="sessionStore.teamModeEnabled ? 'Team Mode 已开启 - 点击关闭' : 'Team Mode - 点击开启多 Agent 协作'"
+        :disabled="teamModeLoading"
+        @click="toggleTeamMode"
+      >
+        <AppIcon :name="teamModeLoading ? 'hourglass' : 'users'" :size="16" :color="sessionStore.teamModeEnabled ? '#58a6ff' : undefined" class="team-icon" />
+        <span v-if="density !== 'compact'" class="team-label" :class="{ on: sessionStore.teamModeEnabled }">TEAM</span>
       </button>
     </div>
     <div v-if="density === 'full' && uiStore.activityActive" class="statusbar-center">

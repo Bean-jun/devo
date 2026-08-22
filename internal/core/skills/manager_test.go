@@ -492,3 +492,119 @@ func TestManager_MultipleSkillsWithActiveFilter(t *testing.T) {
 		t.Error("should not contain full instructions in catalog")
 	}
 }
+
+func TestFilteredSkillsView_GetActiveSkillsPrompt(t *testing.T) {
+	dir := t.TempDir()
+	mgr := NewManager(dir)
+	createTestSkill(t, dir, "python", "python", "Python expert", "# Python Skill\nUse type hints.")
+	createTestSkill(t, dir, "react", "react", "React expert", "# React Skill\nUse hooks.")
+	mgr.ReloadSkills()
+
+	view := mgr.WithFilter([]string{"python"})
+	prompt := view.GetActiveSkillsPrompt()
+
+	if !strings.Contains(prompt, "python") {
+		t.Error("expected 'python' in filtered prompt")
+	}
+	if strings.Contains(prompt, "react") {
+		t.Error("expected 'react' NOT in filtered prompt")
+	}
+}
+
+func TestFilteredSkillsView_IsSkillAllowed(t *testing.T) {
+	dir := t.TempDir()
+	mgr := NewManager(dir)
+	createTestSkill(t, dir, "python", "python", "Python expert", "# Python Skill")
+	createTestSkill(t, dir, "react", "react", "React expert", "# React Skill")
+	mgr.ReloadSkills()
+
+	view := mgr.WithFilter([]string{"python"})
+
+	if !view.IsSkillAllowed("python") {
+		t.Error("expected 'python' to be allowed")
+	}
+	if view.IsSkillAllowed("react") {
+		t.Error("expected 'react' to NOT be allowed")
+	}
+}
+
+func TestFilteredSkillsView_GetSkill(t *testing.T) {
+	dir := t.TempDir()
+	mgr := NewManager(dir)
+	createTestSkill(t, dir, "python", "python", "Python expert", "# Python Skill")
+	mgr.ReloadSkills()
+
+	view := mgr.WithFilter([]string{"python"})
+
+	skill, err := view.GetSkill("python")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if skill.Name != "python" {
+		t.Errorf("expected skill name 'python', got %q", skill.Name)
+	}
+
+	_, err = view.GetSkill("react")
+	if err == nil {
+		t.Error("expected error for disallowed skill")
+	}
+}
+
+func TestFilteredSkillsView_NoFilter(t *testing.T) {
+	dir := t.TempDir()
+	mgr := NewManager(dir)
+	createTestSkill(t, dir, "python", "python", "Python expert", "# Python Skill")
+	createTestSkill(t, dir, "react", "react", "React expert", "# React Skill")
+	mgr.ReloadSkills()
+
+	view := mgr.WithFilter(nil)
+	prompt := view.GetActiveSkillsPrompt()
+
+	if !strings.Contains(prompt, "python") {
+		t.Error("expected 'python' in prompt")
+	}
+	if !strings.Contains(prompt, "react") {
+		t.Error("expected 'react' in prompt")
+	}
+	if !view.IsSkillAllowed("python") {
+		t.Error("expected 'python' to be allowed")
+	}
+	if !view.IsSkillAllowed("react") {
+		t.Error("expected 'react' to be allowed")
+	}
+}
+
+func TestFilteredSkillsView_EmptyFilter(t *testing.T) {
+	dir := t.TempDir()
+	mgr := NewManager(dir)
+	createTestSkill(t, dir, "python", "python", "Python expert", "# Python Skill")
+	mgr.ReloadSkills()
+
+	view := mgr.WithFilter([]string{})
+	prompt := view.GetActiveSkillsPrompt()
+
+	if strings.Contains(prompt, "python") {
+		t.Error("expected 'python' NOT in prompt with empty filter")
+	}
+	if view.IsSkillAllowed("python") {
+		t.Error("expected 'python' to NOT be allowed with empty filter")
+	}
+	_, err := view.GetSkill("python")
+	if err == nil {
+		t.Error("expected error for disallowed skill with empty filter")
+	}
+}
+
+func TestFilteredSkillsView_ListSkillResources(t *testing.T) {
+	dir := t.TempDir()
+	mgr := NewManager(dir)
+	createTestSkill(t, dir, "python", "python", "Python expert", "# Python Skill")
+	mgr.ReloadSkills()
+
+	view := mgr.WithFilter([]string{"python"})
+	scripts, refs, assets := view.ListSkillResources("")
+
+	if len(scripts) != 0 || len(refs) != 0 || len(assets) != 0 {
+		t.Error("expected empty resource lists for empty location")
+	}
+}

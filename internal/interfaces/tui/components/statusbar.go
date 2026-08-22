@@ -12,6 +12,7 @@ type StatusBar struct {
 	Processing       bool
 	Paused           bool
 	Yolo             bool
+	TeamMode         bool
 	Connected        bool
 	Width            int
 	ServerPort       string
@@ -57,7 +58,17 @@ func (s *StatusBar) Render() string {
 			Render(" YOLO ")
 	}
 
+	team := ""
+	if s.TeamMode {
+		team = lipgloss.NewStyle().
+			Foreground(ColorAccent()).Bold(true).
+			Render(" TEAM ")
+	}
+
 	left := session + "  " + statusDot
+	if team != "" {
+		left += "  " + team
+	}
 	if yolo != "" {
 		left += "  " + yolo
 	}

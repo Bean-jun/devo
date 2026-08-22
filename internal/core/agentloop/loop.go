@@ -47,7 +47,7 @@ type Loop struct {
 	pathLockManager  *concurrency.PathLockManager
 	archiveManager   *archive.ArchiveManager
 	memoryManager    *memory.Manager
-	skillsManager    *skills.Manager
+	skillsManager    prompt.SkillsProvider
 	solidifier       *skills.Solidifier
 	bgManager        *tools.BackgroundProcessManager
 	mcpMgr           *mcp.Manager
@@ -64,7 +64,7 @@ func New(
 	cfg *config.Config,
 	approvalMgr *approval.Manager,
 	memoryMgr *memory.Manager,
-	skillsMgr *skills.Manager,
+	skillsProvider prompt.SkillsProvider,
 	bgProcManager *tools.BackgroundProcessManager,
 	mcpMgr *mcp.Manager,
 	solidifier *skills.Solidifier,
@@ -78,8 +78,8 @@ func New(
 	if memoryMgr != nil {
 		assembler.SetMemoryProvider(memoryMgr)
 	}
-	if skillsMgr != nil {
-		assembler.SetSkillsProvider(skillsMgr)
+	if skillsProvider != nil {
+		assembler.SetSkillsProvider(skillsProvider)
 	}
 	l := &Loop{
 		cfg:              cfg,
@@ -94,7 +94,7 @@ func New(
 		pathLockManager:  pathLockManager,
 		archiveManager:   archive.NewArchiveManager(store, pathLockManager),
 		memoryManager:    memoryMgr,
-		skillsManager:    skillsMgr,
+		skillsManager:    skillsProvider,
 		solidifier:       solidifier,
 		bgManager:        bgProcManager,
 		mcpMgr:           mcpMgr,
@@ -142,6 +142,13 @@ func (l *Loop) UpdateLLMClient(client llmclient.Client) {
 	defer l.mu.Unlock()
 	l.llmClient = client
 	l.compressor.UpdateLLMClient(client)
+}
+
+func (l *Loop) ListTools() []tools.Tool {
+	if l.toolExecutor == nil {
+		return nil
+	}
+	return l.toolExecutor.ListTools()
 }
 
 func (l *Loop) ProcessMessage(ctx context.Context, sessionID string, msg session.Message) error {
@@ -297,7 +304,14 @@ func (l *Loop) GetApprovalManager() *approval.Manager {
 }
 
 func (l *Loop) GetSkillsManager() *skills.Manager {
-	return l.skillsManager
+	switch sp := l.skillsManager.(type) {
+	case *skills.Manager:
+		return sp
+	case *skills.FilteredSkillsView:
+		return sp.GetManager()
+	default:
+		return nil
+	}
 }
 
 func (l *Loop) SetSolidifier(sol *skills.Solidifier) {

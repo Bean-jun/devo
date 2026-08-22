@@ -15,6 +15,7 @@ export function useStatusBar(getDensity?: () => string) {
   const renameValue = ref('')
   const renameInputRef = ref<HTMLInputElement>()
   const yoloLoading = ref(false)
+  const teamModeLoading = ref(false)
 
   const SPINNER_CHARS = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']
   const spinnerFrame = ref(0)
@@ -98,6 +99,21 @@ async function toggleYolo() {
   }
 }
 
+async function toggleTeamMode() {
+  teamModeLoading.value = true
+  const prev = sessionStore.teamModeEnabled
+  try {
+    await sessionStore.setTeamMode(!prev)
+    sessionStore.teamModeEnabled = !prev
+    const label = !prev ? 'Team Mode 已开启' : 'Team Mode 已关闭'
+    uiStore.showToast('success', label)
+  } catch {
+    uiStore.showToast('error', 'Team Mode 切换失败')
+  } finally {
+    teamModeLoading.value = false
+  }
+}
+
 const connectionStatusText = computed(() => {
   switch (uiStore.connectionStatus) {
     case 'connected': return '已连接'
@@ -157,6 +173,7 @@ function showUpdateModal() {
     renameValue,
     renameInputRef,
     yoloLoading,
+    teamModeLoading,
     spinnerChar,
     activityText,
     sessionName,
@@ -170,6 +187,7 @@ function showUpdateModal() {
     cancelRename,
     toggleTheme,
     toggleYolo,
+    toggleTeamMode,
     connectionStatusText,
     connectionColor,
     serverPort,

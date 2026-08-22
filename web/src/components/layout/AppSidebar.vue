@@ -204,6 +204,18 @@ const {
           @keydown.enter="confirmNewSession"
           @keydown.escape.stop="cancelNewSession"
         />
+        <label v-if="sessionStore.agents.length > 0" class="new-session-label" style="margin-top: 12px;">选择 Agent</label>
+        <select
+          v-if="sessionStore.agents.length > 0"
+          v-model="sessionStore.selectedAgentId"
+          class="new-session-input agent-select"
+        >
+          <option
+            v-for="agent in sessionStore.agents"
+            :key="agent.id"
+            :value="agent.id"
+          >{{ agent.name }}</option>
+        </select>
         <div class="confirm-actions">
           <button class="confirm-btn confirm-btn-cancel" @click="cancelNewSession">取消</button>
           <button class="confirm-btn confirm-btn-primary" @click="confirmNewSession">创建</button>

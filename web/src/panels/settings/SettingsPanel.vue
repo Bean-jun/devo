@@ -38,6 +38,9 @@ const {
   handleModelTest,
   openAddModelForm,
   onModelAdded,
+  teamMode,
+  teamModeLoading,
+  handleTeamModeToggle,
 } = useSettingsPanel()
 </script>
 
@@ -157,6 +160,25 @@ const {
     </div>
 
     <div v-else class="settings-content">
+      <div class="setting-section">
+        <div class="section-title">Team Mode</div>
+        <div class="setting-item setting-item-row">
+          <div>
+            <label>多 Agent 协作</label>
+            <div class="setting-hint">开启后主 Agent 可将任务委托给子 Agent</div>
+          </div>
+          <button
+            class="toggle-btn"
+            :class="{ active: teamMode }"
+            :disabled="teamModeLoading"
+            @click="handleTeamModeToggle"
+          >
+            <span class="toggle-knob" />
+            <span class="toggle-label">{{ teamMode ? '开' : '关' }}</span>
+          </button>
+        </div>
+      </div>
+
       <div class="setting-section">
         <div class="section-title">LLM 参数（全局默认）</div>
         <div class="setting-item">

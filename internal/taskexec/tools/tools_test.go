@@ -287,3 +287,56 @@ func TestRegistry_ExecuteUnknownTool(t *testing.T) {
 		t.Error("expected failure for unknown tool")
 	}
 }
+
+func TestRegistry_Filter(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&ReadFileTool{})
+	reg.Register(&ListFilesTool{})
+
+	filtered := reg.Filter([]string{"read_file"})
+	if filtered == nil {
+		t.Fatal("expected non-nil filtered registry")
+	}
+
+	if _, ok := filtered.Get("read_file"); !ok {
+		t.Error("expected 'read_file' to be in filtered registry")
+	}
+	if _, ok := filtered.Get("list_files"); ok {
+		t.Error("expected 'list_files' to NOT be in filtered registry")
+	}
+}
+
+func TestRegistry_Filter_UnknownTool(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&ReadFileTool{})
+
+	filtered := reg.Filter([]string{"unknown_tool"})
+	if filtered == nil {
+		t.Fatal("expected non-nil filtered registry")
+	}
+
+	if len(filtered.ListTools()) != 0 {
+		t.Errorf("expected 0 tools in filtered registry, got %d", len(filtered.ListTools()))
+	}
+}
+
+func TestRegistry_Filter_Nil(t *testing.T) {
+	var reg *Registry
+	filtered := reg.Filter([]string{"read_file"})
+	if len(filtered.ListTools()) != 0 {
+		t.Error("expected empty filtered registry for nil input")
+	}
+}
+
+func TestRegistry_Filter_EmptyInput(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(&ReadFileTool{})
+
+	filtered := reg.Filter(nil)
+	if filtered == nil {
+		t.Fatal("expected non-nil filtered registry")
+	}
+	if len(filtered.ListTools()) != 0 {
+		t.Errorf("expected 0 tools, got %d", len(filtered.ListTools()))
+	}
+}

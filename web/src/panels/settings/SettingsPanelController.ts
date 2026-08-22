@@ -74,6 +74,9 @@ export function useSettingsPanel() {
   const testingModelId = ref<string | null>(null)
   const testResult = ref<{ id: string; success: boolean; error?: string } | null>(null)
 
+  const teamMode = ref(false)
+  const teamModeLoading = ref(false)
+
   function getProjectPolicyLevel(key: string): string {
     return projectApprovalPolicy.value[key] ?? ''
   }
@@ -164,6 +167,7 @@ export function useSettingsPanel() {
         globalKeepRecent.value = data.keep_recent ?? null
         globalMaxTokens.value = data.llm?.max_tokens ?? null
         globalApprovalPolicy.value = data.approval_policy || {}
+        teamMode.value = data.team_mode ?? false
       }
     } catch {
       // ignore
@@ -231,6 +235,21 @@ export function useSettingsPanel() {
     showAddModelForm.value = false
   }
 
+  async function handleTeamModeToggle() {
+    teamModeLoading.value = true
+    const prev = teamMode.value
+    try {
+      await sessionStore.setTeamMode(!prev)
+      teamMode.value = !prev
+      uiStore.showToast('success', teamMode.value ? 'Team Mode 已开启' : 'Team Mode 已关闭')
+    } catch {
+      teamMode.value = prev
+      uiStore.showToast('error', '设置 Team Mode 失败')
+    } finally {
+      teamModeLoading.value = false
+    }
+  }
+
   onMounted(async () => {
     await fetchConfig()
     await fetchGlobalConfig()
@@ -274,5 +293,8 @@ export function useSettingsPanel() {
     handleModelTest,
     openAddModelForm,
     onModelAdded,
+    teamMode,
+    teamModeLoading,
+    handleTeamModeToggle,
   }
 }

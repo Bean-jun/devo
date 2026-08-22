@@ -14,13 +14,11 @@ import (
 	"devo/internal/core/concurrency"
 	"devo/internal/core/memory"
 	"devo/internal/core/session"
-	"devo/internal/taskexec/llmclient"
 )
 
 func setupMemoryTestServer(t *testing.T) (*httptest.Server, *session.InMemoryStore) {
 	t.Helper()
 	store := session.NewInMemoryStore()
-	llm := llmclient.NewMockClient()
 	pathLock := concurrency.NewPathLockManager()
 	approvalMgr := approval.NewManager()
 	memStore, err := memory.NewFileStore(t.TempDir())
@@ -31,7 +29,7 @@ func setupMemoryTestServer(t *testing.T) (*httptest.Server, *session.InMemorySto
 
 	ag := agent.New(
 		agent.Config{ID: "test", Name: "Test", Description: "Test agent", SystemPrompt: "", Tools: nil},
-		store, llm, nil, config.DefaultConfig(),
+		store, nil, config.DefaultConfig(),
 		approvalMgr, memManager, nil, nil, nil, nil,
 	)
 	registry := agent.NewRegistry(ag)

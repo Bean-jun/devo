@@ -15,6 +15,7 @@ export function useHelpPanel() {
     { key: 'Ctrl + K', desc: '打开命令面板' },
     { key: 'F2', desc: '重命名当前会话' },
     { key: 'Alt + Y', desc: '切换 YOLO 模式' },
+    { key: 'Alt + E', desc: '切换 Team Mode' },
     { key: 'Y', desc: '批准操作（审批弹窗中）' },
     { key: 'N', desc: '拒绝操作（审批弹窗中）' },
   ]
@@ -29,6 +30,7 @@ export function useHelpPanel() {
     { name: '/pause', desc: '暂停当前会话', args: '' },
     { name: '/resume', desc: '恢复当前会话', args: '' },
     { name: '/cancel', desc: '取消当前操作', args: '' },
+    { name: '/team', desc: '切换 Team Mode', args: '' },
     { name: '/help', desc: '显示帮助', args: '' },
   ]
 

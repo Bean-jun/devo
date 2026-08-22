@@ -359,6 +359,11 @@
   color: var(--color-text-tertiary);
 }
 
+.agent-select {
+  cursor: pointer;
+  appearance: auto;
+}
+
 .app-sidebar.collapsed {
   align-items: center;
   padding: 4px 0;
