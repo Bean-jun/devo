@@ -426,25 +426,6 @@ func (m *Model) handleAPIResponse(msg apiResponseMsg) (tea.Model, tea.Cmd) {
 	case "agents_loaded":
 		if agents, ok := msg.data.([]api.AgentInfo); ok {
 			m.agents = agents
-			newSessionOverride := true
-			if m.overlay.Current == overlays.OverlayNewSession {
-				m.newSessModal.Agents = make([]overlays.AgentItem, 0, len(agents))
-				for _, a := range agents {
-					item := overlays.AgentItem{
-						ID:          a.ID,
-						Name:        a.Name,
-						Description: a.Description,
-					}
-					m.newSessModal.Agents = append(m.newSessModal.Agents, item)
-					if a.ID == m.selectedAgentID {
-						m.newSessModal.Selected = len(m.newSessModal.Agents) - 1
-						newSessionOverride = false
-					}
-				}
-				if newSessionOverride && len(m.newSessModal.Agents) > 0 {
-					m.newSessModal.Selected = 0
-				}
-			}
 		}
 
 	case "agents_error":

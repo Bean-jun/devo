@@ -60,7 +60,6 @@ type Model struct {
 	models                []api.ModelInfo
 	activeModelName       string
 	agents                []api.AgentInfo
-	selectedAgentID       string
 	teamMode              bool
 	loading               map[overlays.OverlayType]bool
 	enableReasoning       bool

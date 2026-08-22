@@ -55,30 +55,7 @@ func New(
 		}
 	}
 
-	var toolExecutor agentloop.ToolExecutor
-	if cfg.Tools == nil {
-		toolExecutor = registry
-	} else {
-		toolExecutor = registry.Filter(cfg.Tools)
-	}
-
-	if !appCfg.TeamMode || cfg.SubAgentOf != "" {
-		toolNames := cfg.Tools
-		if toolNames == nil {
-			allTools := registry.ListTools()
-			toolNames = make([]string, 0, len(allTools))
-			for _, t := range allTools {
-				toolNames = append(toolNames, t.Name())
-			}
-		}
-		filtered := make([]string, 0, len(toolNames))
-		for _, name := range toolNames {
-			if name != "delegate_to" {
-				filtered = append(filtered, name)
-			}
-		}
-		toolExecutor = registry.Filter(filtered)
-	}
+	var toolExecutor agentloop.ToolExecutor = newDynamicToolExecutor(registry, cfg, appCfg)
 
 	var skillsProvider prompt.SkillsProvider
 	if skillsMgr != nil {

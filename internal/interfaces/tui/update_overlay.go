@@ -369,8 +369,7 @@ func (m *Model) handleOverlayEnter() (tea.Model, tea.Cmd) {
 
 	case overlays.OverlayNewSession:
 		m.overlay.Close()
-		agentID := m.newSessModal.SelectedAgentID()
-		return m, m.createSessionFromAPI(m.workingDir, defaultSessionTitle(), agentID)
+		return m, m.createSessionFromAPI(m.workingDir, defaultSessionTitle(), "")
 
 	case overlays.OverlayRename:
 		newName := m.renameModal.NewName
@@ -420,8 +419,6 @@ func (m *Model) handleOverlayEnter() (tea.Model, tea.Cmd) {
 
 func (m *Model) handleOverlayCursorUp() {
 	switch m.overlay.Current {
-	case overlays.OverlayNewSession:
-		m.newSessModal.CursorUp()
 	case overlays.OverlayCommand:
 		m.cmdSheet.CursorUp()
 	case overlays.OverlaySession:
@@ -451,8 +448,6 @@ func (m *Model) handleOverlayCursorUp() {
 
 func (m *Model) handleOverlayCursorDown() {
 	switch m.overlay.Current {
-	case overlays.OverlayNewSession:
-		m.newSessModal.CursorDown()
 	case overlays.OverlayCommand:
 		m.cmdSheet.CursorDown()
 	case overlays.OverlaySession:

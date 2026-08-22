@@ -10,34 +10,7 @@ import (
 )
 
 type NewSessionModal struct {
-	Width    int
-	Agents   []AgentItem
-	Selected int
-}
-
-type AgentItem struct {
-	ID          string
-	Name        string
-	Description string
-}
-
-func (nsm *NewSessionModal) CursorUp() {
-	if nsm.Selected > 0 {
-		nsm.Selected--
-	}
-}
-
-func (nsm *NewSessionModal) CursorDown() {
-	if nsm.Selected < len(nsm.Agents)-1 {
-		nsm.Selected++
-	}
-}
-
-func (nsm *NewSessionModal) SelectedAgentID() string {
-	if nsm.Selected >= 0 && nsm.Selected < len(nsm.Agents) {
-		return nsm.Agents[nsm.Selected].ID
-	}
-	return ""
+	Width int
 }
 
 func (nsm *NewSessionModal) Render() string {
@@ -53,23 +26,7 @@ func (nsm *NewSessionModal) Render() string {
 	lines = append(lines, " "+lipgloss.NewStyle().Foreground(components.ColorMuted()).Render("确定要创建新会话吗？"))
 	lines = append(lines, " "+lipgloss.NewStyle().Foreground(components.ColorMuted()).Render("当前会话将被保存。"))
 
-	if len(nsm.Agents) > 0 {
-		lines = append(lines, "")
-		lines = append(lines, " "+lipgloss.NewStyle().Foreground(components.ColorAccent()).Bold(true).Render("选择 Agent:"))
-
-		for i, a := range nsm.Agents {
-			prefix := "  "
-			style := lipgloss.NewStyle().Foreground(components.ColorMuted())
-			if i == nsm.Selected {
-				prefix = lipgloss.NewStyle().Foreground(components.ColorAccent()).Render(" \u25b8")
-				style = lipgloss.NewStyle().Foreground(components.ColorText())
-			}
-			line := fmt.Sprintf("%s%s %s", prefix, style.Render(a.Name), lipgloss.NewStyle().Foreground(components.ColorMuted()).Render(a.Description))
-			lines = append(lines, line)
-		}
-	}
-
-	lines = append(lines, components.PanelFooterStyle(innerW).Render("[\u2191\u2193] 选择 Agent  [Enter] 确认  [Esc] 取消"))
+	lines = append(lines, components.PanelFooterStyle(innerW).Render("[Enter] 确认  [Esc] 取消"))
 	return strings.Join(lines, "\n")
 }
 

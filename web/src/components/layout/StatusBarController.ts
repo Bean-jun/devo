@@ -101,11 +101,9 @@ async function toggleYolo() {
 
 async function toggleTeamMode() {
   teamModeLoading.value = true
-  const prev = sessionStore.teamModeEnabled
   try {
-    await sessionStore.setTeamMode(!prev)
-    sessionStore.teamModeEnabled = !prev
-    const label = !prev ? 'Team Mode 已开启' : 'Team Mode 已关闭'
+    await sessionStore.setTeamMode(!sessionStore.teamModeEnabled)
+    const label = sessionStore.teamModeEnabled ? 'Team Mode 已开启' : 'Team Mode 已关闭'
     uiStore.showToast('success', label)
   } catch {
     uiStore.showToast('error', 'Team Mode 切换失败')

@@ -4,21 +4,11 @@ import type { Session, CreateSessionRequest, TrustLevel } from '@/types/session'
 import { API_BASE } from '@/utils/constants'
 import { useUiStore } from '@/stores/ui'
 
-export interface AgentInfo {
-  id: string
-  name: string
-  description: string
-  model_id: string
-  builtin: boolean
-}
-
 export const useSessionStore = defineStore('session', () => {
   const currentSession = ref<Session | null>(null)
   const sessions = ref<Session[]>([])
   const isLoading = ref(false)
   const workingDirectory = ref('')
-  const agents = ref<AgentInfo[]>([])
-  const selectedAgentId = ref('')
 
   const isProcessing = computed(() => {
     const s = currentSession.value?.state?.toLowerCase()
@@ -321,20 +311,6 @@ export const useSessionStore = defineStore('session', () => {
     return data.approval_policy || {}
   }
 
-  async function fetchAgents(): Promise<void> {
-    try {
-      const res = await fetch(`${API_BASE}/agents`)
-      if (!res.ok) return
-      const data = await res.json()
-      agents.value = Array.isArray(data) ? data : []
-      if (selectedAgentId.value === '' && agents.value.length > 0) {
-        selectedAgentId.value = agents.value[0].id
-      }
-    } catch {
-      // ignore
-    }
-  }
-
   async function setTeamMode(enabled: boolean): Promise<void> {
     const res = await fetch(`${API_BASE}/config/team-mode`, {
       method: 'PUT',
@@ -392,9 +368,6 @@ export const useSessionStore = defineStore('session', () => {
     setGlobalApprovalPolicy,
     fetchProjectConfig,
     fetchGlobalApprovalPolicy,
-    agents,
-    selectedAgentId,
-    fetchAgents,
     setTeamMode,
     fetchTeamMode,
   }
